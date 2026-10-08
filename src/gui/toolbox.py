@@ -9,11 +9,12 @@ Aufbau:
 Start:          Doppelklick auf Toolbox.pyw im Repo (oder: pythonw src\\gui\\toolbox.py)
 Voraussetzung:  pip install customtkinter pystray pillow
 
-Neue Programme werden in tools/__init__.py eingetragen.
+Programme werden automatisch gefunden: jede Datei src/<programm>/<programm>_gui.py mit einem Eintrag TOOL.
 Einstellungen der Toolbox: toolbox_settings.json, Fehler: toolbox.log (beides neben diesem Skript).
 """
 
 import ctypes
+import importlib.util
 import json
 import logging
 import queue
@@ -21,32 +22,60 @@ import socket
 import sys
 import threading
 from pathlib import Path
-from tkinter import filedialog
 
 import customtkinter as ctk
-from PIL import Image, ImageDraw
+from PIL import Image
+
+sys.dont_write_bytecode = True             # keine __pycache__-Ordner im Projekt anlegen
 
 APP_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(APP_DIR))
+SRC_DIR = APP_DIR.parent                   # hier liegt je Programm ein Ordner (hardware_monitor\, …)
+sys.path.insert(0, str(APP_DIR))           # damit base, winutil usw. gefunden werden – auch von den Programmseiten
 
-from tools import CATEGORIES, TOOLS  # noqa: E402
-from tools.base import GOOD, MUTED, WARN, ToolInfo, ToolPage  # noqa: E402
+from base import GOOD, MUTED, Choice, Section, Switch, Text, ToolInfo, ToolPage  # noqa: E402
+from platzhalter import PlatzhalterPage  # noqa: E402
+
+CATEGORIES = ["Allgemein", "Werkzeuge", "Medien", "Netzwerk"]     # Tabs oben, in dieser Reihenfolge
+PLACEHOLDERS = [
+    ToolInfo("xxx-werkzeuge", "XXX", "Werkzeuge", "Platzhalter", PlatzhalterPage),
+    ToolInfo("xxx-medien", "XXX", "Medien", "Platzhalter", PlatzhalterPage),
+    ToolInfo("xxx-netzwerk", "XXX", "Netzwerk", "Platzhalter", PlatzhalterPage),
+]
 
 VERSION = "1.0"
 SETTINGS_FILE = APP_DIR / "toolbox_settings.json"
-ICON_FILE = APP_DIR / "toolbox.ico"
+ICON_FILE = APP_DIR / "toolbox.ico"        # Werkzeugkoffer auf blauem Grund
 GUI_PORT = 47816                 # damit ein zweiter Start nur das schon laufende Fenster nach vorne holt
 
 APPEARANCE = {"Hell": "light", "Dunkel": "dark", "System": "system"}
 DEFAULT_SETTINGS = {
     "appearance": "System",
     "close_to_tray": True,
-    "tools_dir": str(APP_DIR.parent),          # der src-Ordner, in dem gui\ und hardware_monitor\ liegen
     "tools": {},                               # eigene Einstellungen der einzelnen Programmseiten
 }
 
 logging.basicConfig(filename=APP_DIR / "toolbox.log", level=logging.INFO,
                     format="%(asctime)s %(levelname)s %(message)s")
+
+
+# ---------- Programme finden ----------
+def find_tools():
+    """Lädt jede src/<programm>/*_gui.py und sammelt deren TOOL-Eintrag.
+    Eine fehlerhafte Seite wird nur protokolliert, damit die übrigen Programme trotzdem erscheinen."""
+    tools = []
+    for file in sorted(SRC_DIR.glob("*/*_gui.py")):
+        try:
+            spec = importlib.util.spec_from_file_location(file.stem, file)
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[file.stem] = module
+            spec.loader.exec_module(module)
+            tools.append(module.TOOL)
+        except Exception:
+            logging.exception("Programmseite %s konnte nicht geladen werden", file)
+    return tools
+
+
+TOOLS = find_tools() + PLACEHOLDERS
 
 
 # ---------- Einstellungen ----------
@@ -59,8 +88,6 @@ def load_settings():
                 settings["appearance"] = saved["appearance"]
             if isinstance(saved.get("close_to_tray"), bool):
                 settings["close_to_tray"] = saved["close_to_tray"]
-            if isinstance(saved.get("tools_dir"), str) and saved["tools_dir"].strip():
-                settings["tools_dir"] = saved["tools_dir"]
             if isinstance(saved.get("tools"), dict):
                 settings["tools"] = saved["tools"]
     except (OSError, ValueError):
@@ -77,29 +104,6 @@ def save_settings(settings):
         return False
 
 
-# ---------- Symbol ----------
-def make_app_icon(size=256):
-    """Zeichnet das Toolbox-Symbol: ein Werkzeugkoffer auf blauem Grund."""
-    s = size / 64
-    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    d.rounded_rectangle([2 * s, 2 * s, 62 * s, 62 * s], radius=14 * s, fill=(59, 130, 246))
-    d.rounded_rectangle([22 * s, 13 * s, 42 * s, 25 * s], radius=4 * s, outline="white", width=max(1, int(4 * s)))
-    d.rounded_rectangle([11 * s, 21 * s, 53 * s, 51 * s], radius=6 * s, fill="white")
-    d.rectangle([11 * s, 33 * s, 53 * s, 36 * s], fill=(59, 130, 246))
-    d.rounded_rectangle([28 * s, 30 * s, 36 * s, 39 * s], radius=2 * s, fill="white",
-                        outline=(59, 130, 246), width=max(1, int(2 * s)))
-    return img
-
-
-def ensure_icon_file():
-    if not ICON_FILE.exists():
-        try:
-            make_app_icon(256).save(ICON_FILE, sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (256, 256)])
-        except OSError:
-            logging.exception("Symbol konnte nicht gespeichert werden")
-
-
 # ---------- Nur eine Toolbox gleichzeitig ----------
 def bring_existing_to_front():
     """Läuft die Toolbox schon? Dann deren Fenster zeigen lassen und True zurückgeben."""
@@ -113,78 +117,29 @@ def bring_existing_to_front():
 
 # ---------- Einstellungsseite (Zahnrad) ----------
 class GuiSettingsPage(ToolPage):
-    def build(self):
-        settings = self.app.settings
+    """Einstellungen der Toolbox selbst – liegen in self.app.settings (toolbox_settings.json)."""
 
-        card = self.section("Darstellung")
-        self.row_label(card, 2, "Design", pady=(6, 16))
-        mode = ctk.CTkSegmentedButton(card, values=list(APPEARANCE), command=self.set_appearance)
-        mode.set(settings["appearance"])
-        mode.grid(row=2, column=1, sticky="w", pady=(6, 16))
+    def load(self):
+        return self.app.settings
 
-        card = self.section("Fenster")
-        self.tray_switch = ctk.CTkSwitch(card, text="Beim Schließen in den Infobereich minimieren",
-                                         command=self.set_close_to_tray)
-        if settings["close_to_tray"]:
-            self.tray_switch.select()
-        self.tray_switch.grid(row=2, column=0, columnspan=3, sticky="w", padx=18, pady=(4, 2))
-        ctk.CTkLabel(card, text_color=MUTED, anchor="w", justify="left", wraplength=620,
-                     font=ctk.CTkFont(size=12),
-                     text="Die Toolbox läuft dann unten rechts als Symbol weiter. Doppelklick bzw. Klick öffnet sie "
-                          "wieder, Rechtsklick → Beenden schließt sie ganz.").grid(
-            row=3, column=0, columnspan=3, sticky="ew", padx=18, pady=(0, 16))
-
-        card = self.section("Programm-Ordner", "Der Ordner, in dem die einzelnen Programme liegen "
-                                            "(der src-Ordner mit hardware_monitor\\hardware_monitor.py).")
-        self.dir_entry = ctk.CTkEntry(card)
-        self.dir_entry.insert(0, settings["tools_dir"])
-        self.dir_entry.grid(row=2, column=0, columnspan=2, sticky="ew", padx=(18, 8), pady=6)
-        self.dir_entry.bind("<Return>", lambda e: self.set_tools_dir(self.dir_entry.get()))
-        self.dir_entry.bind("<FocusOut>", lambda e: self.set_tools_dir(self.dir_entry.get()))
-        ctk.CTkButton(card, text="Durchsuchen …", width=120, command=self.browse).grid(
-            row=2, column=2, padx=(0, 18), pady=6)
-        self.dir_status = ctk.CTkLabel(card, anchor="w", font=ctk.CTkFont(size=12))
-        self.dir_status.grid(row=3, column=0, columnspan=3, sticky="ew", padx=18, pady=(0, 16))
-        self.check_tools_dir()
-
-        card = self.section("Info")
-        ctk.CTkLabel(card, text=f"Toolbox {VERSION}\nEinstellungen: {SETTINGS_FILE}", anchor="w", justify="left",
-                     text_color=MUTED, font=ctk.CTkFont(size=12)).grid(
-            row=2, column=0, columnspan=3, sticky="ew", padx=18, pady=(0, 16))
-
-    def set_appearance(self, label):
-        self.app.settings["appearance"] = label
-        ctk.set_appearance_mode(APPEARANCE[label])
+    def save(self):
         self.app.save()
 
-    def set_close_to_tray(self):
-        self.app.settings["close_to_tray"] = bool(self.tray_switch.get())
-        self.app.save()
-        if not self.app.settings["close_to_tray"]:
+    def layout(self):
+        return [
+            Section("Darstellung", Choice("Design", "appearance", list(APPEARANCE))),
+            Section("Fenster",
+                    Switch("Beim Schließen in den Infobereich minimieren", key="close_to_tray"),
+                    Text("Die Toolbox läuft dann unten rechts als Symbol weiter. Doppelklick bzw. Klick öffnet sie "
+                         "wieder, Rechtsklick → Beenden schließt sie ganz.")),
+            Section("Info", Text(f"Toolbox {VERSION}\nEinstellungen: {SETTINGS_FILE}")),
+        ]
+
+    def on_change(self, key, value):
+        if key == "appearance":
+            ctk.set_appearance_mode(APPEARANCE[value])
+        elif key == "close_to_tray" and not value:
             self.app.stop_tray()
-
-    def browse(self):
-        chosen = filedialog.askdirectory(initialdir=self.app.settings["tools_dir"], title="Programm-Ordner (src) wählen")
-        if chosen:
-            self.dir_entry.delete(0, "end")
-            self.dir_entry.insert(0, str(Path(chosen)))
-            self.set_tools_dir(chosen)
-
-    def set_tools_dir(self, path):
-        path = str(Path(path.strip())) if path.strip() else DEFAULT_SETTINGS["tools_dir"]
-        if path != self.app.settings["tools_dir"]:
-            self.app.settings["tools_dir"] = path
-            self.app.save()
-        self.check_tools_dir()
-
-    def check_tools_dir(self):
-        folder = Path(self.app.settings["tools_dir"])
-        if not folder.is_dir():
-            self.dir_status.configure(text="⚠  Ordner existiert nicht", text_color=WARN)
-        elif (folder / "hardware_monitor" / "hardware_monitor.py").exists():
-            self.dir_status.configure(text="✓  Hardware-Monitor (hardware_monitor) gefunden", text_color=GOOD)
-        else:
-            self.dir_status.configure(text="⚠  hardware_monitor\\hardware_monitor.py nicht in diesem Ordner", text_color=WARN)
 
 
 # ---------- Hauptfenster ----------
@@ -224,7 +179,6 @@ class ToolboxApp(ctk.CTk):
 
     # --- Aufbau ---
     def set_window_icon(self):
-        ensure_icon_file()
         try:
             self.iconbitmap(str(ICON_FILE))      # nach iconbitmap() überschreibt CustomTkinter das Symbol nicht mehr
         except Exception:
@@ -236,7 +190,7 @@ class ToolboxApp(ctk.CTk):
         bar.columnconfigure(1, weight=1)
 
         ctk.CTkLabel(bar, text="  Toolbox", font=ctk.CTkFont(size=20, weight="bold"),
-                     image=ctk.CTkImage(make_app_icon(64), size=(28, 28)), compound="left").grid(
+                     image=ctk.CTkImage(Image.open(ICON_FILE), size=(28, 28)), compound="left").grid(
             row=0, column=0, padx=(18, 24), pady=12)
         self.tabs = ctk.CTkSegmentedButton(bar, values=CATEGORIES, command=self.show_category,
                                            font=ctk.CTkFont(size=14), height=34)
@@ -307,10 +261,6 @@ class ToolboxApp(ctk.CTk):
             page.on_show()
 
     # --- Hilfen für Programmseiten ---
-    @property
-    def tools_dir(self):
-        return Path(self.settings["tools_dir"])
-
     def tool_settings(self, tool_id):
         """Eigene Einstellungen einer Programmseite (werden mit den Toolbox-Einstellungen gespeichert)."""
         return self.settings["tools"].setdefault(tool_id, {})
@@ -373,7 +323,7 @@ class ToolboxApp(ctk.CTk):
                     pystray.MenuItem("Toolbox öffnen", lambda icon, item: self.ui_queue.put("show"), default=True),
                     pystray.MenuItem("Beenden", lambda icon, item: self.ui_queue.put("quit")),
                 )
-                self.tray = pystray.Icon("toolbox", make_app_icon(64), "Toolbox", menu)
+                self.tray = pystray.Icon("toolbox", Image.open(ICON_FILE), "Toolbox", menu)
                 self.tray.run_detached()
             except Exception:
                 logging.exception("Tray-Symbol konnte nicht angelegt werden – Toolbox wird stattdessen beendet")

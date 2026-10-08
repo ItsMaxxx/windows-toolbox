@@ -17,9 +17,13 @@ CREATE_NO_WINDOW = 0x08000000           # verhindert, dass bei jedem Aufruf kurz
 
 def run_hidden(args, timeout=20):
     """Führt einen Befehl unsichtbar aus. Gibt das Ergebnis zurück oder None, wenn das Programm fehlt."""
+    windows = sys.platform == "win32"
     try:
+        # Konsolenprogramme (PowerShell, schtasks) schreiben in der OEM-Codepage (cp850: "Überprüfen"),
+        # nicht in cp1252 – sonst bricht das Lesen der Ausgabe bei Umlauten ab
         return subprocess.run(args, capture_output=True, text=True, timeout=timeout,
-                              creationflags=CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+                              encoding="oem" if windows else None, errors="replace",
+                              creationflags=CREATE_NO_WINDOW if windows else 0)
     except (OSError, subprocess.TimeoutExpired):
         return None
 
