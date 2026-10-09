@@ -23,3 +23,7 @@ lhm/
 
 # --- Eigenes Python im Projekt (legt Einrichten.cmd an) ---
 runtime/
+
+# --- Claude Code (nur lokal) ---
+CLAUDE.md
+.claude/
