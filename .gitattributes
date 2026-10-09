@@ -1,0 +1,3 @@
+# Windows-Skripte brauchen CRLF – auch wenn das Repo mit core.autocrlf=false geklont wird
+*.cmd text eol=crlf
+*.ps1 text eol=crlf

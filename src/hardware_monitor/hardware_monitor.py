@@ -217,8 +217,7 @@ def collect(geraete=None):
     """
     # Wird die GPU nicht gebraucht, reicht fürs GPU-Icon NVML – wenn dort "GPU Core" steht (bei "auto" der Fall).
     # Andere Sensoren (Hot Spot, Memory Junction, …) kennt NVML nicht -> dann wie bisher über LHM.
-    use_nvml = (geraete is not None and "gpu" not in geraete and nvidia.available
-                and SETTINGS["gpu_sensor"] in ("auto", "GPU Core"))
+    use_nvml = geraete is not None and "gpu" not in geraete and nvml_fuer_gpu_icon()
     if geraete is not None:
         geraete = set(geraete) | {"cpu"} | (set() if use_nvml else {"gpu"})
     hardware = []
@@ -265,6 +264,53 @@ def sensor_priority(key, defaults):
     """Gewählter Sensor zuerst; falls es ihn nicht gibt, greift die automatische Reihenfolge."""
     chosen = SETTINGS.get(key, "auto")
     return defaults if chosen == "auto" else (chosen,) + defaults
+
+
+# ---------- Nur die beiden Icon-Werte ----------
+ICON_SENSOREN = {}       # "cpu"/"gpu" -> (Gerät, Sensor) als .NET-Objekte: einmal gesucht, danach direkt gelesen
+
+
+def nvml_fuer_gpu_icon():
+    """GPU-Icon über NVML statt LHM – geht nur für „GPU Core“ (bei "auto" der Fall), andere Sensoren kennt NVML nicht."""
+    return nvidia.available and SETTINGS["gpu_sensor"] in ("auto", "GPU Core")
+
+
+def icon_sensor_suchen(kind, priority):
+    """Wie pick(), liefert aber die .NET-Objekte (Gerät, Sensor) statt eines Werts – oder None."""
+    geraete = [hw for hw in pc.Hardware if HW_GERAET.get(enum_name(hw.HardwareType, HW_TYPES)) == kind]
+    for hw in geraete:
+        hw.Update()                              # manche Sensoren gibt es erst nach dem ersten Update
+    for wanted in priority:
+        for hw in geraete:
+            for s in hw.Sensors:
+                if s.SensorType == SensorType.Temperature and str(s.Name) == wanted and s.Value is not None:
+                    return hw, s
+    return None
+
+
+def icon_werte():
+    """Nur die beiden Temperaturen für die Icons: {"cpu": Wert, "gpu": Wert} (None = keiner da).
+
+    Je Gerät ein Update() und ein einziger gelesener Wert. collect() würde dafür jeden CPU-Sensor (Takt, Last,
+    Leistung, Spannung je Kern – bei einem 6-Kerner rund 50) einzeln über pythonnet abfragen.
+    """
+    werte = {}
+    for kind, key, defaults in (("cpu", "cpu_sensor", CPU_SENSORS), ("gpu", "gpu_sensor", GPU_SENSORS)):
+        if kind == "gpu" and nvml_fuer_gpu_icon():
+            werte[kind] = nvidia.read()
+            continue
+        treffer = ICON_SENSOREN.get(kind)
+        if treffer:
+            treffer[0].Update()
+        else:
+            treffer = icon_sensor_suchen(kind, sensor_priority(key, defaults))
+            if treffer:
+                ICON_SENSOREN[kind] = treffer
+        value = treffer[1].Value if treffer else None
+        if value is None:
+            ICON_SENSOREN.pop(kind, None)        # Sensor weg oder (noch) ohne Wert -> beim nächsten Mal neu suchen
+        werte[kind] = None if value is None else float(value)
+    return werte
 
 
 # ---------- Einstellungen speichern / laden ----------
@@ -365,6 +411,27 @@ def set_dpi_aware():
 _mutex = None
 
 
+def effizienzmodus(an):
+    """Effizienzmodus von Windows 11 (Blatt-Symbol im Task-Manager) ein- oder ausschalten.
+
+    Ein: Windows plant den Prozess stromsparend ein (EcoQoS – niedrige Taktrate, auf Hybrid-CPUs die
+    Effizienzkerne) und mit niedrigster Priorität. Für die Icons im Hintergrund reicht das; bei offenem Fenster
+    wird ausgeschaltet, damit die Oberfläche flüssig bleibt.
+    """
+    class PROCESS_POWER_THROTTLING_STATE(ctypes.Structure):
+        _fields_ = [("Version", ctypes.c_ulong), ("ControlMask", ctypes.c_ulong), ("StateMask", ctypes.c_ulong)]
+
+    drosseln = 0x1                                  # PROCESS_POWER_THROTTLING_EXECUTION_SPEED
+    try:
+        kernel32 = ctypes.windll.kernel32
+        prozess = ctypes.c_void_p(-1)               # Pseudo-Handle für den eigenen Prozess (GetCurrentProcess)
+        state = PROCESS_POWER_THROTTLING_STATE(1, drosseln, drosseln if an else 0)
+        kernel32.SetProcessInformation(prozess, 4, ctypes.byref(state), ctypes.sizeof(state))  # 4 = PowerThrottling
+        kernel32.SetPriorityClass(prozess, 0x40 if an else 0x20)                 # IDLE_ bzw. NORMAL_PRIORITY_CLASS
+    except (AttributeError, OSError):               # außerhalb von Windows / ältere Windows-Versionen
+        pass
+
+
 def already_running():
     """True, wenn das Programm schon läuft (wichtig, falls ein Launcher es doppelt startet)."""
     global _mutex
@@ -447,7 +514,12 @@ class HardwareMonitorApp:
     def fenster_braucht(self, geraete):
         """Meldet das Fenster: welche Geräte es gerade zeigt (False = zu oder minimiert)."""
         if geraete != self.fenster_bedarf:
+            if (geraete is False) != (self.fenster_bedarf is False):
+                effizienzmodus(geraete is False)    # nur bei geschlossenem Fenster sparsam laufen
             self.fenster_bedarf = geraete
+            if geraete is False:                 # alte Werte verwerfen – beim Öffnen sonst kurz „Live“ mit altem Stand
+                with self.lock:
+                    self.latest = EMPTY
             self.wake.set()                      # sofort passend messen
 
     def fenster_geometrie(self, geometry):
@@ -470,10 +542,19 @@ class HardwareMonitorApp:
         snap["loading"] = not self.hardware_ready
         return snap
 
-    def update_icons(self, snap):
+    def measure_icons(self):
+        """Nur die beiden Icon-Werte (sparsamer als measure(), siehe icon_werte())."""
+        try:
+            return icon_werte()
+        except Exception:
+            logging.exception("Fehler beim Auslesen der Icon-Werte")
+            ICON_SENSOREN.clear()                # beim nächsten Mal neu suchen
+            return {"cpu": None, "gpu": None}
+
+    def update_icons(self, werte):
+        """werte: {"cpu": Temperatur, "gpu": Temperatur} – None, wenn es keinen Wert gibt."""
         for kind, icon in self.icons.items():
-            info = snap[kind]
-            value = info["value"] if info else None
+            value = werte.get(kind)
             self.current[kind] = None if value is None else round(value, 1)
             text = "--" if value is None else f"{value:.0f}"
             if self.shown.get(kind) == text:
@@ -487,7 +568,7 @@ class HardwareMonitorApp:
         """Fenster zu (oder minimiert): alle `icon_interval` Sekunden nur CPU und GPU lesen.
         Fenster offen: alle `popup_interval` Sekunden die Geräte des gewählten Tabs (die Icons bekommen die Werte mit)."""
         try:
-            self.update_icons(self.measure(set()))           # Icons sofort mit echten Werten füllen …
+            self.update_icons(self.measure_icons())          # Icons sofort mit echten Werten füllen …
             enable_hardware(LATER_HARDWARE)                  # … dann den Rest nachladen (RAM dauert ~8 s)
             self.measure(None)                   # einmal alles "anwärmen": die erste Messung liefert teils 0
             self.hardware_ready = True
@@ -499,13 +580,14 @@ class HardwareMonitorApp:
                 if needed is not False and now >= next_window:
                     snap = self.measure(needed)
                     with self.lock:
-                        self.latest = snap
-                    self.update_icons(snap)
+                        if self.fenster_bedarf is not False:     # Fenster nicht während der Messung geschlossen
+                            self.latest = snap
+                    self.update_icons({k: snap[k]["value"] if snap[k] else None for k in ("cpu", "gpu")})
                     self.ui_queue.put("data")    # Fenster neu zeichnen lassen
                     next_window = now + self.settings["popup_interval"]
                     next_icon = now + self.settings["icon_interval"]
                 elif now >= next_icon:
-                    self.update_icons(self.measure(set()))
+                    self.update_icons(self.measure_icons())
                     next_icon = now + self.settings["icon_interval"]
 
                 due = min(next_icon, next_window) if needed is not False else next_icon
@@ -533,7 +615,6 @@ class HardwareMonitorApp:
                     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 server.bind(("127.0.0.1", IPC_PORT))     # nur von diesem PC aus erreichbar
                 server.listen()
-                server.settimeout(0.5)                   # regelmäßig nachsehen, ob beendet werden soll
             except OSError:
                 server.close()
                 server = None
@@ -543,12 +624,12 @@ class HardwareMonitorApp:
                 self.stop.wait(2)
         if server is None:
             return
+        # accept() wartet ohne Timeout, bis sich jemand meldet – kein Aufwachen im Leerlauf. Beim Beenden muss
+        # niemand den Thread wecken: er läuft als Daemon und endet mit dem Programm.
         with server:
             while not self.stop.is_set():
                 try:
                     conn, _ = server.accept()
-                except socket.timeout:
-                    continue
                 except OSError:
                     break
                 with conn:
@@ -575,6 +656,7 @@ class HardwareMonitorApp:
         SETTINGS.update(load_settings())
         SETTINGS["window"] = window
         self.shown.clear()                       # Icons neu zeichnen (z. B. neue Farbgrenzen)
+        ICON_SENSOREN.clear()                    # Icon-Sensoren neu suchen (z. B. anderer Sensor gewählt)
         for icon in self.icons.values():
             icon.update_menu()
         if self.fenster:
@@ -597,7 +679,8 @@ class HardwareMonitorApp:
                     return
         except queue.Empty:
             pass
-        self.root.after(100, self.poll_queue)
+        # Fenster zu: seltener nachsehen (ein Klick aufs Icon reagiert dann höchstens ¼ s später)
+        self.root.after(100 if self.fenster_bedarf is not False else 250, self.poll_queue)
 
     def quit(self):
         self.stop.set()
@@ -613,6 +696,7 @@ class HardwareMonitorApp:
         for kind in self.order:
             self.icons[kind].run_detached(setup=lambda ic, k=kind: (setattr(ic, "visible", True), self.ready[k].set()))
             self.ready[kind].wait(timeout=5)
+        effizienzmodus(True)                     # Fenster ist zu – aus erst, wenn es geöffnet wird (fenster_braucht)
         self.sensor_thread.start()
         self.ipc_thread.start()
         self.root.after(100, self.poll_queue)

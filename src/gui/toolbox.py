@@ -32,7 +32,8 @@ APP_DIR = Path(__file__).resolve().parent
 SRC_DIR = APP_DIR.parent                   # hier liegt je Programm ein Ordner (hardware_monitor\, …)
 sys.path.insert(0, str(APP_DIR))           # damit base, winutil usw. gefunden werden – auch von den Programmseiten
 
-from base import GOOD, MUTED, Choice, Section, Switch, Text, ToolInfo, ToolPage  # noqa: E402
+from base import (ACCENT, BAD, BAR, BORDER, GOOD, HOVER, MUTED, ON_ACCENT, SELECTED, TEXT, Choice,  # noqa: E402
+                  Section, Switch, Text, ToolInfo, ToolPage, apply_font, apply_theme)
 from platzhalter import PlatzhalterPage  # noqa: E402
 
 CATEGORIES = ["Allgemein", "Werkzeuge", "Medien", "Netzwerk"]     # Tabs oben, in dieser Reihenfolge
@@ -49,7 +50,7 @@ GUI_PORT = 47816                 # damit ein zweiter Start nur das schon laufend
 
 APPEARANCE = {"Hell": "light", "Dunkel": "dark", "System": "system"}
 DEFAULT_SETTINGS = {
-    "appearance": "System",
+    "appearance": "Dunkel",
     "close_to_tray": True,
     "tools": {},                               # eigene Einstellungen der einzelnen Programmseiten
 }
@@ -147,8 +148,9 @@ class ToolboxApp(ctk.CTk):
     def __init__(self):
         self.settings = load_settings()
         ctk.set_appearance_mode(APPEARANCE[self.settings["appearance"]])
-        ctk.set_default_color_theme("blue")
+        apply_theme()
         super().__init__()
+        apply_font(self)
 
         self.title("Toolbox")
         self.geometry("1060x720")
@@ -160,15 +162,16 @@ class ToolboxApp(ctk.CTk):
         self.current_page = None
         self.selected = {}                      # zuletzt gewähltes Programm je Tab
         self.sidebar_buttons = {}
+        self.tab_buttons = {}
         self.tray = None
         self.toast_job = None
 
-        self.columnconfigure(1, weight=1)
-        self.rowconfigure(1, weight=1)
+        self.columnconfigure(2, weight=1)
+        self.rowconfigure(2, weight=1)
         self.build_topbar()
         self.build_sidebar()
         self.main = ctk.CTkFrame(self, fg_color="transparent", corner_radius=0)
-        self.main.grid(row=1, column=1, sticky="nsew")
+        self.main.grid(row=2, column=2, sticky="nsew")
         self.main.columnconfigure(0, weight=1)
         self.main.rowconfigure(0, weight=1)
 
@@ -185,43 +188,60 @@ class ToolboxApp(ctk.CTk):
             pass                                 # z. B. außerhalb von Windows
 
     def build_topbar(self):
-        bar = ctk.CTkFrame(self, height=60, corner_radius=0, fg_color=("gray86", "gray14"))
-        bar.grid(row=0, column=0, columnspan=2, sticky="ew")
-        bar.columnconfigure(1, weight=1)
+        """Kopfleiste wie auf der Website: grünes Logo-Kästchen, Name, Tabs als schlichte Links, Linie darunter."""
+        bar = ctk.CTkFrame(self, height=60, corner_radius=0, fg_color=BAR)
+        bar.grid(row=0, column=0, columnspan=3, sticky="ew")
+        bar.columnconfigure(2, weight=1)
+        ctk.CTkFrame(self, height=1, corner_radius=0, fg_color=BORDER).grid(row=1, column=0, columnspan=3, sticky="ew")
 
-        ctk.CTkLabel(bar, text="  Toolbox", font=ctk.CTkFont(size=20, weight="bold"),
-                     image=ctk.CTkImage(Image.open(ICON_FILE), size=(28, 28)), compound="left").grid(
-            row=0, column=0, padx=(18, 24), pady=12)
-        self.tabs = ctk.CTkSegmentedButton(bar, values=CATEGORIES, command=self.show_category,
-                                           font=ctk.CTkFont(size=14), height=34)
-        self.tabs.grid(row=0, column=1, sticky="w")
+        logo = ctk.CTkFrame(bar, fg_color="transparent")
+        logo.grid(row=0, column=0, padx=(20, 28), pady=14)
+        ctk.CTkLabel(logo, text="⚒", width=28, height=28, corner_radius=7, fg_color=ACCENT, text_color=ON_ACCENT,
+                     font=ctk.CTkFont(size=16, weight="bold")).pack(side="left")
+        ctk.CTkLabel(logo, text="TOOLBOX", font=ctk.CTkFont(size=17, weight="bold")).pack(side="left", padx=(9, 0))
+
+        tabs = ctk.CTkFrame(bar, fg_color="transparent")
+        tabs.grid(row=0, column=1, sticky="w")
+        for category in CATEGORIES:
+            button = ctk.CTkButton(tabs, text=category, width=0, height=34, corner_radius=8, fg_color="transparent",
+                                   hover_color=HOVER, text_color=MUTED, font=ctk.CTkFont(size=14, weight="bold"),
+                                   command=lambda c=category: self.show_category(c))
+            button.pack(side="left", padx=2)
+            self.tab_buttons[category] = button
         self.toast_label = ctk.CTkLabel(bar, text="", text_color=GOOD, font=ctk.CTkFont(size=13))
-        self.toast_label.grid(row=0, column=2, padx=12)
-        self.gear = ctk.CTkButton(bar, text="⚙", width=40, height=36, font=ctk.CTkFont(size=22),
-                                  fg_color="transparent", text_color=("gray20", "gray85"),
-                                  hover_color=("gray78", "gray25"), command=self.show_settings)
-        self.gear.grid(row=0, column=3, padx=(0, 16))
+        self.toast_label.grid(row=0, column=3, padx=12)
+        self.gear = ctk.CTkButton(bar, text="⚙", width=40, height=36, corner_radius=8, font=ctk.CTkFont(size=22),
+                                  fg_color="transparent", text_color=MUTED, hover_color=HOVER,
+                                  command=self.show_settings)
+        self.gear.grid(row=0, column=4, padx=(0, 16))
 
     def build_sidebar(self):
-        self.sidebar = ctk.CTkFrame(self, width=230, corner_radius=0, fg_color=("gray88", "gray16"))
-        self.sidebar.grid(row=1, column=0, sticky="nsw")
+        self.sidebar = ctk.CTkFrame(self, width=230, corner_radius=0, fg_color=BAR)
+        self.sidebar.grid(row=2, column=0, sticky="nsw")
         self.sidebar.grid_propagate(False)       # feste Breite, auch bei kurzen Namen
         self.sidebar.columnconfigure(0, weight=1)
+        ctk.CTkFrame(self, width=1, corner_radius=0, fg_color=BORDER).grid(row=2, column=1, sticky="ns")
+
+    def mark(self, button, active):
+        """Gewählten Tab/Eintrag hervorheben wie die aktiven Links der Website (grün getönt, heller Text)."""
+        button.configure(fg_color=SELECTED if active else "transparent", text_color=TEXT if active else MUTED)
 
     # --- Navigation ---
     def show_category(self, category):
-        self.tabs.set(category)
+        for name, button in self.tab_buttons.items():
+            self.mark(button, name == category)
+        self.mark(self.gear, False)
         for child in self.sidebar.winfo_children():
             child.destroy()
         self.sidebar_buttons = {}
 
         ctk.CTkLabel(self.sidebar, text=category.upper(), text_color=MUTED, anchor="w",
-                     font=ctk.CTkFont(size=12, weight="bold")).grid(row=0, column=0, sticky="ew", padx=12, pady=(14, 6))
+                     font=ctk.CTkFont(size=11, weight="bold")).grid(row=0, column=0, sticky="ew", padx=14, pady=(16, 6))
         tools = sorted((t for t in TOOLS if t.category == category), key=lambda t: t.name.casefold())
         for row, tool in enumerate(tools, start=1):
             button = ctk.CTkButton(self.sidebar, text=tool.name, anchor="w", height=36, corner_radius=8,
-                                   fg_color="transparent", text_color=("gray10", "gray90"),
-                                   hover_color=("gray80", "gray24"), font=ctk.CTkFont(size=14),
+                                   fg_color="transparent", text_color=MUTED, hover_color=HOVER,
+                                   font=ctk.CTkFont(size=14, weight="bold"),
                                    command=lambda t=tool: self.show_tool(t))
             button.grid(row=row, column=0, sticky="ew", padx=8, pady=2)
             self.sidebar_buttons[tool.id] = button
@@ -235,15 +255,17 @@ class ToolboxApp(ctk.CTk):
 
     def show_tool(self, tool):
         self.selected[tool.category] = tool.id
+        self.mark(self.gear, False)
         for tool_id, button in self.sidebar_buttons.items():
-            button.configure(fg_color=("gray78", "gray26") if tool_id == tool.id else "transparent")
+            self.mark(button, tool_id == tool.id)
         if tool.id not in self.pages:
             self.pages[tool.id] = tool.page(self.main, self, tool)
         self.show_page(self.pages[tool.id])
 
     def show_settings(self):
         for button in self.sidebar_buttons.values():
-            button.configure(fg_color="transparent")
+            self.mark(button, False)
+        self.mark(self.gear, True)
         if "_settings" not in self.pages:
             info = ToolInfo("_settings", "Einstellungen", "", "Einstellungen der Toolbox selbst.", GuiSettingsPage)
             self.pages["_settings"] = GuiSettingsPage(self.main, self, info)
@@ -273,7 +295,7 @@ class ToolboxApp(ctk.CTk):
 
     def toast(self, text, error=False):
         """Kurze Meldung oben rechts, verschwindet nach ein paar Sekunden."""
-        self.toast_label.configure(text=text, text_color=("#c0392b", "#f87171") if error else GOOD)
+        self.toast_label.configure(text=text, text_color=BAD if error else GOOD)
         if self.toast_job:
             self.after_cancel(self.toast_job)
         self.toast_job = self.after(2500, lambda: self.toast_label.configure(text=""))

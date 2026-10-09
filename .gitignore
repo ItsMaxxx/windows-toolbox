@@ -20,3 +20,6 @@ desktop.ini
 
 # --- LibreHardwareMonitor (wird separat heruntergeladen) ---
 lhm/
+
+# --- Eigenes Python im Projekt (legt Einrichten.cmd an) ---
+runtime/

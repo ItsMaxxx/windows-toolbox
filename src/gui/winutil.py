@@ -113,17 +113,19 @@ def task_state(name):
     return info["state"] if info else None
 
 
-def register_task(name, script):
-    """Legt die Aufgabe "beim Anmelden mit Adminrechten starten" an oder überschreibt sie (UAC-Abfrage).
+def task_command(name, script, exe=None):
+    """PowerShell-Befehl, der die Aufgabe "beim Anmelden mit Adminrechten starten" anlegt oder überschreibt.
 
     Entspricht dem, was man sonst von Hand in der Aufgabenplanung einstellt: Trigger "Bei Anmeldung",
     "Mit höchsten Privilegien", auch im Akkubetrieb, ohne die 3-Tage-Zeitbegrenzung.
+    exe: Programm, das das Skript ausführt (Standard: pythonw.exe des laufenden Pythons).
+    Braucht Adminrechte – register_task() holt sie per UAC, setup/admin.py hat sie schon.
     """
     script = Path(script)
     lines = [
         "$ErrorActionPreference = 'Stop'",
         '$user = "$env:USERDOMAIN\\$env:USERNAME"',
-        f"$action = New-ScheduledTaskAction -Execute {ps_quote(pythonw_exe())} "
+        f"$action = New-ScheduledTaskAction -Execute {ps_quote(str(exe or pythonw_exe()))} "
         f"-Argument {ps_quote(chr(34) + str(script) + chr(34))} -WorkingDirectory {ps_quote(str(script.parent))}",
         "$trigger = New-ScheduledTaskTrigger -AtLogOn -User $user",
         "$principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Highest",
@@ -132,8 +134,13 @@ def register_task(name, script):
         f"Register-ScheduledTask -TaskName {ps_quote(name)} -Action $action -Trigger $trigger "
         "-Principal $principal -Settings $settings -Force | Out-Null",
     ]
+    return "\n".join(lines)
+
+
+def register_task(name, script, exe=None):
+    """Legt die Aufgabe an oder überschreibt sie (siehe task_command) – mit UAC-Abfrage."""
     # Als Base64 übergeben, damit Anführungszeichen und Leerzeichen in Pfaden keine Probleme machen
-    encoded = base64.b64encode("\n".join(lines).encode("utf-16-le")).decode("ascii")
+    encoded = base64.b64encode(task_command(name, script, exe).encode("utf-16-le")).decode("ascii")
     return run_elevated("powershell.exe", f"-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand {encoded}",
                         wait=True)
 

@@ -18,6 +18,8 @@ from base import (BAD, GOOD, MUTED, WARN, Button, Buttons, Choice, Combo, Entry,
 
 FOLDER = Path(__file__).resolve().parent
 SCRIPT = FOLDER / "hardware_monitor.py"
+# Von Einrichten.cmd angelegt: Kopie von pythonw.exe im Projekt-Python – so heißt der Prozess im Task-Manager
+MONITOR_EXE = FOLDER.parents[1] / "runtime" / "HardwareMonitor.exe"
 IPC_PORT = 47815                 # muss zu IPC_PORT in hardware_monitor.py passen
 DEFAULT_TASK = "HardwareMonitor"
 
@@ -47,6 +49,18 @@ def ipc(command, timeout=0.6):
 
 def fmt_temp(value):
     return "–" if value is None else f"{value:.0f} °C"
+
+
+def monitor_exe():
+    """Womit hardware_monitor.py läuft: runtime\\HardwareMonitor.exe, sonst pythonw.exe des laufenden Pythons."""
+    return str(MONITOR_EXE) if MONITOR_EXE.exists() else winutil.pythonw_exe()
+
+
+def same_path(a, b):
+    try:
+        return Path(a).resolve() == Path(b).resolve()
+    except (OSError, ValueError):
+        return False
 
 
 class HardwareMonitorPage(ToolPage):
@@ -91,14 +105,14 @@ class HardwareMonitorPage(ToolPage):
             Section("Detailfenster",
                     Text("Welche Werte im Detailfenster stehen, legst du in detailfenster_inhalt.py fest – "
                          "eine Zeile pro Wert. Änderungen erscheinen beim nächsten Öffnen des Fensters, "
-                         "alle Sensornamen zeigt dort der Tab „Alles“."),
+                         "alle Sensornamen zeigt „hardware_monitor.py --list“."),
                     Buttons(Button("Ordner öffnen", lambda: self.open(FOLDER), width=150, style="grau"))),
             Section("Erweitert",
                     Entry("Name der Aufgabe", value=self.task_name, command=self.on_task_name),
                     Buttons(Button("Ordner öffnen", lambda: self.open(FOLDER), **grey),
                             Button("Log öffnen", lambda: self.open(FOLDER / "hardware_monitor.log"), **grey),
                             Button("Einstellungsdatei öffnen", lambda: self.open(self.settings_file), **grey),
-                            Button("Alles zurücksetzen", self.reset, width=150, style="rahmen"))),
+                            Button("Alles zurücksetzen", self.reset, width=150, style="gefahr"))),
         ]
 
     # ---------- Einstellungen ----------
@@ -184,7 +198,7 @@ class HardwareMonitorPage(ToolPage):
             if info and info.get("state") != "Disabled" and self.task_points_here(info) and winutil.run_task(task):
                 return True
             # Keine passende aktive Aufgabe -> direkt mit Adminrechten starten; Windows fragt per UAC nach
-            return winutil.run_elevated(winutil.pythonw_exe(), f'"{SCRIPT}"', cwd=str(FOLDER))
+            return winutil.run_elevated(monitor_exe(), f'"{SCRIPT}"', cwd=str(FOLDER))
 
         def done(ok):
             if not ok:
@@ -224,9 +238,10 @@ class HardwareMonitorPage(ToolPage):
         self.app.run_async(lambda: winutil.task_info(task), self.show_task)
 
     def task_points_here(self, info):
-        """Startet die Aufgabe wirklich dieses hardware_monitor.py (und nicht z. B. eine alte Kopie unter C:\\Tools)?"""
+        """Startet die Aufgabe wirklich dieses hardware_monitor.py mit dem richtigen Programm – und nicht z. B. eine
+        alte Kopie unter C:\\Tools oder den Ort, an dem der Ordner vor dem Verschieben lag?"""
         arguments = (info.get("arguments") or "").strip().strip('"')
-        return Path(arguments).resolve() == SCRIPT.resolve() if arguments else False
+        return bool(arguments) and same_path(arguments, SCRIPT) and same_path(info.get("execute") or "", monitor_exe())
 
     def show_task(self, info):
         task, switch, label, button = self.task_name, self.w["autostart"], self.w["task_label"], self.w["task_button"]
@@ -245,8 +260,9 @@ class HardwareMonitorPage(ToolPage):
                             text_color=MUTED)
         else:
             button.configure(text="Aufgabe aktualisieren")
-            label.configure(text=f"⚠  Aufgabe „{task}“ startet einen anderen Ort: {info.get('arguments')}\n"
-                                 f"„Aufgabe aktualisieren“ stellt sie auf {SCRIPT} um.", text_color=WARN)
+            label.configure(text=f"⚠  Aufgabe „{task}“ startet einen anderen Ort: {info.get('execute')} "
+                                 f"{info.get('arguments')}\n„Aufgabe aktualisieren“ stellt sie auf diesen Ordner um "
+                                 f"(oder Einrichten.cmd erneut ausführen).", text_color=WARN)
 
     def setup_task(self):
         if not SCRIPT.exists():
@@ -263,7 +279,7 @@ class HardwareMonitorPage(ToolPage):
                            error=not ok)
             self.refresh_task()
 
-        self.app.run_async(lambda: winutil.register_task(task, SCRIPT), done)
+        self.app.run_async(lambda: winutil.register_task(task, SCRIPT, monitor_exe()), done)
 
     def toggle_autostart(self):
         enabled, task = bool(self.w["autostart"].get()), self.task_name

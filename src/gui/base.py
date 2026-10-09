@@ -23,17 +23,67 @@ Die Toolbox findet jede Datei src/<programm>/<programm>_gui.py mit einem Eintrag
 
 import json
 import os
+import tkinter.font as tkfont
 from dataclasses import dataclass
 
 import customtkinter as ctk
 
-# Farben jeweils als (hell, dunkel) – CustomTkinter nimmt automatisch die passende
-CARD = ("gray99", "gray18")
-BUTTON_OFF = ("gray80", "gray26")     # Farbe für gerade nicht nutzbare Knöpfe
-MUTED = ("gray40", "gray62")
-GOOD = ("#1f9d55", "#4ade80")
-BAD = ("#c0392b", "#f87171")
-WARN = ("#b7791f", "#fbbf24")
+# Farben jeweils als (hell, dunkel) – CustomTkinter nimmt automatisch die passende.
+# Dunkel = Stil der PROOFM-Website (Navy-Hintergrund, grüner Akzent), hell = dieselben Töne auf hellem Grund.
+BG = ("#eef2f6", "#0a1d2c")             # Fensterhintergrund
+BAR = ("#f8fafc", "#071822")            # Kopf- und Seitenleiste
+CARD = ("#ffffff", "#152736")
+BORDER = ("#d8e1ea", "#213443")
+FIELD = ("#f4f7fa", "#101d29")          # Eingabefelder, Auswahlknöpfe
+TEXT = ("#0f2333", "#e2e8f0")
+MUTED = ("#5b6f84", "#8fa3b8")
+ACCENT = ("#3ddc97", "#3ddc97")         # Hauptknöpfe
+ACCENT_HOVER = ("#5ce8aa", "#5ce8aa")
+ACCENT_DEEP = ("#1f9e6a", "#3ddc97")    # Schalter, Regler, Häkchen (auf hellem Grund etwas dunkler)
+ON_ACCENT = ("#062016", "#062016")      # Text auf grünen Knöpfen
+SELECTED = ("#c6eedb", "#1d4f47")       # gewählter Tab, Eintrag oder Auswahlknopf
+HOVER = ("#e6edf3", "#13242d")          # Maus über Tab oder Eintrag
+BUTTON = ("#e6edf3", "#233443")         # graue Knöpfe
+BUTTON_HOVER = ("#d8e1ea", "#31414f")
+BUTTON_OFF = ("#e6edf3", "#1b2c3a")     # Farbe für gerade nicht nutzbare Knöpfe
+TRACK = ("#c5d1dc", "#2a3b4a")          # Bahn von Schaltern und Reglern
+GOOD = ("#1f9e6a", "#3ddc97")
+BAD = ("#d64545", "#ff6464")
+WARN = ("#b7791f", "#f5c451")
+FONTS = ("Inter", "Segoe UI")           # erste installierte Schrift wird genommen
+
+
+def apply_theme():
+    """Farben und Formen aller CustomTkinter-Bausteine – vor dem ersten Fenster aufrufen."""
+    ctk.set_default_color_theme("blue")                     # Grundlage, die Farben kommen von hier
+    t = ctk.ThemeManager.theme
+    t["CTk"]["fg_color"] = t["CTkToplevel"]["fg_color"] = BG
+    t["CTkFrame"].update(fg_color=CARD, top_fg_color=CARD, border_color=BORDER)
+    t["CTkButton"].update(corner_radius=8, fg_color=ACCENT, hover_color=ACCENT_HOVER, border_color=BORDER,
+                          text_color=ON_ACCENT, text_color_disabled=MUTED)
+    t["CTkLabel"]["text_color"] = TEXT
+    field = {"corner_radius": 8, "border_width": 1, "fg_color": FIELD, "border_color": BORDER, "text_color": TEXT}
+    t["CTkEntry"].update(field, placeholder_text_color=MUTED)
+    t["CTkComboBox"].update(field, button_color=BORDER, button_hover_color=BUTTON_HOVER, text_color_disabled=MUTED)
+    t["CTkTextbox"].update(field, scrollbar_button_color=BUTTON, scrollbar_button_hover_color=BUTTON_HOVER)
+    t["CTkCheckBox"].update(corner_radius=5, border_width=2, fg_color=ACCENT_DEEP, hover_color=ACCENT_HOVER,
+                            border_color=MUTED, checkmark_color=ON_ACCENT, text_color=TEXT,
+                            text_color_disabled=MUTED)
+    t["CTkSwitch"].update(fg_color=TRACK, progress_color=ACCENT_DEEP, button_color=("#5b6f84", "#e2e8f0"),
+                          button_hover_color=("#0f2333", "#ffffff"), text_color=TEXT, text_color_disabled=MUTED)
+    t["CTkSlider"].update(fg_color=TRACK, progress_color=ACCENT_DEEP, button_color=ACCENT_DEEP,
+                          button_hover_color=ACCENT_HOVER)
+    t["CTkSegmentedButton"].update(corner_radius=8, fg_color=FIELD, selected_color=SELECTED,
+                                   selected_hover_color=SELECTED, unselected_color=FIELD,
+                                   unselected_hover_color=BUTTON, text_color=TEXT, text_color_disabled=MUTED)
+    t["CTkScrollbar"].update(button_color=BUTTON, button_hover_color=BUTTON_HOVER)
+    t["DropdownMenu"].update(fg_color=CARD, hover_color=SELECTED, text_color=TEXT)
+
+
+def apply_font(root):
+    """Schrift der Website (Inter), falls installiert – sonst Segoe UI. Braucht ein schon erstelltes Fenster."""
+    families = set(tkfont.families(root))
+    ctk.ThemeManager.theme["CTkFont"]["family"] = next((f for f in FONTS if f in families), FONTS[-1])
 
 
 @dataclass
@@ -97,11 +147,12 @@ class Text(Element):
 
 
 class Button:
-    """Ein Knopf in Buttons(...). style: "normal", "grau" oder "rahmen"."""
+    """Ein Knopf in Buttons(...). style: "normal" (grün), "grau", "rahmen" oder "gefahr" (roter Text)."""
     STYLES = {
         "normal": {},
-        "grau": {"fg_color": ("gray70", "gray30"), "hover_color": ("gray60", "gray35")},
-        "rahmen": {"fg_color": "transparent", "border_width": 1, "text_color": ("gray20", "gray85")},
+        "grau": {"fg_color": BUTTON, "hover_color": BUTTON_HOVER, "border_width": 1, "text_color": TEXT},
+        "rahmen": {"fg_color": "transparent", "hover_color": BUTTON, "border_width": 1, "text_color": TEXT},
+        "gefahr": {"fg_color": "transparent", "hover_color": BUTTON, "border_width": 1, "text_color": BAD},
     }
 
     def __init__(self, text, command, name=None, width=110, style="normal"):
@@ -302,7 +353,7 @@ class ToolPage(ctk.CTkScrollableFrame):
         self.columnconfigure(0, weight=1)
 
         ctk.CTkLabel(self, text=info.name, font=ctk.CTkFont(size=24, weight="bold"),
-                     anchor="w").grid(row=0, column=0, sticky="ew", padx=24, pady=(20, 0))
+                     anchor="w").grid(row=0, column=0, sticky="ew", padx=24, pady=(22, 0))
         if info.description:
             ctk.CTkLabel(self, text=info.description, text_color=MUTED, anchor="w", justify="left",
                          wraplength=640).grid(row=1, column=0, sticky="ew", padx=24, pady=(2, 8))
@@ -311,10 +362,10 @@ class ToolPage(ctk.CTkScrollableFrame):
         self.refresh()
 
     def add_section(self, number, section):
-        card = ctk.CTkFrame(self, fg_color=CARD, corner_radius=12)
+        card = ctk.CTkFrame(self, fg_color=CARD, corner_radius=12, border_width=1, border_color=BORDER)
         card.grid(row=number, column=0, sticky="ew", padx=24, pady=(10, 4))
         card.columnconfigure(1, weight=1)
-        ctk.CTkLabel(card, text=section.title, font=ctk.CTkFont(size=15, weight="bold"), anchor="w").grid(
+        ctk.CTkLabel(card, text=section.title, font=ctk.CTkFont(size=16, weight="bold"), anchor="w").grid(
             row=0, column=0, columnspan=2, sticky="ew", padx=18, pady=(14, 4))
         row = 1
         for element in section.elements:

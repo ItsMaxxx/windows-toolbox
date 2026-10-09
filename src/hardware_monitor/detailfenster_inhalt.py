@@ -5,18 +5,19 @@ Was im Detailfenster des Hardware-Monitors steht – Tab für Tab, eine Zeile pr
   Wert weglassen:   die Zeile löschen
   Reihenfolge:      so wie hier aufgeschrieben
 
-Die genauen Sensornamen stehen im Tab „Alles“ oder in der Ausgabe von `python hardware_monitor.py --list`
+Die genauen Sensornamen stehen in der Ausgabe von `python hardware_monitor.py --list`
 (dort in eckigen Klammern auch das Gerät für Gruppe(...): cpu, gpu, ram, mainboard, laufwerk, netzwerk).
 
   Gruppe("laufwerk", ...)          gilt für jedes Laufwerk einzeln
   Wert("Fan #*")                   * steht für beliebigen Text – hier: alle Lüfter
   Wert("GPU Core", typ="Takt")     typ nur nötig, wenn es den Namen mehrfach gibt
   Wert("Package", text="CPU gesamt")   eigene Beschriftung
+  Hardwaredaten()                  statt Gruppen: feste Daten wie Hersteller- und Produkt-IDs
 
 Gespeichert? Fenster schließen und wieder öffnen – die Änderungen sind sofort da.
 """
 
-from detailfenster import AlleSensoren, Gruppe, Tab, Wert
+from detailfenster import AlleSensoren, Gruppe, Hardwaredaten, Tab, Wert  # noqa: F401 (AlleSensoren siehe unten)
 
 FENSTER = [
     Tab("Temperaturen",
@@ -120,7 +121,11 @@ FENSTER = [
                Wert("Data Downloaded"),
                Wert("Data Uploaded"))),
 
-    Tab("Alles", AlleSensoren()),
+    # Feste Daten statt Messwerte: Hersteller, Modell, IDs, Seriennummern (siehe hardwaredaten.py)
+    Tab("Hardwaredaten", Hardwaredaten()),
+
+    # Alles, was LibreHardwareMonitor findet, zum Nachschlagen von Sensornamen – bei Bedarf wieder einkommentieren:
+    # Tab("Alles", AlleSensoren()),
 ]
 
 

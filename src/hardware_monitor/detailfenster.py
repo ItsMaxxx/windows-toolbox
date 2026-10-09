@@ -17,10 +17,13 @@ import fnmatch
 import importlib
 import logging
 import re
+import threading
 import tkinter as tk
 from ctypes import wintypes
 from pathlib import Path
 from tkinter import ttk
+
+import hardwaredaten
 
 INHALT_DATEI = Path(__file__).with_name("detailfenster_inhalt.py")
 ICON_DATEI = Path(__file__).resolve().parents[1] / "gui" / "toolbox.ico"
@@ -28,7 +31,7 @@ ICON_DATEI = Path(__file__).resolve().parents[1] / "gui" / "toolbox.ico"
 
 # ---------- Bausteine für detailfenster_inhalt.py ----------
 class Tab:
-    """Ein Tab im Fenster: Titel und darin die Gruppen (oder AlleSensoren())."""
+    """Ein Tab im Fenster: Titel und darin die Gruppen (oder AlleSensoren() bzw. Hardwaredaten())."""
 
     def __init__(self, titel, *gruppen):
         self.titel, self.gruppen = titel, gruppen
@@ -68,6 +71,11 @@ class Wert:
 
 class AlleSensoren:
     """Alles, was LibreHardwareMonitor findet – nach Gerät und Sensortyp sortiert. Gut zum Nachschlagen von Namen."""
+
+
+class Hardwaredaten:
+    """Feste Daten der Hardware: Hersteller, Modell, Hersteller- und Produkt-IDs, Seriennummern, Treiber.
+    Wird beim Öffnen des Fensters einmal über Windows gelesen (hardwaredaten.py), nicht laufend gemessen."""
 
 
 # ---------- Werte anzeigen ----------
@@ -117,7 +125,7 @@ def fmt_value(sensor_type, value):
     return f"{num(value, decimals)} {unit}".strip()
 
 
-AMPEL = {"grau": (160, 160, 160), "gruen": (90, 210, 120), "gelb": (245, 190, 40), "rot": (235, 60, 60)}
+AMPEL = {"grau": (143, 163, 184), "gruen": (61, 220, 151), "gelb": (245, 196, 81), "rot": (255, 100, 100)}
 
 
 def temp_stufe(value, settings):
@@ -157,9 +165,28 @@ def erklaere(sensor, inhalt):
 # ---------- Vom Inhalt zur Liste ----------
 def benoetigte_geraete(tab):
     """Welche Geräte der Mess-Thread für diesen Tab lesen muss (None = alle)."""
+    if ist_hwdaten(tab):
+        return set()                                     # nichts messen, nur die Icons laufen weiter
     if any(isinstance(g, AlleSensoren) for g in tab.gruppen):
         return None
     return {g.geraet for g in tab.gruppen}
+
+
+def ist_hwdaten(tab):
+    return any(isinstance(g, Hardwaredaten) for g in tab.gruppen)
+
+
+def hwdaten_zeilen(daten):
+    """Wie zeilen(), nur für den Tab Hardwaredaten: Bereich -> Gerät -> Felder. Felder stehen als "Info"-Sensor drin."""
+    result = []
+    for b, (bereich, geraete) in enumerate(daten):
+        result.append((f"b{b}", "", bereich, None))
+        for g, (name, felder) in enumerate(geraete):
+            head = f"b{b}|{g}"
+            result.append((head, f"b{b}", name, None))
+            result += [(f"{head}|{i}", head, feld, {"type": "Info", "name": feld, "value": wert})
+                       for i, (feld, wert) in enumerate(felder)]
+    return result
 
 
 def zeilen(tab, snap):
@@ -218,10 +245,11 @@ def dunkle_titelleiste(window):
 
 
 # ---------- Das Fenster ----------
-BG, BG_LIST, FG, SUB, HOVER = "#202020", "#2b2b2b", "#f0f0f0", "#9a9a9a", "#3a3a3a"
+# dieselben Farben wie die dunkle Toolbox (src/gui/base.py)
+BG, BG_LIST, FG, SUB, HOVER, AKZENT = "#0a1d2c", "#152736", "#e2e8f0", "#8fa3b8", "#213443", "#3ddc97"
 GROESSE = (560, 640)             # Startgröße bei 100 % Skalierung
 TITELLEISTE = 32                 # Höhe der Windows-Titelleiste (zählt bei der Fenstergröße nicht mit)
-HINWEIS = "Maus über einen Wert halten, um ihn erklärt zu bekommen."
+HINWEIS = "Maus über einen Wert halten, um ihn erklärt zu bekommen. Klick auf einen Gerätenamen kopiert ihn."
 
 
 class Detailfenster:
@@ -240,6 +268,12 @@ class Detailfenster:
         self.tabs = []                                   # [(Tab, Treeview)]
         self.signatur = {}                               # je Treeview: Aufbau beim letzten Zeichnen
         self.sensoren = {}                               # Zeilen-Schlüssel -> Sensor (für die Erklärung)
+        self.kopierbar = {}                              # Zeilen-Schlüssel -> Text, den ein Klick kopiert
+        self.knoepfe = {}                                # je Treeview: Bereichszeile -> „Kopieren“-Button darüber
+        self.meldung_job = None                          # „… kopiert“ steht gerade in der Fußzeile
+        self.hwdaten = None                              # zuletzt gelesene Hardwaredaten (hardwaredaten.lesen())
+        self.hwdaten_aktuell = False                     # False = beim nächsten Anzeigen neu lesen
+        self.hwdaten_thread = None
 
         win = self.win = tk.Toplevel(root)
         win.withdraw()
@@ -261,6 +295,12 @@ class Detailfenster:
             self.kopf[kind] = ttk.Label(kopf, text="–", style="KopfWert.TLabel")
             self.kopf[kind].pack(side="left", padx=(0, self.px(24)))
 
+        # rechts daneben: „Daten werden geladen …“, bis die erste passende Messung da ist, danach „● Live“
+        self.status = ttk.Label(kopf, style="KopfName.TLabel")
+        self.status.pack(side="right")
+        self.live = None                                 # True = „● Live“ steht schon da (bleibt bis zum Schließen)
+        self.status_setzen(False)
+
         self.notebook = ttk.Notebook(win)
         self.notebook.pack(fill="both", expand=True, padx=self.px(8))
         self.notebook.bind("<<NotebookTabChanged>>", lambda e: (self.melden(), self.aktualisieren()))
@@ -271,7 +311,7 @@ class Detailfenster:
 
         win.protocol("WM_DELETE_WINDOW", self.verstecken)          # ✕ blendet nur aus
         for event in ("<Map>", "<Unmap>"):                           # minimiert = nichts messen
-            win.bind(event, lambda e: e.widget is win and self.melden())
+            win.bind(event, lambda e: e.widget is win and self.sichtbarkeit())
         win.update_idletasks()
         dunkle_titelleiste(win)
 
@@ -290,11 +330,16 @@ class Detailfenster:
         style.configure("TNotebook.Tab", background=BG, foreground=SUB, borderwidth=0,
                         padding=(self.px(8), self.px(4)))
         style.map("TNotebook.Tab", background=[("selected", BG_LIST), ("active", HOVER)],
-                  foreground=[("selected", FG), ("active", FG)],
+                  foreground=[("selected", AKZENT), ("active", FG)],
                   expand=[("selected", (0, 0, 0, 0))])  # gewählten Tab nicht vergrößern (sonst wird es eng)
         style.configure("Treeview", background=BG_LIST, fieldbackground=BG_LIST, foreground=FG, borderwidth=0,
                         rowheight=self.px(22))
         style.map("Treeview", background=[("selected", BG_LIST)], foreground=[("selected", FG)])
+        style.configure("Knopf.TButton", background=HOVER, foreground=AKZENT, bordercolor=HOVER, lightcolor=HOVER,
+                        darkcolor=HOVER, focuscolor=HOVER, borderwidth=0, padding=(self.px(8), self.px(2)), width=0)
+        style.map("Knopf.TButton", background=[("pressed", FG), ("active", AKZENT)],
+                  foreground=[("active", BG)], lightcolor=[("active", AKZENT)], darkcolor=[("active", AKZENT)],
+                  bordercolor=[("active", AKZENT)])
         style.configure("Vertical.TScrollbar", background=HOVER, troughcolor=BG_LIST, bordercolor=BG_LIST,
                         arrowcolor=SUB, lightcolor=HOVER, darkcolor=HOVER, gripcount=0)
 
@@ -333,23 +378,47 @@ class Detailfenster:
             tree.master.destroy()
         self.tabs, self.signatur = [], {}
 
+        self.knoepfe = {}
         for tab in tabs:
             frame = ttk.Frame(self.notebook)
+            if ist_hwdaten(tab):                         # oben eine Leiste zum Kopieren von allem
+                leiste = ttk.Frame(frame)
+                leiste.pack(side="top", fill="x", pady=(self.px(6), self.px(4)))
+                for text, als_text, meldung, hilfe in (
+                        ("⧉  Modellnamen kopieren", hardwaredaten.modellnamen_als_text, "Modellnamen kopiert",
+                         "Kopiert nur die Modellnamen aller Komponenten, nach Bereichen sortiert."),
+                        ("⧉  Alles kopieren", hardwaredaten.alles_als_text, "Alle Hardwaredaten kopiert",
+                         "Kopiert alle Hardwaredaten als Text.")):
+                    knopf = ttk.Button(leiste, text=text, style="Knopf.TButton", cursor="hand2",
+                                       command=lambda f=als_text, m=meldung: self.alles_kopieren(f, m))
+                    knopf.pack(side="right", padx=(self.px(6), 0))
+                    knopf.bind("<Enter>", lambda e, h=hilfe: self.fusszeile(h))
+                    knopf.bind("<Leave>", lambda e: self.fusszeile(HINWEIS))
             tree = ttk.Treeview(frame, columns=("wert", "balken"), show="tree", selectmode="none")
-            tree.column("#0", width=self.px(250), stretch=True)
-            tree.column("wert", width=self.px(100), stretch=False, anchor="e")
-            tree.column("balken", width=self.px(100), stretch=False, anchor="center")
+            if ist_hwdaten(tab):                         # Feldname links, langer Wert (IDs) daneben
+                tree.column("#0", width=self.px(300), stretch=True)     # breit genug für lange Gerätenamen
+                tree.column("wert", width=self.px(260), stretch=True, anchor="w")
+                tree.column("balken", width=0, minwidth=0, stretch=False)
+            else:
+                tree.column("#0", width=self.px(250), stretch=True)
+                tree.column("wert", width=self.px(100), stretch=False, anchor="e")
+                tree.column("balken", width=self.px(100), stretch=False, anchor="center")
+            tree.tag_configure("bereich", foreground=SUB, font=("Segoe UI Semibold", 9))
             tree.tag_configure("gruppe", font=("Segoe UI Semibold", 10))
             tree.tag_configure("typ", foreground=SUB, font=("Segoe UI", 8))
             tree.tag_configure("hinweis", foreground=SUB)
             for stufe, rgb in AMPEL.items():             # Temperaturzeilen in Ampelfarbe
                 tree.tag_configure(stufe, foreground=hex_color(rgb))
             scroll = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
-            tree.configure(yscrollcommand=scroll.set)
+            # die „Kopieren“-Buttons liegen über der Liste und wandern beim Scrollen, Auf-/Zuklappen und Vergrößern mit
+            tree.configure(yscrollcommand=lambda *a, s=scroll, t=tree: (s.set(*a), self.knoepfe_platzieren(t)))
+            for event in ("<Configure>", "<<TreeviewOpen>>", "<<TreeviewClose>>"):
+                tree.bind(event, lambda e, t=tree: self.win.after_idle(self.knoepfe_platzieren, t))
             scroll.pack(side="right", fill="y")
             tree.pack(side="left", fill="both", expand=True)
             tree.bind("<Motion>", lambda e, t=tree: self.erklaeren(t.identify_row(e.y)))
             tree.bind("<Leave>", lambda e: self.erklaeren(None))
+            tree.bind("<Button-1>", lambda e, t=tree: self.kopieren(t, e))
             self.notebook.add(frame, text=tab.titel)
             self.tabs.append((tab, tree))
 
@@ -400,6 +469,23 @@ class Detailfenster:
         if self.sichtbar():
             self.app.fenster_geometrie(self.win.geometry())
 
+    def sichtbarkeit(self):
+        """Fenster geöffnet oder wiederhergestellt -> sofort messen lassen; versteckt oder minimiert -> nichts messen."""
+        if not self.sichtbar():
+            self.status_setzen(False, neu=True)          # beim nächsten Öffnen erst wieder „Daten werden geladen …“
+            self.hwdaten_aktuell = False                 # beim nächsten Öffnen neu lesen (z. B. neue USB-Geräte)
+        self.melden()
+
+    def status_setzen(self, geladen, neu=False):
+        """Oben rechts: „● Live“, sobald nach dem Öffnen die ersten Werte da sind, vorher „Daten werden geladen …“.
+        Einmal „Live“, bleibt es dabei bis zum Schließen – auch wenn ein Tabwechsel kurz auf neue Werte wartet.
+        neu=True setzt zurück (Fenster geschlossen oder minimiert)."""
+        live = bool(geladen or (self.live and not neu))
+        if live != self.live:
+            self.live = live
+            self.status.configure(text="●  Live" if live else "Daten werden geladen …",
+                                  foreground=AKZENT if live else SUB)
+
     def melden(self):
         """Dem Mess-Thread sagen, was gebraucht wird: die Geräte des gewählten Tabs – oder nichts (Fenster zu)."""
         if self.sichtbar() and self.tabs:
@@ -419,38 +505,169 @@ class Detailfenster:
                             foreground=hex_color(temp_color(value, self.app.settings)))
 
         tab, tree = self.aktiver_tab()
-        gebraucht, gemessen = benoetigte_geraete(tab), snap.get("geraete")
-        if gemessen is not None and (gebraucht is None or not gebraucht <= gemessen):
-            rows = []                                    # passende Messung kommt gleich
-            leer = "Lade Sensordaten …"
+        info = ist_hwdaten(tab)
+        if info:
+            self.hwdaten_laden()
+            rows = hwdaten_zeilen(self.hwdaten or [])
+            leer = ("Keine Hardwaredaten gefunden (Details in hardware_monitor.log)." if self.hwdaten == []
+                    else "Lese Hardwaredaten …")
+            geladen = self.hwdaten_aktuell
         else:
-            rows = zeilen(tab, snap)
-            leer = "Keine passenden Sensoren – die Namen stehen im Tab mit AlleSensoren()."
-        if snap.get("loading"):
-            leer = "Lade Sensordaten …"
+            gebraucht, gemessen = benoetigte_geraete(tab), snap.get("geraete")
+            if gemessen is not None and (gebraucht is None or not gebraucht <= gemessen):
+                rows = []                                # passende Messung kommt gleich
+                leer = "Lade Sensordaten …"
+                geladen = False
+            else:
+                rows = zeilen(tab, snap)
+                leer = "Keine passenden Sensoren – die Namen zeigt „python hardware_monitor.py --list“."
+                geladen = True
+            if snap.get("loading"):                      # direkt nach dem Programmstart wird noch Hardware nachgeladen
+                leer = "Lade Sensordaten …"
+                geladen = False
+        self.status_setzen(geladen)
 
         signatur = [(key, parent, text) for key, parent, text, _ in rows] or [leer]
         if signatur != self.signatur.get(tree):
             tree.delete(*tree.get_children())
             for key, parent, text, sensor in rows:
-                tag = () if sensor else ("gruppe",) if not parent else ("typ",)
+                if sensor:
+                    tag = ()
+                elif not parent:                         # oberste Ebene: Gerät – bei Hardwaredaten der Bereich
+                    tag = ("bereich",) if info else ("gruppe",)
+                else:                                    # zweite Ebene: Sensortyp – bei Hardwaredaten das Gerät
+                    tag = ("gruppe",) if info else ("typ",)
                 tree.insert(parent, "end", iid=key, text=text, open=True, tags=tag)
             if not rows:
                 tree.insert("", "end", iid="leer", text=leer, tags=("hinweis",))
             self.signatur[tree] = signatur
+            if info:
+                self.knoepfe_bauen(tree, [(key, text) for key, parent, text, _ in rows if not parent])
 
-        self.sensoren = {}
-        for key, _, _, sensor in rows:
+        self.sensoren, self.kopierbar = {}, {}
+        for key, _, text, sensor in rows:
             if sensor is None:
+                if "gruppe" in tree.item(key, "tags"):  # Gerätename -> Klick kopiert ihn
+                    self.kopierbar[key] = text
                 continue
             self.sensoren[key] = sensor
+            if sensor["type"] == "Info":                 # Hardwaredaten: fester Wert, Klick kopiert ihn
+                self.kopierbar[key] = sensor["value"]
+                tree.item(key, values=(sensor["value"], ""))
+                continue
             is_temp = sensor["type"] == "Temperature"
-            tree.item(key, values=(fmt_value(sensor["type"], sensor["value"]),
-                                   balken(sensor["value"]) if sensor["type"] in BAR_TYPES else ""),
+            values = (fmt_value(sensor["type"], sensor["value"]),
+                      balken(sensor["value"]) if sensor["type"] in BAR_TYPES else "")
+            tree.item(key, values=values,
                       tags=(temp_stufe(sensor["value"], self.app.settings),) if is_temp else ())
 
     def erklaeren(self, key):
-        if self.fehler:
-            return                                       # Fehlermeldung zum Inhalt stehen lassen
+        self.aktiver_tab()[1].configure(cursor="hand2" if key in self.kopierbar else "")
+        if self.fehler or self.meldung_job:
+            return                                       # Fehlermeldung bzw. „… kopiert“ stehen lassen
         sensor = self.sensoren.get(key)
-        self.fuss.configure(text=f"{sensor['name']}: {erklaere(sensor, self.inhalt)}" if sensor else HINWEIS)
+        if sensor and sensor["type"] == "Info":
+            erklaerung = hardwaredaten.ERKLAERUNGEN.get(sensor["name"])
+            text = (f"{sensor['name']}: {sensor['value']}\n"     # voller Wert, falls die Spalte zu schmal ist
+                    f"{erklaerung + ' ' if erklaerung else ''}Klick kopiert den Wert.")
+        elif sensor:
+            text = f"{sensor['name']}: {erklaere(sensor, self.inhalt)}"
+        elif key in self.kopierbar:
+            text = f"Klick kopiert „{self.kopierbar[key]}“."
+        else:
+            text = HINWEIS
+        self.fuss.configure(text=text, foreground=SUB)
+
+    def fusszeile(self, text):
+        """Hilfetext der Buttons (Maus drüber) – Fehlermeldung und „… kopiert“ haben Vorrang."""
+        if not (self.fehler or self.meldung_job):
+            self.fuss.configure(text=text, foreground=SUB)
+
+    # --- Kopieren ---
+    def kopieren(self, tree, event):
+        """Klick auf einen Gerätenamen (oder bei Hardwaredaten auf einen Wert) kopiert ihn in die Zwischenablage."""
+        if tree.identify_element(event.x, event.y).endswith("indicator"):
+            return                                       # Klick aufs Dreieck klappt nur auf/zu
+        text = self.kopierbar.get(tree.identify_row(event.y))
+        if text:
+            self.zwischenablage(text, f"„{text}“ kopiert")
+
+    def zwischenablage(self, text, meldung):
+        self.win.clipboard_clear()
+        self.win.clipboard_append(text)
+        self.bestaetigen(meldung)
+
+    def bestaetigen(self, meldung, farbe=AKZENT):
+        """Kurze Meldung in der Fußzeile, nach 2 s (bzw. 4 s bei Fehlern) wieder der Hinweis."""
+        if self.meldung_job:
+            self.win.after_cancel(self.meldung_job)
+        self.fuss.configure(text=("✓  " if farbe == AKZENT else "⚠  ") + meldung, foreground=farbe)
+        self.meldung_job = self.win.after(2000 if farbe == AKZENT else 4000, self.meldung_ende)
+
+    def knoepfe_bauen(self, tree, bereiche):
+        """Ein echter „Kopieren“-Button rechts in jeder Bereichszeile (bereiche: [(Zeilen-Schlüssel, Bereich)])."""
+        for knopf in self.knoepfe.pop(tree, {}).values():
+            knopf.destroy()
+        self.knoepfe[tree] = {}
+        for key, bereich in bereiche:
+            knopf = ttk.Button(tree, text="⧉  Kopieren", style="Knopf.TButton", cursor="hand2",
+                               command=lambda b=bereich: self.bereich_kopieren(b))
+            knopf.bind("<Enter>", lambda e, b=bereich: self.fusszeile(f"Kopiert alle Daten zu „{b}“ als Text."))
+            knopf.bind("<Leave>", lambda e: self.fusszeile(HINWEIS))
+            self.knoepfe[tree][key] = knopf
+        self.win.after_idle(self.knoepfe_platzieren, tree)
+
+    def knoepfe_platzieren(self, tree):
+        """Buttons auf die Höhe ihrer Zeile setzen – oder ausblenden, wenn die Zeile gerade nicht zu sehen ist."""
+        for key, knopf in self.knoepfe.get(tree, {}).items():
+            box = tree.bbox(key) if tree.exists(key) else ""
+            if box:
+                _, y, _, h = box
+                knopf.place(relx=1.0, x=-self.px(4), y=y + 1, height=h - 2, anchor="ne")
+            else:
+                knopf.place_forget()
+
+    def bereich_kopieren(self, bereich):
+        geraete = dict(self.hwdaten or []).get(bereich)
+        if geraete:
+            self.zwischenablage(hardwaredaten.als_text(bereich, geraete), f"Alle Daten zu „{bereich}“ kopiert")
+
+    def alles_kopieren(self, als_text, meldung):
+        """Die Buttons oben im Tab: alle Bereiche auf einmal (als_text aus hardwaredaten.py)."""
+        if self.hwdaten:
+            self.zwischenablage(als_text(self.hwdaten), meldung)
+        else:
+            self.bestaetigen("Die Hardwaredaten werden noch gelesen – gleich noch einmal versuchen.", farbe=SUB)
+
+    def meldung_ende(self):
+        self.meldung_job = None
+        if self.fehler:
+            self.fuss.configure(text=self.fehler, foreground=hex_color(AMPEL["rot"]))
+        else:
+            self.fuss.configure(text=HINWEIS, foreground=SUB)
+
+    # --- Hardwaredaten ---
+    def hwdaten_laden(self):
+        """Liest die Hardwaredaten im Hintergrund – beim ersten Anzeigen und nach jedem erneuten Öffnen des Fensters.
+        Bis dahin bleiben die alten Daten stehen."""
+        if self.hwdaten_aktuell or self.hwdaten_thread:
+            return
+
+        def lesen():
+            try:
+                self.hwdaten_neu = hardwaredaten.lesen()
+            except Exception:
+                logging.exception("Hardwaredaten konnten nicht gelesen werden")
+                self.hwdaten_neu = self.hwdaten or []
+
+        self.hwdaten_thread = threading.Thread(target=lesen, daemon=True)
+        self.hwdaten_thread.start()
+        self.win.after(100, self.hwdaten_warten)
+
+    def hwdaten_warten(self):
+        if self.hwdaten_thread.is_alive():
+            self.win.after(100, self.hwdaten_warten)
+            return
+        self.hwdaten_thread = None
+        self.hwdaten, self.hwdaten_aktuell = self.hwdaten_neu, True
+        self.aktualisieren()
