@@ -6,8 +6,8 @@ Aufbau:
   links    alle Programme des gewählten Tabs, alphabetisch
   rechts   die Einstellungen des gewählten Programms
 
-Start:          Doppelklick auf Toolbox.pyw im Repo (oder: pythonw src\\gui\\toolbox.py)
-Voraussetzung:  pip install customtkinter pystray pillow
+Start:          Doppelklick auf Toolbox.cmd im Repo (oder: pythonw src\\gui\\toolbox.py)
+Voraussetzung:  einmal Einrichten.cmd (oder: pip install -r requirements.txt)
 
 Programme werden automatisch gefunden: jede Datei src/<programm>/<programm>_gui.py mit einem Eintrag TOOL.
 Einstellungen der Toolbox: toolbox_settings.json, Fehler: toolbox.log (beides neben diesem Skript).

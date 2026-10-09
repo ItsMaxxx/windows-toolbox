@@ -14,16 +14,13 @@ Jedes Tool hat in seinem Ordner eine eigene `README.md` mit Einrichtung, Bedienu
 ```
 windows-toolbox/
 ├─ Einrichten.cmd         richtet alles ein (einmal nach dem Klonen, erneut nach dem Verschieben)
-├─ Entfernen.cmd          Gegenstück: Monitor beenden, Aufgabe löschen
-├─ Toolbox.cmd            startet die GUI mit dem Python aus runtime\
-├─ Toolbox.pyw            startet die GUI mit dem installierten Python
+├─ Toolbox.cmd            startet die GUI
+├─ Entfernen.cmd          Gegenstück zu Einrichten: Monitor beenden, Aufgabe löschen
 ├─ __init__.py            damit Zed die Skripte als Modul starten kann (Play-Button)
 ├─ requirements.txt
 ├─ runtime/               eigenes Python mit allen Paketen (legt Einrichten.cmd an, nicht im Repo)
 ├─ setup/
-│  ├─ einrichten.ps1      was Einrichten.cmd macht
-│  ├─ admin.py            Teil davon mit Adminrechten: PawnIO, geplante Aufgabe
-│  └─ entfernen.ps1       was Entfernen.cmd macht
+│  └─ setup.ps1           was Einrichten.cmd und Entfernen.cmd machen
 └─ src/
    ├─ gui/
    │  ├─ toolbox.py       Hauptfenster; findet die Programmseiten automatisch
@@ -46,7 +43,7 @@ windows-toolbox/
 git clone https://github.com/ItsMaxxx/windows-toolbox.git
 ```
 Danach **Doppelklick auf `Einrichten.cmd`** – sonst ist nichts nötig, nicht einmal ein installiertes Python. Das Skript
-(`setup\einrichten.ps1`):
+(`setup\setup.ps1`; die `.cmd` gibt es nur, weil ein Doppelklick auf eine `.ps1` sie im Editor öffnet):
 
 1. sucht ein installiertes Python ab 3.10 (fehlt es, installiert es Python 3.14 per winget),
 2. kopiert es nach `runtime\` (ohne Doku und Tests, ~90 MB) und installiert dort die Pakete aus `requirements.txt` –
@@ -62,8 +59,9 @@ Jeder Schritt prüft vorher, ob er schon erledigt ist – `Einrichten.cmd` läss
 z. B. nach einem `git pull` (neue Pakete) oder **nach dem Verschieben des Ordners**: dann wird nur die Aufgabe neu
 eingerichtet. Mit `-OhneAdmin` (im Terminal: `Einrichten.cmd -OhneAdmin`) entfallen Schritt 5 und 6.
 
-**Toolbox starten**: Doppelklick auf `Toolbox.cmd` (nutzt `runtime\`). `Toolbox.pyw` geht weiterhin, nutzt aber das
-installierte Python.
+**Toolbox starten**: Doppelklick auf `Toolbox.cmd` (nutzt `runtime\`; dabei blitzt kurz eine Konsole auf). Ganz ohne
+Konsole geht es mit einer Verknüpfung auf `runtime\pythonw.exe` mit dem Argument `"<Ordner>\src\gui\toolbox.py"` und
+dem Symbol `src\gui\toolbox.ico` – die muss nach dem Verschieben aber angepasst werden.
 
 **Portabel**: Nach dem Einrichten steckt alles im Ordner. Verschieben oder auf einen anderen PC kopieren, dort
 `Einrichten.cmd` erneut ausführen – fertig. Außerhalb des Ordners liegen nur PawnIO (ein Treiber muss in Windows
