@@ -1,4 +1,16 @@
-customtkinter
-pystray
-pillow
-pythonnet
+# Feste Versionen – jeder PC bekommt genau diese Pakete (wie beim Tor Browser: eine geprüfte Version, keine
+# Überraschung durch ein neues Release). Geprüft mit Python 3.14 (siehe $PythonVersion in setup\setup.ps1).
+# Neue Versionen: in runtime\ installieren, testen, dann hier mit „runtime\python.exe -m pip freeze“ übernehmen.
+
+customtkinter==6.0.0
+pystray==0.19.5
+pillow==12.3.0
+pythonnet==3.2.1
+
+# Abhängigkeiten der Pakete oben (pip würde sie sonst in der jeweils neuesten Version holen)
+darkdetect==0.8.0           # customtkinter
+packaging==26.3             # customtkinter
+six==1.17.0                 # pystray
+clr_loader==0.3.1           # pythonnet
+cffi==2.1.1                 # clr_loader
+pycparser==3.11             # cffi

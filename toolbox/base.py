@@ -2,7 +2,6 @@
 Baukasten für Programmseiten in der Toolbox. Eine Seite wird – ähnlich wie HTML – nur beschrieben:
 
     class MeineSeite(ToolPage):
-        settings_file = Path(__file__).with_name("mein_programm_settings.json")
         defaults = {"rate": 2, "farbe": "blau"}
 
         def layout(self):
@@ -14,20 +13,29 @@ Baukasten für Programmseiten in der Toolbox. Eine Seite wird – ähnlich wie H
                         Buttons(Button("Ordner öffnen", lambda: self.open(Path(__file__).parent)))),
             ]
 
-    TOOL = ToolInfo("mein_programm", "Mein Programm", "Werkzeuge", "Kurze Beschreibung", MeineSeite)
+    SEITE = MeineSeite
 
-Bausteine mit key zeigen den Wert self.data[key] an und speichern Änderungen sofort in settings_file.
+Name, Tab und Beschreibung stehen nicht hier, sondern in programm.json daneben – daraus baut die Toolbox das ToolInfo.
+Läuft ein Tool als eigenes Programm weiter (wie der Hardware-Monitor), sagt PROGRAMM = Programm(laeuft, beenden,
+starten) der Toolbox, wie sie es abfragt, beendet und startet. Dann gilt „Toolbox und alle Programme beenden
+bzw. neu starten“ in den Einstellungen der Toolbox automatisch auch dafür.
+
+Bausteine mit key zeigen den Wert self.data[key] an und speichern Änderungen sofort in settings_file – ohne Angabe
+ist das daten\\<programm>.json (eine Datei pro Programm, siehe daten.py).
 Bausteine mit name sind danach als self.w[name] erreichbar, z. B. um eine Statuszeile zu ändern.
-Die Toolbox findet jede Datei src/<programm>/<programm>_gui.py mit einem Eintrag TOOL automatisch.
+Die Toolbox findet jedes Programm über programme/<programm>/programm.json; dessen "seite" ist die Datei mit SEITE.
 """
 
 import json
 import os
 import tkinter as tk
 import tkinter.font as tkfont
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import customtkinter as ctk
+
+import daten
 
 # Farben jeweils als (hell, dunkel) – CustomTkinter nimmt automatisch die passende.
 # Dunkel = Stil der PROOFM-Website (Navy-Hintergrund, grüner Akzent), hell = dieselben Töne auf hellem Grund.
@@ -88,12 +96,28 @@ def apply_font(root):
 
 
 @dataclass
+class Programm:
+    """Ein eigenständiges Programm eines Tools, das auch ohne die Toolbox weiterläuft (z. B. der Hardware-Monitor).
+    Darüber kann die Toolbox es in ihren Einstellungen mit beenden und neu starten („Toolbox und alle Programme“).
+
+    Alle drei bekommen die Toolbox (app), laufen im Hintergrund (nicht im GUI-Thread) und dürfen etwas dauern:
+      laeuft(app)  -> True, wenn es gerade läuft
+      beenden(app) -> True, wenn es danach wirklich beendet ist (auf das Prozessende warten!)
+      starten(app) -> True, wenn der Start geklappt hat
+    """
+    laeuft: Callable
+    beenden: Callable
+    starten: Callable
+
+
+@dataclass
 class ToolInfo:
     id: str               # eindeutiger Kurzname, z. B. "hardware_monitor"
     name: str             # Anzeige in der Seitenleiste
     category: str         # Tab, in dem das Programm erscheint
     description: str      # Untertitel auf der Programmseite
     page: type            # Klasse der Programmseite (Unterklasse von ToolPage)
+    programm: Programm | None = None     # nur bei Tools mit eigenständig laufendem Programm (siehe Programm)
 
 
 # ---------- Bausteine ----------
@@ -211,16 +235,17 @@ class Button:
 
 
 class Buttons(Element):
-    """Eine Reihe Knöpfe nebeneinander."""
+    """Eine Reihe Knöpfe nebeneinander – mit label wie die anderen Bausteine mit Beschriftung links."""
 
-    def __init__(self, *buttons):
-        super().__init__()
+    def __init__(self, *buttons, label=None, info=None):
+        super().__init__(label=label, info=info)
         self.buttons = buttons
 
     def create(self, page, card):
         row = ctk.CTkFrame(card, fg_color="transparent")
         for b in self.buttons:
             button = ctk.CTkButton(row, text=b.text, width=b.width, command=b.command, **Button.STYLES[b.style])
+            button.farbe = Button.STYLES[b.style].get("fg_color")      # für page.enable(): wieder diese Farbe
             button.pack(side="left", padx=(0, 8))
             if b.name:
                 page.w[b.name] = button
@@ -390,13 +415,15 @@ class TextList(Element):
 # ---------- Seite ----------
 class ToolPage(ctk.CTkScrollableFrame):
     """Eine scrollbare Seite im Hauptbereich: Titel, Untertitel und die Bereiche aus layout()."""
-    settings_file = None      # Path der JSON-Datei mit den Einstellungen des Programms (oder None)
+    settings_file = None      # JSON-Datei mit den Einstellungen (Path) – ohne Angabe daten\<programm>.json
     defaults = {}             # Startwerte für alles, was die Bausteine per key anzeigen
 
     def __init__(self, master, app, info):
         super().__init__(master, fg_color="transparent")
         self.app = app
         self.info = info
+        if self.settings_file is None:
+            self.settings_file = daten.einstellungen(info.id)
         self.w = {}                              # Bausteine mit name
         self.elements = []                       # alle Bausteine (zum Auffrischen)
         self.save_job = None
@@ -476,9 +503,11 @@ class ToolPage(ctk.CTkScrollableFrame):
         self.w[name].grid() if visible else self.w[name].grid_remove()
 
     def enable(self, name, enabled=True):
-        """Knopf an/aus – ausgeschaltete Knöpfe werden grau, damit man den Unterschied sofort sieht."""
-        self.w[name].configure(state="normal" if enabled else "disabled",
-                               fg_color=ctk.ThemeManager.theme["CTkButton"]["fg_color"] if enabled else BUTTON_OFF)
+        """Knopf an/aus – ausgeschaltete Knöpfe werden grau, damit man den Unterschied sofort sieht.
+        Beim Einschalten bekommt er wieder seine Farbe (grün bzw. die seines Stils, z. B. "grau")."""
+        knopf = self.w[name]
+        farbe = getattr(knopf, "farbe", None) or ctk.ThemeManager.theme["CTkButton"]["fg_color"]
+        knopf.configure(state="normal" if enabled else "disabled", fg_color=farbe if enabled else BUTTON_OFF)
 
     def open(self, path):
         """Datei oder Ordner mit dem passenden Programm öffnen."""

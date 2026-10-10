@@ -26,7 +26,10 @@ from tkinter import ttk
 import hardwaredaten
 
 INHALT_DATEI = Path(__file__).with_name("detailfenster_inhalt.py")
-ICON_DATEI = Path(__file__).resolve().parents[1] / "gui" / "toolbox.ico"
+ICON_DATEI = Path(__file__).resolve().parents[2] / "toolbox" / "programm.ico"     # ⚒ auf Grün, wie alle Programme
+# Fenstertitel: der Pfad des Programms, wie der Explorer seinen Ordner zeigt. Im Task-Manager steht er dann unter
+# „Hardware-Monitor“ und zeigt, welche Kopie läuft (z. B. nach dem Verschieben des Ordners).
+PROGRAMM_DATEI = Path(__file__).resolve().with_name("hardware_monitor.py")
 
 
 # ---------- Bausteine für detailfenster_inhalt.py ----------
@@ -284,7 +287,7 @@ class Detailfenster:
 
         win = self.win = tk.Toplevel(root)
         win.withdraw()
-        win.title("Hardware-Monitor")
+        win.title(str(PROGRAMM_DATEI))                   # Pfad wie beim Explorer – siehe PROGRAMM_DATEI
         win.configure(bg=BG)
         win.minsize(self.px(320), self.px(240))
         try:
@@ -530,7 +533,7 @@ class Detailfenster:
         if info:
             self.hwdaten_laden()
             rows = hwdaten_zeilen(self.hwdaten or [])
-            leer = ("Keine Hardwaredaten gefunden (Details in hardware_monitor.log)." if self.hwdaten == []
+            leer = ("Keine Hardwaredaten gefunden (Details in daten\\logs\\hardware_monitor.log)." if self.hwdaten == []
                     else "Lese Hardwaredaten …")
             geladen = self.hwdaten_aktuell
         else:

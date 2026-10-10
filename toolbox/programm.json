@@ -1,0 +1,8 @@
+{
+  "id": "toolbox",
+  "name": "Toolbox",
+  "version": "1.0",
+  "skript": "toolbox.py",
+  "starter": "../Toolbox.exe",
+  "symbol": "toolbox.ico"
+}

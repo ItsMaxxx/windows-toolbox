@@ -43,6 +43,27 @@ def pythonw_exe():
     return str(candidate if candidate.exists() else sys.executable)
 
 
+def wait_for_exit(pid, timeout=10):
+    """Wartet, bis der Prozess pid beendet ist – höchstens timeout Sekunden.
+    True = beendet (oder gab es gar nicht), False = läuft noch oder Warten nicht möglich.
+
+    Wichtig vor einem Neustart: Ein Programm antwortet oft schon nicht mehr, räumt aber noch auf. Solange es lebt,
+    hält es seine .exe gesperrt und seinen „läuft schon“-Schutz (Mutex bzw. Port) – ein neuer Start würde sich
+    sofort wieder beenden. Klappt auch bei Programmen mit Adminrechten (z. B. dem Hardware-Monitor).
+    """
+    if sys.platform != "win32" or not pid:
+        return False
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    handle = kernel32.OpenProcess(0x00100000, False, int(pid))         # SYNCHRONIZE: nur darauf warten dürfen
+    if not handle:
+        return ctypes.get_last_error() == 87                            # ERROR_INVALID_PARAMETER: gibt es nicht
+    try:
+        return kernel32.WaitForSingleObject(wintypes.HANDLE(handle), int(timeout * 1000)) == 0
+    finally:
+        kernel32.CloseHandle(wintypes.HANDLE(handle))
+
+
 # ---------- Mit Adminrechten starten ----------
 if sys.platform == "win32":
     from ctypes import wintypes
@@ -113,20 +134,21 @@ def task_state(name):
     return info["state"] if info else None
 
 
-def task_command(name, script, exe=None):
+def task_command(name, exe, arguments="", cwd=None):
     """PowerShell-Befehl, der die Aufgabe "beim Anmelden mit Adminrechten starten" anlegt oder überschreibt.
 
     Entspricht dem, was man sonst von Hand in der Aufgabenplanung einstellt: Trigger "Bei Anmeldung",
     "Mit höchsten Privilegien", auch im Akkubetrieb, ohne die 3-Tage-Zeitbegrenzung.
-    exe: Programm, das das Skript ausführt (Standard: pythonw.exe des laufenden Pythons).
+    exe: das gestartete Programm, z. B. der Starter HardwareMonitor.exe (braucht keine Argumente).
+    cwd: Arbeitsordner (Standard: Ordner von exe).
     Braucht Adminrechte – register_task() holt sie per UAC; setup\\setup.ps1 ruft es schon mit Adminrechten auf.
     """
-    script = Path(script)
+    argument = f" -Argument {ps_quote(arguments)}" if arguments else ""
     lines = [
         "$ErrorActionPreference = 'Stop'",
         '$user = "$env:USERDOMAIN\\$env:USERNAME"',
-        f"$action = New-ScheduledTaskAction -Execute {ps_quote(str(exe or pythonw_exe()))} "
-        f"-Argument {ps_quote(chr(34) + str(script) + chr(34))} -WorkingDirectory {ps_quote(str(script.parent))}",
+        f"$action = New-ScheduledTaskAction -Execute {ps_quote(str(exe))}{argument} "
+        f"-WorkingDirectory {ps_quote(str(cwd or Path(exe).parent))}",
         "$trigger = New-ScheduledTaskTrigger -AtLogOn -User $user",
         "$principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Highest",
         "$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries "
@@ -137,10 +159,10 @@ def task_command(name, script, exe=None):
     return "\n".join(lines)
 
 
-def register_task(name, script, exe=None):
+def register_task(name, exe, arguments="", cwd=None):
     """Legt die Aufgabe an oder überschreibt sie (siehe task_command) – mit UAC-Abfrage."""
     # Als Base64 übergeben, damit Anführungszeichen und Leerzeichen in Pfaden keine Probleme machen
-    encoded = base64.b64encode(task_command(name, script, exe).encode("utf-16-le")).decode("ascii")
+    encoded = base64.b64encode(task_command(name, exe, arguments, cwd).encode("utf-16-le")).decode("ascii")
     return run_elevated("powershell.exe", f"-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand {encoded}",
                         wait=True)
 

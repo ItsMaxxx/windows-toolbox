@@ -9,7 +9,7 @@ Dateien:
 
 Voraussetzungen:
   - PawnIO installiert:            winget install namazso.PawnIO
-  - LibreHardwareMonitor-Release (LibreHardwareMonitor.zip) entpackt nach src/hardware_monitor/lhm
+  - LibreHardwareMonitor-Release (LibreHardwareMonitor.zip) entpackt nach lhm/ in diesem Ordner (macht Setup.exe)
   - Python-Pakete:                 pip install pythonnet pystray pillow
   - Start mit Adminrechten (sonst fehlen CPU- und Mainboard-Werte)
 
@@ -21,10 +21,10 @@ Sparsam im Hintergrund: Solange das Fenster zu ist, werden nur CPU und GPU geles
 bei Nvidia-Karten direkt über nvml.dll statt über LHM (ein Bruchteil des Aufwands). Beim Start wird zuerst nur
 CPU und GPU geöffnet, damit die Icons sofort da sind; die übrige Hardware lädt danach im Hintergrund nach.
 Die Aktualisierungsraten lassen sich per Rechtsklick aufs Icon einstellen; alle weiteren
-Einstellungen über die Toolbox-GUI. Gespeichert wird in hardware_monitor_settings.json neben dem Skript.
+Einstellungen über die Toolbox-GUI. Gespeichert wird in daten/hardware_monitor.json.
 Die GUI steuert das Programm über eine lokale Verbindung (127.0.0.1, Port IPC_PORT).
 
-Fehler landen in hardware_monitor.log neben dem Skript (pythonw hat keine Konsole).
+Fehler landen in daten/logs/hardware_monitor.log (pythonw hat keine Konsole).
 """
 
 import ctypes
@@ -41,13 +41,16 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True                              # keine __pycache__-Ordner anlegen (wie bei der Toolbox)
 sys.path.insert(0, str(Path(__file__).resolve().parent))    # detailfenster finden – auch beim Start mit python -m
+sys.path.append(str(Path(__file__).resolve().parents[2] / "toolbox"))   # daten.py (gemeinsam mit der Toolbox)
+import daten  # noqa: E402
 from detailfenster import TYPE_LABELS, Detailfenster, fmt_value, temp_color  # noqa: E402
 
 
 # ---------- Einstellungen ----------
-# Ordner mit LibreHardwareMonitorLib.dll: zuerst lhm\ neben diesem Skript, dann im Repo, dann C:\Tools\lhm
+# Ordner mit LibreHardwareMonitorLib.dll: lhm\ neben diesem Skript (legt Setup.exe an, siehe "downloads" in
+# programm.json), sonst runtime\lhm (dort lag es kurzzeitig), sonst C:\Tools\lhm
 SCRIPT_DIR = Path(__file__).resolve().parent
-LHM_CANDIDATES = [SCRIPT_DIR / "lhm", SCRIPT_DIR.parents[1] / "lhm", Path(r"C:\Tools\lhm")]
+LHM_CANDIDATES = [SCRIPT_DIR / "lhm", SCRIPT_DIR.parents[1] / "runtime" / "lhm", Path(r"C:\Tools\lhm")]
 LHM_DIR = next((str(d) for d in LHM_CANDIDATES if (d / "LibreHardwareMonitorLib.dll").exists()),
                str(LHM_CANDIDATES[0]))
 
@@ -56,7 +59,7 @@ ICON_RATES = (1, 2, 5, 10)      # Taskleisten-Icons (liest nur CPU und GPU)
 POPUP_RATES = (0.5, 1, 2, 5)    # geöffnetes Fenster (liest die Geräte des gewählten Tabs)
 
 # Startwerte. Geändert wird über das Rechtsklick-Menü oder die Toolbox-GUI;
-# beides landet in hardware_monitor_settings.json neben dem Skript.
+# beides landet in daten/hardware_monitor.json.
 DEFAULT_SETTINGS = {
     "icon_interval": 2,
     "popup_interval": 1,
@@ -69,7 +72,7 @@ DEFAULT_SETTINGS = {
     "effizienzmodus": "auto",        # "auto" = nur bei geschlossenem Fenster, "an" = immer, "aus" = nie
 }
 EFFIZIENZ = ("auto", "an", "aus")
-SETTINGS_FILE = Path(__file__).with_name("hardware_monitor_settings.json")
+SETTINGS_FILE = daten.einstellungen("hardware_monitor")
 
 # Bei "auto": welcher Sensor im Tray-Icon angezeigt wird – der erste aus der Liste, den es gibt
 CPU_SENSORS = ("Core (Tctl/Tdie)", "CPU Package", "Core Average")
@@ -89,7 +92,7 @@ LATER_HARDWARE = (
 )
 
 logging.basicConfig(
-    filename=Path(__file__).with_suffix(".log"),
+    filename=daten.log("hardware_monitor"),
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
 )
@@ -334,7 +337,8 @@ def icon_werte(kinds=("cpu", "gpu")):
 
 # ---------- Einstellungen speichern / laden ----------
 def load_settings():
-    """Liest die Einstellungen; alles Fehlende oder Ungültige bekommt den Startwert."""
+    """Liest die Einstellungen; alles Fehlende oder Ungültige bekommt den Startwert. Schlüssel, die nur die Toolbox
+    kennt (z. B. task_name), bleiben unverändert erhalten – sonst löschte save_settings() sie beim nächsten Speichern."""
     settings = json.loads(json.dumps(DEFAULT_SETTINGS))          # tiefe Kopie
     try:
         saved = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
@@ -358,6 +362,8 @@ def load_settings():
         settings["window"] = saved["window"]
     if saved.get("effizienzmodus") in EFFIZIENZ:
         settings["effizienzmodus"] = saved["effizienzmodus"]
+    for key, value in saved.items():
+        settings.setdefault(key, value)
     return settings
 
 

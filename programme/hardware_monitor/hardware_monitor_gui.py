@@ -1,10 +1,10 @@
 """
-Seite des Hardware-Monitors in der Toolbox-GUI (Bausteine aus src/gui/base.py).
+Seite des Hardware-Monitors in der Toolbox-GUI (Bausteine aus toolbox/base.py).
 
 Die Toolbox läuft ohne Adminrechte, hardware_monitor mit. Deshalb:
   - Status, Beenden und "Einstellungen neu laden" gehen über eine lokale Verbindung (IPC_PORT),
   - Starten geht über die geplante Aufgabe (keine UAC-Abfrage) oder notfalls direkt mit UAC-Abfrage,
-  - Einstellungen schreibt die Toolbox in hardware_monitor_settings.json und sagt hardware_monitor dann "reload".
+  - Einstellungen schreibt die Toolbox in daten\\hardware_monitor.json und sagt hardware_monitor dann "reload".
 """
 
 import json
@@ -12,15 +12,22 @@ import socket
 import time
 from pathlib import Path
 
+import daten
 import winutil
-from base import (BAD, GOOD, MUTED, WARN, Button, Buttons, Choice, Combo, Entry, Section, Slider, Switch, Text,
-                  ToolInfo, ToolPage)
+from base import (BAD, GOOD, MUTED, WARN, Button, Buttons, Choice, Combo, Entry, Programm, Section, Slider, Switch,
+                  Text, ToolPage)
 
 FOLDER = Path(__file__).resolve().parent
 SCRIPT = FOLDER / "hardware_monitor.py"
-# Von Einrichten.cmd angelegt: pythonw.exe mit eigenem Namen und Symbol – so heißt der Prozess im Task-Manager
+AUSWEIS = json.loads((FOLDER / "programm.json").read_text(encoding="utf-8"))
+# Von Setup.exe angelegt: der Starter HardwareMonitor.exe (findet runtime\ relativ zu sich, deshalb ohne
+# Argumente) und dahinter pythonw.exe mit eigenem Namen und Symbol – so heißt der Prozess im Task-Manager
 # „Hardware-Monitor“ statt „Python“ (setup\exe_anlegen.py)
-MONITOR_EXE = FOLDER.parents[1] / "runtime" / "HardwareMonitor.exe"
+STARTER = FOLDER / AUSWEIS["starter"]
+MONITOR_EXE = FOLDER.parents[1] / "runtime" / AUSWEIS["starter"]
+# Dieselben Dateien wie SETTINGS_FILE und das Log in hardware_monitor.py
+SETTINGS_FILE = daten.einstellungen(AUSWEIS["id"])
+LOG_FILE = daten.log(AUSWEIS["id"])
 IPC_PORT = 47815                 # muss zu IPC_PORT in hardware_monitor.py passen
 DEFAULT_TASK = "HardwareMonitor"
 
@@ -59,9 +66,13 @@ def fmt_temp(value):
     return "–" if value is None else f"{value:.0f} °C"
 
 
-def monitor_exe():
-    """Womit hardware_monitor.py läuft: runtime\\HardwareMonitor.exe, sonst pythonw.exe des laufenden Pythons."""
-    return str(MONITOR_EXE) if MONITOR_EXE.exists() else winutil.pythonw_exe()
+def startbefehl():
+    """(Programm, Argumente), womit der Monitor startet – für die Aufgabe und den Start mit UAC-Abfrage:
+    der Starter HardwareMonitor.exe ohne Argumente; fehlt er (Setup.exe noch nicht gelaufen), wie früher
+    runtime\\HardwareMonitor.exe bzw. pythonw.exe mit dem Skript."""
+    if STARTER.exists():
+        return str(STARTER), ""
+    return (str(MONITOR_EXE) if MONITOR_EXE.exists() else winutil.pythonw_exe()), f'"{SCRIPT}"'
 
 
 def same_path(a, b):
@@ -71,11 +82,59 @@ def same_path(a, b):
         return False
 
 
+def task_name(app=None):
+    """Name der Aufgabe aus daten\\hardware_monitor.json (einstellbar unter „Erweitert“)."""
+    try:
+        return json.loads(SETTINGS_FILE.read_text(encoding="utf-8")).get("task_name") or DEFAULT_TASK
+    except (OSError, ValueError, AttributeError):
+        return DEFAULT_TASK
+
+
+def task_points_here(info):
+    """Startet die Aufgabe wirklich diesen Monitor – und nicht z. B. eine alte Kopie unter C:\\Tools oder den Ort, an
+    dem der Ordner vor dem Verschieben lag?"""
+    exe, arguments = startbefehl()
+    return (same_path(info.get("execute") or "", exe)
+            and (info.get("arguments") or "").strip().strip('"') == arguments.strip('"'))
+
+
+# ---------- Programm steuern (auch für „Toolbox und alle Programme“ in den Toolbox-Einstellungen) ----------
+# Alle drei blockieren eine Weile – nur im Hintergrund aufrufen (app.run_async).
+def laeuft(app=None):
+    return ipc("status") is not None
+
+
+def beenden(app=None):
+    """Bittet das Programm, sich zu beenden, und wartet aufs Prozessende (sonst scheitert ein direkter Neustart)."""
+    status = ipc("status")
+    if status is None:
+        return True
+    ipc("quit")
+    if winutil.wait_for_exit(status.get("pid"), timeout=10):
+        return True
+    for _ in range(50):                          # Rückfall: warten, bis es nicht mehr antwortet (bis zu 5 s)
+        if ipc("status", timeout=0.2) is None:
+            return True
+        time.sleep(0.1)
+    return False
+
+
+def starten(app):
+    """Über die geplante Aufgabe (ohne Nachfrage) – oder, wenn es keine passende gibt, direkt mit UAC-Abfrage."""
+    task = task_name(app)
+    info = winutil.task_info(task)
+    if info and info.get("state") != "Disabled" and task_points_here(info) and winutil.run_task(task):
+        return True
+    exe, arguments = startbefehl()
+    return winutil.run_elevated(exe, arguments, cwd=str(FOLDER))
+
+
 class HardwareMonitorPage(ToolPage):
-    settings_file = FOLDER / "hardware_monitor_settings.json"
+    settings_file = SETTINGS_FILE
     defaults = {                 # muss zu DEFAULT_SETTINGS in hardware_monitor.py passen
         "icon_interval": 2, "popup_interval": 1, "icon_order": ["cpu", "gpu"],
         "cpu_sensor": "auto", "gpu_sensor": "auto", "warn_temp": 60, "hot_temp": 80, "effizienzmodus": "auto",
+        "task_name": DEFAULT_TASK,           # nur für die Toolbox (Autostart) – hardware_monitor.py lässt ihn stehen
     }
     visible = False
     poll_job = None
@@ -119,7 +178,7 @@ class HardwareMonitorPage(ToolPage):
             Section("Erweitert",
                     Entry("Name der Aufgabe", value=self.task_name, command=self.on_task_name),
                     Buttons(Button("Ordner öffnen", lambda: self.open(FOLDER), **grey),
-                            Button("Log öffnen", lambda: self.open(FOLDER / "hardware_monitor.log"), **grey),
+                            Button("Log öffnen", lambda: self.open(LOG_FILE), **grey),
                             Button("Einstellungsdatei öffnen", lambda: self.open(self.settings_file), **grey),
                             Button("Alles zurücksetzen", self.reset, width=150, style="gefahr"))),
         ]
@@ -144,13 +203,13 @@ class HardwareMonitorPage(ToolPage):
 
     @property
     def task_name(self):
-        return self.app.tool_settings("hardware_monitor").get("task_name", DEFAULT_TASK)
+        return self.data.get("task_name") or DEFAULT_TASK
 
     def on_task_name(self, name):
         name = name or DEFAULT_TASK
         if name != self.task_name:
-            self.app.tool_settings("hardware_monitor")["task_name"] = name
-            self.app.save()
+            self.data["task_name"] = name
+            self.save()
             self.refresh_task()
 
     # ---------- Status und Steuerung ----------
@@ -203,21 +262,13 @@ class HardwareMonitorPage(ToolPage):
             return
         self.say("Wird gestartet …")
         self.enable("start", False)
-        task = self.task_name
-
-        def work():
-            info = winutil.task_info(task)
-            if info and info.get("state") != "Disabled" and self.task_points_here(info) and winutil.run_task(task):
-                return True
-            # Keine passende aktive Aufgabe -> direkt mit Adminrechten starten; Windows fragt per UAC nach
-            return winutil.run_elevated(monitor_exe(), f'"{SCRIPT}"', cwd=str(FOLDER))
 
         def done(ok):
             if not ok:
                 self.app.toast("Start abgebrochen oder fehlgeschlagen", error=True)
             self.poll_status_soon()
 
-        self.app.run_async(work, done)
+        self.app.run_async(lambda: starten(self.app), done)
 
     def stop(self):
         self.say("Wird beendet …")
@@ -226,21 +277,13 @@ class HardwareMonitorPage(ToolPage):
     def restart(self):
         self.say("Wird neu gestartet …")
 
-        def work():
-            ipc("quit")
-            for _ in range(50):                  # bis zu 5 Sekunden warten, bis es wirklich beendet ist
-                if ipc("status", timeout=0.2) is None:
-                    return True
-                time.sleep(0.1)
-            return False
-
         def done(stopped):
             if stopped:
                 self.start()
             else:
                 self.app.toast("Programm reagiert nicht", error=True)
 
-        self.app.run_async(work, done)
+        self.app.run_async(beenden, done)
 
     # ---------- Autostart ----------
     def refresh_task(self):
@@ -248,12 +291,6 @@ class HardwareMonitorPage(ToolPage):
         self.w["autostart"].configure(state="disabled")
         self.w["task_label"].configure(text=f"Prüfe Aufgabe „{task}“ …", text_color=MUTED)
         self.app.run_async(lambda: winutil.task_info(task), self.show_task)
-
-    def task_points_here(self, info):
-        """Startet die Aufgabe wirklich dieses hardware_monitor.py mit dem richtigen Programm – und nicht z. B. eine
-        alte Kopie unter C:\\Tools oder den Ort, an dem der Ordner vor dem Verschieben lag?"""
-        arguments = (info.get("arguments") or "").strip().strip('"')
-        return bool(arguments) and same_path(arguments, SCRIPT) and same_path(info.get("execute") or "", monitor_exe())
 
     def show_task(self, info):
         task, switch, label, button = self.task_name, self.w["autostart"], self.w["task_label"], self.w["task_button"]
@@ -266,7 +303,7 @@ class HardwareMonitorPage(ToolPage):
         enabled = info.get("state") != "Disabled"
         switch.configure(state="normal")
         switch.select() if enabled else switch.deselect()
-        if self.task_points_here(info):
+        if task_points_here(info):
             button.configure(text="Neu einrichten")
             label.configure(text=f"Aufgabe „{task}“ in der Aufgabenplanung ({'aktiv' if enabled else 'deaktiviert'})",
                             text_color=MUTED)
@@ -274,7 +311,7 @@ class HardwareMonitorPage(ToolPage):
             button.configure(text="Aufgabe aktualisieren")
             label.configure(text=f"⚠  Aufgabe „{task}“ startet einen anderen Ort: {info.get('execute')} "
                                  f"{info.get('arguments')}\n„Aufgabe aktualisieren“ stellt sie auf diesen Ordner um "
-                                 f"(oder Einrichten.cmd erneut ausführen).", text_color=WARN)
+                                 f"(oder Setup.exe erneut ausführen).", text_color=WARN)
 
     def setup_task(self):
         if not SCRIPT.exists():
@@ -291,7 +328,7 @@ class HardwareMonitorPage(ToolPage):
                            error=not ok)
             self.refresh_task()
 
-        self.app.run_async(lambda: winutil.register_task(task, SCRIPT, monitor_exe()), done)
+        self.app.run_async(lambda: winutil.register_task(task, *startbefehl(), cwd=FOLDER), done)
 
     def toggle_autostart(self):
         enabled, task = bool(self.w["autostart"].get()), self.task_name
@@ -305,7 +342,5 @@ class HardwareMonitorPage(ToolPage):
         self.app.run_async(lambda: winutil.set_task_enabled(task, enabled), done)
 
 
-TOOL = ToolInfo("hardware_monitor", "Hardware-Monitor", "Allgemein",
-                "CPU- und GPU-Temperatur in der Taskleiste; ein Klick aufs Icon zeigt fast alle Hardware-Werte "
-                "(hardware_monitor).",
-                HardwareMonitorPage)
+SEITE = HardwareMonitorPage
+PROGRAMM = Programm(laeuft, beenden, starten)     # für „Toolbox und alle Programme“

@@ -21,33 +21,37 @@ es über seine Seite in der Toolbox (*Allgemein → Hardware-Monitor*) oder per 
 | `detailfenster.py` | baut das Fenster aus `detailfenster_inhalt.py` (Farben, Layout, Ampelfarben) |
 | `hardwaredaten.py` | liest die festen Daten für den Tab „Hardwaredaten“ über WMI; `python hardwaredaten.py` gibt sie aus |
 | `hardware_monitor_gui.py` | Seite in der Toolbox: Status, Starten/Beenden, Autostart, Einstellungen |
+| `programm.json` | Ausweis: Name, Tab, Beschreibung, Version, Skript, Starter, Download von LibreHardwareMonitor |
+| `HardwareMonitor.exe` | Starter (legt `Setup.exe` an, nicht im Repo) – startet `hardware_monitor.py` ohne Argumente |
 | `lhm/` | LibreHardwareMonitor (nicht im Repo, siehe unten) |
-| `hardware_monitor_settings.json` | Einstellungen (entsteht beim ersten Speichern, nicht im Repo) |
-| `hardware_monitor.log` | Fehler und Hinweise – `pythonw` hat keine Konsole (nicht im Repo) |
+| `daten/hardware_monitor.json` (im Hauptordner) | Einstellungen (entsteht beim ersten Speichern, nicht im Repo) |
+| `daten/logs/hardware_monitor.log` (im Hauptordner) | Fehler und Hinweise – `pythonw` hat keine Konsole (nicht im Repo) |
 
 ## Einrichtung
 
-**`Einrichten.cmd` im Repo-Ordner** erledigt alles (siehe Haupt-README): eigenes Python in `runtime\`, die Pakete
-(`pythonnet`, `pystray`, `pillow`), `runtime\HardwareMonitor.exe`, LibreHardwareMonitor 0.9.6 nach `lhm/`, PawnIO
+**`Setup.exe` im Repo-Ordner** erledigt alles (siehe Haupt-README): eigenes Python in `runtime\`, die Pakete
+(`pythonnet`, `pystray`, `pillow`), den Starter `HardwareMonitor.exe`, LibreHardwareMonitor 0.9.6 nach `lhm\`, PawnIO
 und die geplante Aufgabe `HardwareMonitor`. Von Hand ginge es so:
 
-1. **Python-Pakete**: `pip install -r requirements.txt` im Repo-Ordner.
+1. **Python-Pakete**: `pip install -r requirements.txt` im Repo-Ordner (feste Versionen, geprüft mit Python 3.14).
 2. **PawnIO** (Treiber für CPU- und Mainboard-Sensoren), einmalig im Admin-Terminal:
    ```
    winget install namazso.PawnIO
    ```
 3. **LibreHardwareMonitor**: `LibreHardwareMonitor.zip` (nicht die .NET-10-Variante) von den
-   [GitHub-Releases](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/releases) nach `lhm/` in diesem
-   Ordner entpacken. Gesucht wird `LibreHardwareMonitorLib.dll` zuerst hier, dann in `lhm/` im Repo-Ordner, dann in
-   `C:\Tools\lhm`.
+   [GitHub-Releases](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/releases) nach `lhm\` in
+   diesem Ordner entpacken. Gesucht wird `LibreHardwareMonitorLib.dll` zuerst dort, dann in `runtime\lhm\` (dort lag
+   es kurzzeitig), dann in `C:\Tools\lhm`.
 4. **Autostart**: in der Toolbox auf *Aufgabe einrichten* klicken. Das legt die geplante Aufgabe `HardwareMonitor` an,
    die das Programm beim Anmelden mit Adminrechten startet – ohne UAC-Abfrage. Ohne Aufgabe startet *Starten* in der
    Toolbox das Programm direkt, dann fragt Windows jedes Mal nach.
 
-**Womit es läuft:** Gibt es `runtime\HardwareMonitor.exe` (`pythonw.exe` des Projekt-Pythons mit eigener
-Dateibeschreibung und eigenem Symbol, angelegt von `setup\exe_anlegen.py`), nutzen Aufgabe und *Starten* diese – dann
-steht im Task-Manager „Hardware-Monitor“ mit dem Toolbox-Symbol statt „Python“. Sonst das `pythonw.exe` des Pythons,
-mit dem die Toolbox läuft. Ist das Detailfenster zu, steht der Monitor dort unter „Hintergrundprozesse“ statt unter
+**Womit es läuft:** Aufgabe und *Starten* rufen den Starter `HardwareMonitor.exe` in diesem Ordner auf (ohne
+Argumente). Der startet `runtime\HardwareMonitor.exe` (`pythonw.exe` des Projekt-Pythons mit eigener
+Dateibeschreibung und eigenem Symbol, angelegt von `setup\exe_anlegen.py`) mit `hardware_monitor.py` und beendet
+sich – im Task-Manager steht dann „Hardware-Monitor“ mit dem Toolbox-Symbol statt „Python“. Fehlt der Starter, geht
+es wie früher direkt über `runtime\HardwareMonitor.exe` bzw. das `pythonw.exe` des Pythons, mit dem die Toolbox läuft.
+Der Name der Aufgabe steht in `daten\hardware_monitor.json` (`task_name`, einstellbar unter *Erweitert*). Ist das Detailfenster zu, steht der Monitor dort unter „Hintergrundprozesse“ statt unter
 „Apps“ – so hält Windows es mit jedem Programm ohne sichtbares Fenster.
 
 ## Starten und prüfen
@@ -80,7 +84,7 @@ ein zweiter Start beendet sich sofort.
 
 ## Einstellungen
 
-Gespeichert in `hardware_monitor_settings.json`. Die Toolbox schreibt die Datei und schickt danach `reload`, das
+Gespeichert in `daten\hardware_monitor.json`. Die Toolbox schreibt die Datei und schickt danach `reload`, das
 laufende Programm übernimmt die Werte sofort. Fehlende oder ungültige Werte bekommen den Startwert.
 
 | Schlüssel | Standard | Bedeutung |
@@ -92,6 +96,7 @@ laufende Programm übernimmt die Werte sofort. Fehlende oder ungültige Werte be
 | `warn_temp` / `hot_temp` | `60` / `80` | ab hier gelb bzw. rot |
 | `effizienzmodus` | `"auto"` | Effizienzmodus von Windows 11: `auto` = nur bei geschlossenem Fenster, `an` = immer, `aus` = nie |
 | `window` | `""` | Größe und Position des Detailfensters (setzt das Fenster selbst) |
+| `task_name` | `"HardwareMonitor"` | Name der Autostart-Aufgabe – nur für die Toolbox, der Monitor lässt ihn unverändert |
 
 Die Standardwerte stehen doppelt: `DEFAULT_SETTINGS` in `hardware_monitor.py` und `defaults` in
 `hardware_monitor_gui.py` – bei Änderungen beide anpassen.
@@ -180,16 +185,17 @@ Der Port steht als `IPC_PORT` in `hardware_monitor.py` **und** `hardware_monitor
 - **CPU zeigt `--` oder fehlt**: Programm läuft ohne Adminrechte, oder PawnIO ist nicht installiert.
 - **Kein GPU-Icon**: Die Grafik hat keinen Temperatursensor – bei Intel-Onboard-Grafik (z. B. Iris Xe) normal
   (steht auch so im Log).
-- **Task-Manager zeigt noch „Python“**: `Einrichten.cmd` erneut ausführen (legt die `.exe`-Dateien neu an und löscht
-  den Namens-Zwischenspeicher von Windows), danach Task-Manager und Programm neu starten.
+- **Task-Manager zeigt noch „Python“ oder das Python-Logo**: `Setup.exe` erneut ausführen (legt die
+  `.exe`-Dateien neu an und lässt Windows Name und Symbol neu lesen), danach den Task-Manager ganz schließen und neu
+  öffnen – ein offener behält, was er einmal geladen hat.
 - **Ein Tab zeigt „Keine passenden Sensoren“**: Die Hardware nennt ihre Sensoren anders; `--list` zeigt die Namen,
   die dann in `detailfenster_inhalt.py` ergänzt werden.
-- **Startet gar nicht**: `hardware_monitor.log` ansehen (Toolbox: *Erweitert → Log öffnen*). Häufig fehlt `lhm/` oder
-  es ist die .NET-10-Variante von LHM.
+- **Startet gar nicht**: `daten\logs\hardware_monitor.log` ansehen (Toolbox: *Erweitert → Log öffnen*). Häufig
+  fehlt `lhm\` oder es ist die .NET-10-Variante von LHM.
 - **Toolbox zeigt „Gestoppt“, obwohl die Icons da sind**: Port 47815 war beim Start belegt; das Programm versucht es
   alle 2 s erneut (steht dann auch im Log).
 - **Tab „Hardwaredaten“ bleibt leer**: Fehler der WMI-Abfragen stehen im Log; `python hardwaredaten.py` zeigt, was
   Windows liefert.
-- **Aufgabe startet eine alte Kopie**: Die Toolbox warnt, wenn die Aufgabe auf ein anderes `hardware_monitor.py` oder
-  ein anderes Programm zeigt (z. B. nach dem Verschieben des Ordners); *Aufgabe aktualisieren* oder `Einrichten.cmd`
+- **Aufgabe startet eine alte Kopie**: Die Toolbox warnt, wenn die Aufgabe nicht auf `HardwareMonitor.exe` in diesem
+  Ordner zeigt (z. B. nach dem Verschieben des Ordners); *Aufgabe aktualisieren* oder `Setup.exe`
   stellt sie um.

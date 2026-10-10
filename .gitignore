@@ -14,16 +14,20 @@ env/
 Thumbs.db
 desktop.ini
 
-# --- Beim Ausführen erzeugt ---
+# --- Einstellungen und Logs (entstehen beim Ausführen) ---
+daten/
 *.log
 *_settings.json
 
-# --- LibreHardwareMonitor (wird separat heruntergeladen) ---
-lhm/
-
-# --- Eigenes Python im Projekt (legt Einrichten.cmd an) ---
+# --- Eigenes Python, Starter-.exe und Downloads der Programme (legt Setup.exe an) ---
 runtime/
+/Toolbox.exe
+programme/*/*.exe
+lhm/
 
 # --- Claude Code (nur lokal) ---
 CLAUDE.md
 .claude/
+
+# --- For my stupid ass ---
+ERKLAERUNG.md

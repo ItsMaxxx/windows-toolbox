@@ -86,7 +86,7 @@ def versionsinfo(beschreibung, dateiname):
         "ProductVersion": version,
         "InternalName": Path(dateiname).stem,
         "OriginalFilename": dateiname,
-        "Comments": f"pythonw.exe (Python {version}) mit eigenem Namen und Symbol – angelegt von Einrichten.cmd",
+        "Comments": f"pythonw.exe (Python {version}) mit eigenem Namen und Symbol – angelegt von Setup.exe",
         "LegalCopyright": "Python: Copyright © Python Software Foundation",
     }
     eintraege = [knoten(k, (w + "\0").encode("utf-16-le"), text=True) for k, w in texte.items()]
@@ -132,7 +132,8 @@ def ressource(handle, typ, nummer, daten):
 
 def namen_vergessen(ziel):
     """Windows merkt sich Programmnamen im „MuiCache“ – dort stünde für eine frühere reine Kopie noch „Python“, und der
-    Task-Manager zeigte weiter den alten Namen. Den Eintrag löschen, dann liest Windows den Namen neu aus der Datei."""
+    Task-Manager zeigte weiter den alten Namen. Den Eintrag löschen, dann liest Windows den Namen neu aus der Datei.
+    Danach der Shell melden, dass sich die Datei geändert hat, damit sie auch das Symbol neu liest."""
     import winreg
     schluessel = r"Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache"
     try:
@@ -144,6 +145,9 @@ def namen_vergessen(ziel):
                     pass
     except OSError:
         pass                                     # kein MuiCache – nichts zu vergessen
+    # Dasselbe für das Symbol: Windows hält es zwischengespeichert (der Task-Manager zeigte sonst weiter das
+    # Python-Logo). SHCNE_UPDATEITEM sagt der Shell, dass sich die Datei geändert hat -> Symbol neu lesen.
+    ctypes.windll.shell32.SHChangeNotify(0x00002000, 0x0005, ctypes.c_wchar_p(str(ziel.resolve())), None)  # PATHW
 
 
 # ---------- Ablauf ----------
@@ -169,8 +173,8 @@ def anlegen(ziel, beschreibung, ico_pfad):
         if not k32.EndUpdateResourceW(handle, False):
             fehler("EndUpdateResource fehlgeschlagen")
 
-        namen_vergessen(ziel)
         if ziel.exists() and ziel.read_bytes() == neu.read_bytes():
+            namen_vergessen(ziel)                # auch dann: ein früherer Lauf hat das evtl. noch nicht gemacht
             print(f"{ziel.name} ist schon aktuell")
             return 0
         try:
@@ -178,6 +182,7 @@ def anlegen(ziel, beschreibung, ico_pfad):
         except PermissionError:
             print(f"{ziel.name} ist gerade in Benutzung – nach dem Beenden des Programms erneut einrichten")
             return 2
+        namen_vergessen(ziel)
         print(f"{ziel.name} angelegt")
         return 0
     finally:

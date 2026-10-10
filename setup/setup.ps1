@@ -1,27 +1,42 @@
 ﻿<#
-Einrichten und Entfernen der windows-toolbox. Aufgerufen von Einrichten.cmd bzw. Entfernen.cmd im Hauptordner
-(ein Doppelklick auf eine .ps1 würde sie nur im Editor öffnen).
+Einrichten und Entfernen der windows-toolbox. Aufgerufen von Setup.exe bzw. Uninstall.exe im Hauptordner – kleine
+Starter aus setup\setup_exe.cs, die fertig im Repo liegen (ein Doppelklick auf eine .ps1 würde sie nur im Editor
+öffnen). Neu bauen nach einer Änderung an setup_exe.cs: setup\setup_exe_bauen.ps1.
+
+Welche Programme es gibt, steht in den Ausweisen: toolbox\programm.json und programme\<programm>\programm.json
+(Name, Version, Skript, Starter-.exe, Downloads). Die Schritte 3 und 4 gelten für jedes Programm darin.
 
 Einrichten (ohne Parameter) – alles, was nach dem Klonen fehlt:
-  1. Python finden (oder per winget installieren)
-  2. runtime\ anlegen: eigenes Python im Projektordner, mit den Paketen aus requirements.txt
-  3. runtime\Toolbox.exe und runtime\HardwareMonitor.exe anlegen: Kopien von pythonw.exe mit eigenem Namen und Symbol,
-     damit beide im Task-Manager als eigene Programme erscheinen statt als „Python“ (setup\exe_anlegen.py)
-  4. LibreHardwareMonitor herunterladen (feste Version) nach src\hardware_monitor\lhm\
+  1. Python $PythonVersion finden (oder per winget installieren) – genau diese Version, keine ältere oder neuere
+  2. runtime\ anlegen: eigenes Python im Projektordner, mit den Paketen aus requirements.txt (feste Versionen)
+  3. je Programm zwei .exe:
+       - runtime\<Name>.exe: Kopie von pythonw.exe mit eigenem Namen und Symbol, damit es im Task-Manager als eigenes
+         Programm erscheint statt als „Python“ (setup\exe_anlegen.py)
+       - der Starter (Toolbox.exe im Hauptordner, HardwareMonitor.exe im Programmordner): startet die Kopie mit dem
+         Skript, alle Pfade relativ – Doppelklick und Verknüpfungen funktionieren auch nach dem Verschieben
+         (setup\starter.cs, übersetzt mit csc.exe aus dem .NET Framework von Windows)
+  4. je Programm die Downloads aus programm.json (feste Version, Prüfsumme), z. B. LibreHardwareMonitor nach
+     programme\hardware_monitor\lhm\
   5. mit einer UAC-Abfrage: PawnIO installieren und die geplante Aufgabe HardwareMonitor einrichten
   6. Hardware-Monitor (neu) starten
   Jeder Schritt prüft vorher, ob er schon erledigt ist – Einrichten lässt sich also jederzeit erneut ausführen,
   z. B. nach dem Verschieben des Ordners (dann wird nur die Aufgabe neu eingerichtet) oder nach einem git pull.
 
   -OhneAdmin    nur Schritte 1–4, ohne UAC-Abfrage
+  -Neustart     Hardware-Monitor in Schritt 6 auf jeden Fall neu starten, damit er neuen Code lädt
+                (nach einem Update – „Aktualisieren“ in den Toolbox-Einstellungen übergibt das)
 
--Entfernen – das Gegenstück: Hardware-Monitor beenden, Aufgabe löschen, auf Wunsch runtime\ und lhm\ löschen.
+-Entfernen – das Gegenstück: Toolbox und Hardware-Monitor beenden, Aufgabe löschen, auf Wunsch alles Erzeugte und
+  Heruntergeladene löschen (runtime\, Starter, Downloads). daten\ bleibt.
   PawnIO bleibt installiert, weil es auch andere Programme nutzen (entfernen: winget uninstall namazso.PawnIO).
 
 -Admin <Schritte> – intern: der Teil mit Adminrechten. Das Skript startet sich dafür selbst nach einer UAC-Abfrage
   noch einmal (Schritte, mit Komma getrennt: pawnio, aufgabe, aufgabe-loeschen).
+
+Aufteilung des Ordners: Code = Repo (toolbox\, programme\, setup\), runtime\ = wegwerfbar (Python und Pakete –
+lässt sich jederzeit neu einrichten), daten\ = Einstellungen (eine .json je Programm) und Logs.
 #>
-param([switch]$Entfernen, [switch]$OhneAdmin, [string]$Admin)
+param([switch]$Entfernen, [switch]$OhneAdmin, [switch]$Neustart, [string]$Admin)
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'         # Fortschrittsbalken bremsen Invoke-WebRequest stark aus
@@ -29,24 +44,43 @@ $ProgressPreference = 'SilentlyContinue'         # Fortschrittsbalken bremsen In
 $Root       = Split-Path -Parent $PSScriptRoot
 $Runtime    = Join-Path $Root 'runtime'
 $RuntimePy  = Join-Path $Runtime 'python.exe'
-$MonitorExe = Join-Path $Runtime 'HardwareMonitor.exe'
-$ToolboxExe = Join-Path $Runtime 'Toolbox.exe'
-$Symbol     = Join-Path $Root 'src\gui\toolbox.ico'
-$Script     = Join-Path $Root 'src\hardware_monitor\hardware_monitor.py'
-$Lhm        = Join-Path $Root 'src\hardware_monitor\lhm'
+$Symbol     = Join-Path $Root 'toolbox\programm.ico'   # Standardsymbol der Programme (⚒ auf Grün); die Toolbox hat
+                                                     # ihr eigenes ("symbol" in toolbox\programm.json)
+$Csc        = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 $Aufgabe    = 'HardwareMonitor'                  # wie DEFAULT_TASK in hardware_monitor_gui.py
 $IpcPort    = 47815                              # wie IPC_PORT in hardware_monitor.py
+$GuiPort    = 47816                              # wie GUI_PORT in toolbox.py
 
-# LibreHardwareMonitor: feste Version, damit die Sensornamen in detailfenster_inhalt.py passen
-$LhmVersion = '0.9.6'
-$LhmUrl     = "https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/releases/download/v$LhmVersion/LibreHardwareMonitor.zip"
-$LhmSha256  = '086D9F1B5A99E643EDC2CFAAAC16051685B551E4C5AC0B32A57C58C0E529C001'
+# Python: genau diese Version (Major.Minor) – mit ihr sind die festen Paketversionen in requirements.txt geprüft.
+# Zum Wechseln: hier ändern, runtime\ löschen, Setup.exe ausführen, testen, requirements.txt anpassen.
+$PythonVersion = '3.14'
 
 # Richtet die Aufgabe über winutil.task_command() ein – denselben Befehl nutzt die Toolbox bei „Aufgabe einrichten“.
 # (Ohne doppelte Anführungszeichen, die würde Windows PowerShell 5.1 bei der Übergabe an python.exe verstümmeln.)
 $PyAufgabe = 'import sys; sys.path.insert(0, sys.argv[1]); import winutil; ' +
-             'r = winutil.powershell(winutil.task_command(*sys.argv[2:5])); ok = r is not None and r.returncode == 0; ' +
+             'r = winutil.powershell(winutil.task_command(*sys.argv[2:4])); ok = r is not None and r.returncode == 0; ' +
              'ok or print(r.stderr if r else None); sys.exit(0 if ok else 1)'
+
+
+# ---------- Programme (aus den programm.json) ----------
+function Lade-Programm($datei) {
+    <# Liest einen Ausweis und ergänzt die fertigen Pfade: Ordner, Skript, Starter (die .exe zum Doppelklicken) und
+       Host (die pythonw.exe-Kopie in runtime\, die der Starter aufruft – gleicher Dateiname wie der Starter). #>
+    $p = Get-Content -Raw -Encoding UTF8 $datei | ConvertFrom-Json
+    $ordner = Split-Path -Parent $datei
+    $p | Add-Member Ordner $ordner
+    if ($p.starter) {                             # nur bei Programmen, die eigenständig laufen (nicht nur eine Seite)
+        $p | Add-Member SkriptPfad (Join-Path $ordner $p.skript)
+        $p | Add-Member StarterPfad ([IO.Path]::GetFullPath((Join-Path $ordner $p.starter)))
+        $p | Add-Member HostPfad (Join-Path $Runtime (Split-Path -Leaf $p.starter))
+        $p | Add-Member SymbolPfad $(if ($p.symbol) { Join-Path $ordner $p.symbol } else { $Symbol })
+    }
+    $p
+}
+
+$Toolbox   = Lade-Programm (Join-Path $Root 'toolbox\programm.json')
+$Programme = @($Toolbox) + @(Get-ChildItem (Join-Path $Root 'programme\*\programm.json') | ForEach-Object { Lade-Programm $_.FullName })
+$Monitor   = $Programme | Where-Object id -eq 'hardware_monitor'
 
 
 # ---------- Helfer ----------
@@ -58,9 +92,18 @@ function Warnung($text) { Write-Host "   [!] $text" -ForegroundColor Yellow }
 function Monitor-Befehl($befehl) {
     <# Schickt einen Befehl an den laufenden Hardware-Monitor (wie ipc() in hardware_monitor_gui.py) – $null, wenn er
        nicht läuft. #>
+    Befehl-Senden $IpcPort $befehl
+}
+
+function Toolbox-Befehl($befehl) {
+    <# Dasselbe für die Toolbox ("status", "quit", "show" – siehe instance_server in toolbox.py). #>
+    Befehl-Senden $GuiPort $befehl
+}
+
+function Befehl-Senden($port, $befehl) {
     try {
         $client = New-Object Net.Sockets.TcpClient
-        $client.Connect('127.0.0.1', $IpcPort)
+        $client.Connect('127.0.0.1', $port)
         $client.ReceiveTimeout = 1000
         $stream = $client.GetStream()
         $bytes = [Text.Encoding]::UTF8.GetBytes("$befehl`n")
@@ -78,6 +121,22 @@ function Monitor-Beenden {
     for ($i = 0; $i -lt 50 -and (Monitor-Befehl 'status'); $i++) { Start-Sleep -Milliseconds 100 }   # bis zu 5 s
 }
 
+function Toolbox-Beenden {
+    <# $true, wenn die Toolbox lief (und jetzt beendet ist). Eine Toolbox von vor dieser Version kennt "status" und
+       "quit" noch nicht – die muss man selbst über das Symbol im Infobereich beenden. #>
+    if (-not (Toolbox-Befehl 'status')) { return $false }
+    Toolbox-Befehl 'quit' | Out-Null
+    for ($i = 0; $i -lt 50 -and (Toolbox-Befehl 'status'); $i++) { Start-Sleep -Milliseconds 100 }
+    Start-Sleep -Milliseconds 500                 # Prozess räumt nach dem Schließen des Ports noch kurz auf
+    return $true
+}
+
+function Toolbox-Starten {
+    if (Test-Path $Toolbox.StarterPfad) { Start-Process $Toolbox.StarterPfad; return }
+    $exe = if (Test-Path $Toolbox.HostPfad) { $Toolbox.HostPfad } else { Join-Path $Runtime 'pythonw.exe' }
+    Start-Process $exe -ArgumentList "`"$($Toolbox.SkriptPfad)`"" -WorkingDirectory $Toolbox.Ordner
+}
+
 function Als-Admin($schritte) {
     <# Startet dieses Skript mit -Admin nach einer UAC-Abfrage noch einmal. $true, wenn dort alles geklappt hat. #>
     Info 'Windows fragt jetzt nach Adminrechten …'
@@ -89,6 +148,43 @@ function Als-Admin($schritte) {
         Warnung 'Adminrechte abgelehnt.'
         return $false
     }
+}
+
+function Relativ($von, $nach) {
+    <# Pfad von Ordner $von nach $nach, z. B. "..\..\runtime" – für den Starter, der so nach dem Verschieben noch passt.
+       (Windows PowerShell 5.1 hat kein [IO.Path]::GetRelativePath, deshalb über Uri.) #>
+    $basis = New-Object Uri ($von.TrimEnd('\') + '\')
+    $rel = [Uri]::UnescapeDataString($basis.MakeRelativeUri((New-Object Uri $nach)).ToString()) -replace '/', '\'
+    if ($rel) { $rel } else { '.' }
+}
+
+function Starter-Bauen($p) {
+    <# Übersetzt setup\starter.cs für dieses Programm. Rückgabe: Meldung. Gebaut wird nur, wenn sich der erzeugte
+       Quelltext oder das Symbol geändert hat (csc erzeugt bei jedem Lauf eine leicht andere Datei – ein
+       Byte-Vergleich ginge nicht). #>
+    $ordner = Split-Path -Parent $p.StarterPfad
+    $werte = [ordered]@{
+        '%NAME%' = $p.name; '%VERSION%' = $p.version; '%HOST%' = (Split-Path -Leaf $p.HostPfad)
+        '%RUNTIME%' = (Relativ $ordner $Runtime); '%SKRIPT%' = (Relativ $ordner $p.SkriptPfad)
+    }
+    $quelle = Get-Content -Raw -Encoding UTF8 (Join-Path $PSScriptRoot 'starter.cs')
+    foreach ($platzhalter in $werte.Keys) { $quelle = $quelle.Replace($platzhalter, $werte[$platzhalter]) }
+    # Prüfsumme des Symbols mit in den Quelltext – so wird nach einem neuen Symbol auch neu gebaut
+    $quelle += "`r`n// Symbol: $((Get-FileHash $p.SymbolPfad -Algorithm SHA256).Hash)`r`n"
+    $merker = Join-Path $Runtime "starter\$($p.id).cs"          # zuletzt übersetzter Quelltext (gehört zu runtime\)
+    if ((Test-Path $p.StarterPfad) -and (Test-Path $merker) -and
+        (Get-Content -Raw -Encoding UTF8 $merker) -eq $quelle) { return "$(Split-Path -Leaf $p.StarterPfad) ist schon aktuell" }
+    if (-not (Test-Path $Csc)) { throw "C#-Compiler nicht gefunden ($Csc)" }
+
+    New-Item -ItemType Directory -Force (Split-Path -Parent $merker) | Out-Null
+    $tmp = Join-Path (Split-Path -Parent $merker) "$($p.id).tmp.cs"
+    [IO.File]::WriteAllText($tmp, $quelle, (New-Object Text.UTF8Encoding $true))    # mit BOM, sonst kein „ü“ in csc
+    $neu = "$($p.StarterPfad).neu"
+    $ausgabe = & $Csc /nologo /target:winexe /optimize+ "/win32icon:$($p.SymbolPfad)" "/out:$neu" $tmp 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "csc meldet: $ausgabe" }
+    Move-Item -Force $neu $p.StarterPfad
+    Move-Item -Force $tmp $merker
+    "$(Split-Path -Leaf $p.StarterPfad) angelegt"
 }
 
 
@@ -103,7 +199,7 @@ function Admin-Schritte($schritte) {
     if ($schritte -contains 'aufgabe') {
         Schritt "Aufgabe $Aufgabe einrichten"
         $vorher = Get-ScheduledTask -TaskName $Aufgabe -ErrorAction SilentlyContinue
-        & $RuntimePy -B -c $PyAufgabe (Join-Path $Root 'src\gui') $Aufgabe $Script $MonitorExe | Out-Host
+        & $RuntimePy -B -c $PyAufgabe (Join-Path $Root 'toolbox') $Aufgabe $Monitor.StarterPfad | Out-Host
         if ($LASTEXITCODE -ne 0) {
             Warnung 'fehlgeschlagen'; $ok = $false
         } else {
@@ -126,31 +222,39 @@ function Admin-Schritte($schritte) {
 
 # ---------- Einrichten ----------
 function Finde-Python {
-    <# Höchste registrierte Python-Version ab 3.10 (64 Bit), aus der Registry (PEP 514) – oder $null. #>
-    $kandidaten = foreach ($hive in 'HKCU:', 'HKLM:') {
-        Get-ChildItem "$hive\Software\Python\PythonCore" -ErrorAction SilentlyContinue | ForEach-Object {
-            $version = $_.PSChildName
-            $exe = (Get-ItemProperty (Join-Path $_.PSPath 'InstallPath') -ErrorAction SilentlyContinue).ExecutablePath
-            if ($version -match '^3\.(\d+)$' -and [int]$Matches[1] -ge 10 -and $exe -and (Test-Path $exe)) {
-                [pscustomobject]@{ Version = [version]$version; Exe = $exe }
-            }
-        }
+    <# Registriertes Python $PythonVersion (64 Bit) aus der Registry (PEP 514) – oder $null.
+       Andere Versionen zählen bewusst nicht: requirements.txt ist nur mit $PythonVersion geprüft. #>
+    foreach ($hive in 'HKCU:', 'HKLM:') {
+        $exe = (Get-ItemProperty "$hive\Software\Python\PythonCore\$PythonVersion\InstallPath" `
+                    -ErrorAction SilentlyContinue).ExecutablePath
+        if ($exe -and (Test-Path $exe)) { return [pscustomobject]@{ Version = $PythonVersion; Exe = $exe } }
     }
-    $kandidaten | Sort-Object Version -Descending | Select-Object -First 1
+    $null
+}
+
+function Runtime-Version {
+    <# Major.Minor des Pythons in runtime\, z. B. "3.14". #>
+    & $RuntimePy -c 'import sys; print(*sys.version_info[:2], sep=''.'')'
 }
 
 function Einrichten {
+    # Eine laufende Toolbox hält Dateien in runtime\ fest (Pakete, Toolbox.exe) -> vorher beenden, am Ende neu starten
+    $toolboxLief = Toolbox-Beenden
+    if ($toolboxLief) { Info 'Toolbox für die Einrichtung beendet – wird am Ende wieder gestartet.' }
+
     # 1. Python
-    Schritt 'Python'
+    Schritt "Python $PythonVersion"
     if (Test-Path $RuntimePy) {
-        Ok 'runtime\ ist schon da – das installierte Python wird nicht gebraucht'
+        $vorhanden = Runtime-Version
+        if ($vorhanden -eq $PythonVersion) { Ok 'runtime\ ist schon da – das installierte Python wird nicht gebraucht' }
+        else { Warnung "runtime\ enthält Python $vorhanden statt $PythonVersion – zum Wechseln runtime\ löschen und erneut einrichten." }
     } else {
         $python = Finde-Python
         if (-not $python) {
-            Info 'Kein Python gefunden – wird per winget installiert …'
-            winget install --id Python.Python.3.14 --exact --scope user --accept-package-agreements --accept-source-agreements
+            Info "Python $PythonVersion nicht gefunden – wird per winget installiert …"
+            winget install --id "Python.Python.$PythonVersion" --exact --scope user --accept-package-agreements --accept-source-agreements
             $python = Finde-Python
-            if (-not $python) { throw 'Python konnte nicht installiert werden. Bitte von python.org installieren und erneut starten.' }
+            if (-not $python) { throw "Python $PythonVersion konnte nicht installiert werden. Bitte von python.org installieren und erneut starten." }
         }
         Ok "Python $($python.Version): $($python.Exe)"
     }
@@ -176,7 +280,7 @@ function Einrichten {
         "$($dll.BaseName).zip`r`nDLLs`r`nLib`r`nimport site`r`n" |
             Set-Content -Encoding ASCII (Join-Path $Runtime "$($dll.BaseName)._pth")
         # sitecustomize.py: nimmt die Pakete aus %APPDATA%\Python wieder heraus (die ._pth-Datei allein tut das nicht)
-        "# Angelegt von Einrichten.cmd: keine Pakete aus dem Benutzerordner (%APPDATA%\Python) verwenden`r`n" +
+        "# Angelegt von Setup.exe: keine Pakete aus dem Benutzerordner (%APPDATA%\Python) verwenden`r`n" +
         "import site, sys`r`n" +
         "if site.getusersitepackages() in sys.path:`r`n" +
         "    sys.path.remove(site.getusersitepackages())`r`n" |
@@ -191,7 +295,10 @@ function Einrichten {
         if ($LASTEXITCODE -ne 0) { throw 'pip konnte nicht eingerichtet werden' }
         Ok 'runtime\ angelegt'
     }
-    Info 'Pakete aus requirements.txt …'
+    # Ohne ssl lädt pip nichts von PyPI – z. B. wenn beim Kopieren libcrypto-3.dll fehlte. Lieber hier klar abbrechen.
+    & $RuntimePy -c 'import ssl'
+    if ($LASTEXITCODE -ne 0) { throw 'runtime\ ist unvollständig (ssl fehlt) – Ordner runtime\ löschen und erneut einrichten' }
+    Info 'Pakete aus requirements.txt (feste Versionen) …'
     & $RuntimePy -m pip install --disable-pip-version-check --no-warn-script-location --quiet `
         -r (Join-Path $Root 'requirements.txt')
     if ($LASTEXITCODE -ne 0) { throw 'Pakete konnten nicht installiert werden' }
@@ -199,48 +306,73 @@ function Einrichten {
     if ($LASTEXITCODE -ne 0) { throw 'runtime\ ist unvollständig – Ordner runtime\ löschen und erneut einrichten' }
     Ok 'Pakete vollständig'
 
-    # 3. Toolbox.exe und HardwareMonitor.exe (pythonw.exe mit eigenem Namen und Symbol)
-    Schritt 'Toolbox.exe und HardwareMonitor.exe'
-    $neuStarten = $false
-    foreach ($exe in @(@($ToolboxExe, 'Toolbox'), @($MonitorExe, 'Hardware-Monitor'))) {
-        $meldung = & $RuntimePy -B (Join-Path $PSScriptRoot 'exe_anlegen.py') $exe[0] $exe[1] $Symbol
+    # 3. Je Programm: pythonw.exe-Kopie mit eigenem Namen und Symbol + Starter
+    $neuStarten = [bool]$Neustart                 # Monitor in Schritt 6 neu starten (-Neustart: nach einem Update)
+    foreach ($p in $Programme | Where-Object StarterPfad) {
+        Schritt "$($p.name): $(Split-Path -Leaf $p.StarterPfad)"
+        $meldung = & $RuntimePy -B (Join-Path $PSScriptRoot 'exe_anlegen.py') $p.HostPfad $p.name $p.SymbolPfad
         # 2 = Datei gesperrt, weil das Programm läuft. Den Monitor dürfen wir kurz beenden (Schritt 6 startet ihn neu),
         # die Toolbox nicht – da bleibt die alte Datei bis zum nächsten Einrichten.
-        if ($LASTEXITCODE -eq 2 -and $exe[0] -eq $MonitorExe -and (Monitor-Befehl 'status')) {
+        if ($LASTEXITCODE -eq 2 -and $p -eq $Monitor -and (Monitor-Befehl 'status')) {
             Info 'Hardware-Monitor läuft noch mit der alten Datei – wird kurz beendet …'
             Monitor-Beenden
             $neuStarten = $true
             # Der Prozess räumt nach dem letzten IPC-Lebenszeichen noch kurz auf (LHM schließen) – so lange ist die
             # Datei noch gesperrt. Bis zu 10 s erneut versuchen.
             for ($i = 0; $i -lt 20; $i++) {
-                $meldung = & $RuntimePy -B (Join-Path $PSScriptRoot 'exe_anlegen.py') $exe[0] $exe[1] $Symbol
+                $meldung = & $RuntimePy -B (Join-Path $PSScriptRoot 'exe_anlegen.py') $p.HostPfad $p.name $p.SymbolPfad
                 if ($LASTEXITCODE -ne 2) { break }
                 Start-Sleep -Milliseconds 500
             }
         }
-        if ($LASTEXITCODE -eq 0) { Ok $meldung }
+        if ($LASTEXITCODE -eq 0) { Ok "runtime\$meldung" }
         elseif ($LASTEXITCODE -eq 2) { Warnung "$meldung (z. B. Toolbox schließen)" }
         else { Warnung $meldung }
+
+        try { Ok (Starter-Bauen $p) }
+        catch { Warnung "Starter nicht angelegt: $_ – das Programm startet trotzdem über runtime\$(Split-Path -Leaf $p.HostPfad)." }
     }
 
-    # 4. LibreHardwareMonitor
-    Schritt "LibreHardwareMonitor $LhmVersion"
-    if (Test-Path (Join-Path $Lhm 'LibreHardwareMonitorLib.dll')) {
-        $vorhanden = (Get-Item (Join-Path $Lhm 'LibreHardwareMonitorLib.dll')).VersionInfo.ProductVersion -replace '\+.*$', ''
-        if ($vorhanden -eq $LhmVersion) { Ok 'schon da' }
-        else { Warnung "lhm\ enthält Version $vorhanden statt $LhmVersion – bleibt so (zum Ersetzen lhm\ löschen)." }
-    } else {
-        $zip = Join-Path ([IO.Path]::GetTempPath()) "LibreHardwareMonitor-$LhmVersion.zip"
-        Info 'Lade von GitHub …'
-        Invoke-WebRequest $LhmUrl -OutFile $zip -UseBasicParsing
-        if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne $LhmSha256) {
-            Remove-Item $zip
-            throw 'Prüfsumme der heruntergeladenen Datei stimmt nicht – Download abgebrochen.'
+    # 4. Je Programm: Downloads aus programm.json
+    foreach ($p in $Programme) {
+        foreach ($d in @($p.downloads | Where-Object { $_ })) {
+            Schritt "$($d.name) $($d.version) für $($p.name)"
+            $ziel = Join-Path $p.Ordner $d.ordner
+            # Früher lag es in runtime\ (Oktober 2026) bzw. in src\<programm>\ (davor) – einmalig hierher verschieben.
+            # Ein laufender Monitor hält die DLLs fest -> kurz beenden, Schritt 6 startet ihn neu.
+            $alt = @((Join-Path $Runtime $d.ordner), (Join-Path $Root "src\$($p.id)\$($d.ordner)")) |
+                Where-Object { Test-Path $_ } | Select-Object -First 1
+            if ($alt -and -not (Test-Path $ziel)) {
+                if ($p -eq $Monitor -and (Monitor-Befehl 'status')) {
+                    Info 'Hardware-Monitor nutzt noch den alten Ordner – wird kurz beendet …'
+                    Monitor-Beenden
+                    $neuStarten = $true
+                }
+                for ($i = 0; $i -lt 20; $i++) {      # Prozess räumt nach dem letzten IPC-Lebenszeichen noch kurz auf
+                    try { Move-Item $alt $ziel; break } catch { Start-Sleep -Milliseconds 500 }
+                }
+                if (Test-Path $ziel) { Ok "von $alt hierher verschoben" }
+                else { Warnung "$alt ließ sich nicht verschieben – wird neu geladen." }
+            }
+            $pruefdatei = Join-Path $ziel $d.pruefdatei
+            if (Test-Path $pruefdatei) {
+                $vorhanden = (Get-Item $pruefdatei).VersionInfo.ProductVersion -replace '\+.*$', ''
+                if ($vorhanden -eq $d.version) { Ok 'schon da' }
+                else { Warnung "$($d.ordner)\ enthält Version $vorhanden statt $($d.version) – bleibt so (zum Ersetzen den Ordner löschen)." }
+            } else {
+                $zip = Join-Path ([IO.Path]::GetTempPath()) "$($p.id)-$($d.ordner)-$($d.version).zip"
+                Info "Lade $($d.url) …"
+                Invoke-WebRequest $d.url -OutFile $zip -UseBasicParsing
+                if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne $d.sha256) {
+                    Remove-Item $zip
+                    throw 'Prüfsumme der heruntergeladenen Datei stimmt nicht – Download abgebrochen.'
+                }
+                Expand-Archive $zip -DestinationPath $ziel -Force
+                Remove-Item $zip
+                Get-ChildItem $ziel -Recurse -File | Unblock-File    # „aus dem Internet“-Markierung entfernen, sonst lädt .NET die DLLs nicht
+                Ok "entpackt nach $ziel"
+            }
         }
-        Expand-Archive $zip -DestinationPath $Lhm -Force
-        Remove-Item $zip
-        Get-ChildItem $Lhm -Recurse -File | Unblock-File    # „aus dem Internet“-Markierung entfernen, sonst lädt .NET die DLLs nicht
-        Ok "entpackt nach $Lhm"
     }
 
     # 5. Adminrechte: PawnIO und Aufgabe
@@ -249,9 +381,11 @@ function Einrichten {
     if (Get-Service PawnIO -ErrorAction SilentlyContinue) { Ok 'PawnIO ist installiert' }
     else { Info 'PawnIO fehlt'; $schritte += 'pawnio' }
 
+    # Die Aufgabe startet den Starter ohne Argumente (wie task_points_here in hardware_monitor_gui.py)
     $task = Get-ScheduledTask -TaskName $Aufgabe -ErrorAction SilentlyContinue
-    $taskPasst = $task -and $task.Actions[0].Execute -eq $MonitorExe -and "$($task.Actions[0].Arguments)".Trim('"') -eq $Script
+    $taskPasst = $task -and $task.Actions[0].Execute -eq $Monitor.StarterPfad -and -not $task.Actions[0].Arguments
     if ($taskPasst) { Ok "Aufgabe $Aufgabe zeigt auf diesen Ordner" }
+    elseif (-not (Test-Path $Monitor.StarterPfad)) { Warnung "$($Monitor.StarterPfad) fehlt (siehe oben) – Aufgabe bleibt, wie sie ist" }
     elseif ($task) { Info "Aufgabe $Aufgabe zeigt noch auf: $($task.Actions[0].Execute) $($task.Actions[0].Arguments)"; $schritte += 'aufgabe' }
     else { Info "Aufgabe $Aufgabe fehlt"; $schritte += 'aufgabe' }
 
@@ -263,7 +397,7 @@ function Einrichten {
         Ok 'erledigt'
         $neuStarten = $neuStarten -or ($schritte -contains 'aufgabe')
     } else {
-        Warnung 'Nicht alles hat geklappt – Einrichten.cmd erneut ausführen.'
+        Warnung 'Nicht alles hat geklappt – Setup.exe erneut ausführen.'
     }
 
     # 6. Hardware-Monitor starten
@@ -281,12 +415,20 @@ function Einrichten {
     }
 
     Write-Host ""
-    Write-Host "Fertig. Die Toolbox startest du mit Toolbox.cmd." -ForegroundColor Green
+    if ($toolboxLief) {
+        Toolbox-Starten
+        Write-Host "Fertig. Die Toolbox wurde wieder gestartet." -ForegroundColor Green
+    } else {
+        Write-Host "Fertig. Die Toolbox startest du mit Toolbox.exe." -ForegroundColor Green
+    }
 }
 
 
 # ---------- Entfernen ----------
 function Entfernen {
+    Schritt 'Toolbox beenden'
+    if (Toolbox-Beenden) { Ok 'beendet' } else { Ok 'lief nicht' }
+
     Schritt 'Hardware-Monitor beenden'
     if (Monitor-Befehl 'status') { Monitor-Beenden; Ok 'beendet' } else { Ok 'lief nicht' }
 
@@ -302,15 +444,19 @@ function Entfernen {
         }
     }
 
-    Schritt 'Heruntergeladene Dateien'
-    $ordner = @('runtime', 'src\hardware_monitor\lhm') | ForEach-Object { Join-Path $Root $_ } | Where-Object { Test-Path $_ }
-    if (-not $ordner) {
+    Schritt 'Erzeugte und heruntergeladene Dateien'
+    $pfade = @($Runtime) + @($Programme | ForEach-Object {
+        $p = $_
+        $p.StarterPfad
+        @($p.downloads | Where-Object { $_ }) | ForEach-Object { Join-Path $p.Ordner $_.ordner }
+    }) | Where-Object { $_ -and (Test-Path $_) }
+    if (-not $pfade) {
         Ok 'nichts da'
     } else {
-        $ordner | ForEach-Object { Info $_ }
-        if ((Read-Host '   Diese Ordner auch löschen? (j/n)') -match '^[jJyY]') {
+        $pfade | ForEach-Object { Info $_ }
+        if ((Read-Host '   Das alles löschen? (j/n)') -match '^[jJyY]') {
             try {
-                $ordner | ForEach-Object { Remove-Item $_ -Recurse -Force }
+                $pfade | ForEach-Object { Remove-Item $_ -Recurse -Force }
                 Ok 'gelöscht'
             } catch {
                 Warnung 'Nicht alles ließ sich löschen – läuft die Toolbox noch? Dann schließen und erneut versuchen.'
@@ -321,7 +467,7 @@ function Entfernen {
     }
 
     Write-Host ""
-    Write-Host "Fertig. Den Ordner kannst du jetzt löschen. PawnIO bleibt installiert (entfernen: winget uninstall namazso.PawnIO)." -ForegroundColor Green
+    Write-Host "Fertig. Den Ordner kannst du jetzt löschen (daten\ enthält deine Einstellungen). PawnIO bleibt installiert (entfernen: winget uninstall namazso.PawnIO)." -ForegroundColor Green
 }
 
 

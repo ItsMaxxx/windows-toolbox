@@ -6,21 +6,26 @@ Aufbau:
   links    alle Programme des gewählten Tabs, alphabetisch
   rechts   die Einstellungen des gewählten Programms
 
-Start:          Doppelklick auf Toolbox.cmd im Repo (oder: pythonw src\\gui\\toolbox.py)
-Voraussetzung:  einmal Einrichten.cmd (oder: pip install -r requirements.txt)
+Start:          Doppelklick auf Toolbox.exe im Hauptordner (oder: pythonw toolbox\\toolbox.py)
+Voraussetzung:  einmal Setup.exe (legt runtime\\ und die Starter-.exe an)
 
-Programme werden automatisch gefunden: jede Datei src/<programm>/<programm>_gui.py mit einem Eintrag TOOL.
-Einstellungen der Toolbox: toolbox_settings.json, Fehler: toolbox.log (beides neben diesem Skript).
+Programme werden automatisch gefunden: jeder Ordner programme\\<programm>\\ mit einer programm.json (Name, Tab,
+Beschreibung, Version …); deren "seite" ist die Datei mit der Programmseite (SEITE, optional PROGRAMM).
+Einstellungen der Toolbox: daten\\toolbox.json, Fehler: daten\\logs\\toolbox.log (siehe daten.py).
 """
 
 import ctypes
 import importlib.util
 import json
 import logging
+import os
 import queue
+import shutil
 import socket
+import subprocess
 import sys
 import threading
+import webbrowser
 from pathlib import Path
 
 import customtkinter as ctk
@@ -29,11 +34,14 @@ from PIL import Image
 sys.dont_write_bytecode = True             # keine __pycache__-Ordner im Projekt anlegen
 
 APP_DIR = Path(__file__).resolve().parent
-SRC_DIR = APP_DIR.parent                   # hier liegt je Programm ein Ordner (hardware_monitor\, …)
+ROOT = APP_DIR.parent                      # Hauptordner (Toolbox.exe, runtime\, programme\, daten\)
+PROGRAMME_DIR = ROOT / "programme"         # hier liegt je Programm ein Ordner (hardware_monitor\, …)
 sys.path.insert(0, str(APP_DIR))           # damit base, winutil usw. gefunden werden – auch von den Programmseiten
 
-from base import (ACCENT, BAD, BAR, BORDER, GOOD, HOVER, MUTED, ON_ACCENT, SELECTED, TEXT, Choice,  # noqa: E402
-                  Section, Switch, Text, ToolInfo, ToolPage, apply_font, apply_theme)
+import daten  # noqa: E402
+import winutil  # noqa: E402
+from base import (BAD, BAR, BORDER, GOOD, HOVER, MUTED, SELECTED, TEXT, Button, Buttons, Choice,  # noqa: E402
+                  Section, Switch, Text, ToolInfo, ToolPage, Tooltip, apply_font, apply_theme)
 from platzhalter import PlatzhalterPage  # noqa: E402
 
 CATEGORIES = ["Allgemein", "Werkzeuge", "Medien", "Netzwerk"]     # Tabs oben, in dieser Reihenfolge
@@ -43,36 +51,44 @@ PLACEHOLDERS = [
     ToolInfo("xxx-netzwerk", "XXX", "Netzwerk", "Platzhalter", PlatzhalterPage),
 ]
 
-VERSION = "1.0"
-SETTINGS_FILE = APP_DIR / "toolbox_settings.json"
-ICON_FILE = APP_DIR / "toolbox.ico"        # ⚒ auf grünem Grund, wie das Logo oben links
-GUI_PORT = 47816                 # damit ein zweiter Start nur das schon laufende Fenster nach vorne holt
+AUSWEIS = json.loads((APP_DIR / "programm.json").read_text(encoding="utf-8"))    # wie bei jedem Programm
+VERSION = AUSWEIS["version"]
+SETTINGS_FILE = daten.einstellungen("toolbox")
+ICON_FILE = APP_DIR / "toolbox.ico"        # blauer Werkzeugkoffer – die Programme haben programm.ico (⚒ auf Grün)
+GITHUB_URL = "https://github.com/ItsMaxxx/windows-toolbox"     # Knopf „Windows Toolbox“ oben links
+# Von Setup.exe angelegt: pythonw.exe mit Namen „Toolbox“ und eigenem Symbol (für den Task-Manager). Diese
+# startet auch der Starter Toolbox.exe im Hauptordner; für den Neustart geht es direkt, ohne den Umweg.
+TOOLBOX_EXE = ROOT / "runtime" / "Toolbox.exe"
+SETUP_EXE = ROOT / "Setup.exe"
+GUI_PORT = 47816                 # ein zweiter Start holt nur das laufende Fenster nach vorne; setup.ps1 sagt "quit"
 
 APPEARANCE = {"Hell": "light", "Dunkel": "dark", "System": "system"}
 DEFAULT_SETTINGS = {
     "appearance": "Dunkel",
     "close_to_tray": True,
-    "tools": {},                               # eigene Einstellungen der einzelnen Programmseiten
 }
 
-logging.basicConfig(filename=APP_DIR / "toolbox.log", level=logging.INFO,
+logging.basicConfig(filename=daten.log("toolbox"), level=logging.INFO,
                     format="%(asctime)s %(levelname)s %(message)s")
 
 
 # ---------- Programme finden ----------
 def find_tools():
-    """Lädt jede src/<programm>/*_gui.py und sammelt deren TOOL-Eintrag.
-    Eine fehlerhafte Seite wird nur protokolliert, damit die übrigen Programme trotzdem erscheinen."""
+    """Liest jede programme\\<programm>\\programm.json, lädt die darin genannte Seite und baut daraus das ToolInfo.
+    Ein fehlerhaftes Programm wird nur protokolliert, damit die übrigen trotzdem erscheinen."""
     tools = []
-    for file in sorted(SRC_DIR.glob("*/*_gui.py")):
+    for ausweis_datei in sorted(PROGRAMME_DIR.glob("*/programm.json")):
         try:
+            ausweis = json.loads(ausweis_datei.read_text(encoding="utf-8"))
+            file = ausweis_datei.with_name(ausweis["seite"])
             spec = importlib.util.spec_from_file_location(file.stem, file)
             module = importlib.util.module_from_spec(spec)
             sys.modules[file.stem] = module
             spec.loader.exec_module(module)
-            tools.append(module.TOOL)
+            tools.append(ToolInfo(ausweis["id"], ausweis["name"], ausweis["kategorie"], ausweis.get("beschreibung", ""),
+                                  module.SEITE, getattr(module, "PROGRAMM", None)))
         except Exception:
-            logging.exception("Programmseite %s konnte nicht geladen werden", file)
+            logging.exception("Programm %s konnte nicht geladen werden", ausweis_datei.parent)
     return tools
 
 
@@ -89,8 +105,6 @@ def load_settings():
                 settings["appearance"] = saved["appearance"]
             if isinstance(saved.get("close_to_tray"), bool):
                 settings["close_to_tray"] = saved["close_to_tray"]
-            if isinstance(saved.get("tools"), dict):
-                settings["tools"] = saved["tools"]
     except (OSError, ValueError):
         pass
     return settings
@@ -103,6 +117,43 @@ def save_settings(settings):
     except OSError:
         logging.exception("Einstellungen der Toolbox konnten nicht gespeichert werden")
         return False
+
+
+# ---------- Aktualisieren (git pull, danach Setup.exe) ----------
+# Alle drei blockieren eine Weile – nur im Hintergrund aufrufen (app.run_async).
+def git(*args, timeout=30):
+    """git im Hauptordner ausführen (ohne Konsolenfenster). Ergebnis – oder None, wenn git fehlt oder hängt."""
+    exe = shutil.which("git")
+    return winutil.run_hidden([exe, "-C", str(ROOT), *args], timeout) if exe else None
+
+
+def git_stand():
+    """Stand des Ordners für die Anzeige, z. B. „6c3fccf vom 10.10.2026“ – oder None ohne git bzw. ohne Repo."""
+    if not (ROOT / ".git").exists():
+        return None
+    result = git("log", "-1", "--format=%h vom %cd", "--date=format:%d.%m.%Y")
+    return result.stdout.strip() if result is not None and result.returncode == 0 else None
+
+
+def git_holen():
+    """Holt neue Commits von GitHub – nur als Fast-Forward, eigene Änderungen werden nie überschrieben.
+    Rückgabe (neue Commits, Fehlermeldung oder None); 0 neue Commits = schon aktuell."""
+    def fehler(result, text):
+        zeilen = result.stderr.strip().splitlines() if result is not None else []
+        return 0, f"{text}: {zeilen[-1]}" if zeilen else text
+
+    result = git("fetch", "--quiet", timeout=120)
+    if result is None or result.returncode != 0:
+        return fehler(result, "Abrufen fehlgeschlagen")
+    result = git("rev-list", "--count", "HEAD..@{upstream}")
+    if result is None or result.returncode != 0:
+        return fehler(result, "Kein Zweig auf GitHub zugeordnet")
+    neu = int(result.stdout.strip() or 0)
+    if neu:
+        result = git("pull", "--ff-only", "--quiet", timeout=120)
+        if result is None or result.returncode != 0:
+            return fehler(result, "git pull fehlgeschlagen")
+    return neu, None
 
 
 # ---------- Nur eine Toolbox gleichzeitig ----------
@@ -133,7 +184,19 @@ class GuiSettingsPage(ToolPage):
                     Switch("Beim Schließen in den Infobereich minimieren", key="close_to_tray"),
                     Text("Die Toolbox läuft dann unten rechts als Symbol weiter. Doppelklick bzw. Klick öffnet sie "
                          "wieder, Rechtsklick → Beenden schließt sie ganz.")),
-            Section("Info", Text(f"Toolbox {VERSION}\nEinstellungen: {SETTINGS_FILE}")),
+            Section("Beenden und Neustart",
+                    Text("●  Prüfe Programme …", name="programme"),
+                    Buttons(Button("Neu starten", self.app.neu_starten, name="nur_neu"),
+                            Button("Beenden", self.app.quit_app, name="nur_ende", style="grau"),
+                            label="Nur Toolbox", info=NUR_TOOLBOX_INFO),
+                    Buttons(Button("Neu starten", lambda: self.alle(neu=True), name="alle_neu"),
+                            Button("Beenden", lambda: self.alle(neu=False), name="alle_ende", style="grau"),
+                            label="Toolbox und alle Programme", info=ALLE_INFO)),
+            Section("Aktualisieren",
+                    Text("●  Prüfe Stand …", name="stand"),
+                    Buttons(Button("Aktualisieren", self.aktualisieren, name="update"),
+                            label="Neuester Stand von GitHub", info=UPDATE_INFO)),
+            Section("Info", Text(f"Toolbox {VERSION}\nEinstellungen und Logs: {daten.DATEN_DIR}")),
         ]
 
     def on_change(self, key, value):
@@ -141,6 +204,111 @@ class GuiSettingsPage(ToolPage):
             ctk.set_appearance_mode(APPEARANCE[value])
         elif key == "close_to_tray" and not value:
             self.app.stop_tray()
+
+    # --- Beenden und Neustart ---
+    def on_show(self):
+        super().on_show()
+        self.programme_pruefen()
+        self.stand_pruefen()
+
+    def programme_pruefen(self):
+        """Zeigt, welche Programme gerade laufen (die Abfrage läuft im Hintergrund)."""
+        tools = [t for t in TOOLS if t.programm]
+        if not tools:
+            self.w["programme"].configure(text="Keine Programme, die eigenständig laufen.", text_color=MUTED)
+            return
+
+        def zeigen(zustaende):
+            zeilen = [f"●  {t.name}: {'läuft' if an else 'gestoppt'}" for t, an in zip(tools, zustaende or [])]
+            self.w["programme"].configure(text="\n".join(zeilen), text_color=MUTED)
+
+        self.app.run_async(lambda: [t.programm.laeuft(self.app) for t in tools], zeigen)
+
+    def alle(self, neu):
+        """Erst jedes laufende Programm beenden (und bei neu wieder starten), dann die Toolbox selbst.
+        Klappt bei einem Programm etwas nicht, bleibt die Toolbox offen und zeigt den Fehler."""
+        tools = [t for t in TOOLS if t.programm]
+        knoepfe = ("nur_neu", "nur_ende", "alle_neu", "alle_ende")
+        for name in knoepfe:
+            self.enable(name, False)
+        self.w["programme"].configure(text="●  Programme werden " + ("neu gestartet …" if neu else "beendet …"))
+
+        def work():
+            fehler = []
+            for tool in tools:
+                p = tool.programm
+                if not p.laeuft(self.app):
+                    continue                     # gestoppte Programme bleiben gestoppt – auch beim Neustart
+                if not p.beenden(self.app) or (neu and not p.starten(self.app)):
+                    fehler.append(tool.name)
+            return fehler
+
+        def done(fehler):
+            if fehler is None or fehler:
+                for name in knoepfe:
+                    self.enable(name, True)
+                self.app.toast(f"Nicht geklappt: {', '.join(fehler or ['unbekannter Fehler'])}", error=True)
+                self.programme_pruefen()
+            elif neu:
+                self.app.neu_starten()
+            else:
+                self.app.quit_app()
+
+        self.app.run_async(work, done)
+
+    # --- Aktualisieren ---
+    def stand_pruefen(self):
+        def zeigen(stand):
+            text = f"●  Stand: {stand}" if stand else "●  Kein Git-Ordner oder git fehlt – Aktualisieren nicht möglich."
+            self.w["stand"].configure(text=text, text_color=MUTED)
+            self.enable("update", bool(stand))
+
+        self.app.run_async(git_stand, zeigen)
+
+    def aktualisieren(self):
+        """git pull; gab es Neues, danach Setup.exe -Neustart in einem eigenen Fenster. Das beendet die Toolbox,
+        bringt runtime\\ auf den Stand von requirements.txt und startet Toolbox und Hardware-Monitor neu."""
+        self.enable("update", False)
+        self.w["stand"].configure(text="●  Suche nach Updates …", text_color=MUTED)
+
+        def done(ergebnis):
+            neu, fehler = ergebnis or (0, "unbekannter Fehler")
+            if fehler:
+                self.w["stand"].configure(text=f"●  {fehler}", text_color=BAD)
+                self.enable("update", True)
+            elif not neu:
+                self.app.toast("Schon auf dem neuesten Stand ✓")
+                self.stand_pruefen()
+            else:
+                self.w["stand"].configure(text=f"●  {neu} neue Änderung(en) geholt – Setup.exe läuft …",
+                                          text_color=GOOD)
+                try:
+                    os.startfile(str(SETUP_EXE), arguments="-Neustart", cwd=str(SETUP_EXE.parent))
+                except OSError:
+                    logging.exception("Setup.exe konnte nicht gestartet werden")
+                    self.w["stand"].configure(text="●  Code ist aktuell, aber Setup.exe startete nicht – "
+                                                   "bitte selbst ausführen.", text_color=BAD)
+
+        self.app.run_async(git_holen, done)
+
+
+UPDATE_INFO = (
+    "Holt den neuesten Stand von GitHub (git pull) und führt danach Setup.exe aus:\n\n"
+    "•  Die Toolbox schließt sich kurz, Pakete in runtime\\ werden auf die Versionen aus requirements.txt gebracht.\n"
+    "•  Danach starten Toolbox und Hardware-Monitor mit dem neuen Code.\n\n"
+    "Eigene Änderungen am Code bleiben unangetastet: Passen sie nicht zum neuen Stand, bricht das Update mit einer "
+    "Meldung ab. Einstellungen in daten\\ bleiben sowieso erhalten."
+)
+NUR_TOOLBOX_INFO = (
+    "•  Neu starten: schließt die Toolbox und öffnet sie gleich wieder – z. B. nach einem Update.\n"
+    "•  Beenden: schließt die Toolbox ganz (auch das Symbol im Infobereich).\n\n"
+    "Programme wie der Hardware-Monitor laufen dabei weiter."
+)
+ALLE_INFO = (
+    "Wie „Nur Toolbox“, aber zusätzlich für jedes Programm, das gerade läuft (z. B. den Hardware-Monitor):\n\n"
+    "•  Neu starten: erst die Programme neu, dann die Toolbox. Gestoppte Programme bleiben gestoppt.\n"
+    "•  Beenden: erst die Programme, dann die Toolbox."
+)
 
 
 # ---------- Hauptfenster ----------
@@ -152,7 +320,9 @@ class ToolboxApp(ctk.CTk):
         super().__init__()
         apply_font(self)
 
-        self.title("Toolbox")
+        # Titel = Pfad des Programms, wie beim Explorer: Im Task-Manager steht er unter „Toolbox“ und zeigt, welche
+        # Kopie gerade läuft (z. B. nach dem Verschieben des Ordners). Der Name steht ja schon im Logo.
+        self.title(str(Path(__file__).resolve()))
         self.geometry("1060x720")
         self.minsize(860, 540)
         self.set_window_icon()
@@ -188,17 +358,17 @@ class ToolboxApp(ctk.CTk):
             pass                                 # z. B. außerhalb von Windows
 
     def build_topbar(self):
-        """Kopfleiste wie auf der Website: grünes Logo-Kästchen, Name, Tabs als schlichte Links, Linie darunter."""
+        """Kopfleiste wie auf der Website: Name (Knopf zum GitHub-Repo), Tabs als schlichte Links, Linie darunter."""
         bar = ctk.CTkFrame(self, height=60, corner_radius=0, fg_color=BAR)
         bar.grid(row=0, column=0, columnspan=3, sticky="ew")
         bar.columnconfigure(2, weight=1)
         ctk.CTkFrame(self, height=1, corner_radius=0, fg_color=BORDER).grid(row=1, column=0, columnspan=3, sticky="ew")
 
-        logo = ctk.CTkFrame(bar, fg_color="transparent")
-        logo.grid(row=0, column=0, padx=(20, 28), pady=14)
-        ctk.CTkLabel(logo, text="⚒", width=28, height=28, corner_radius=7, fg_color=ACCENT, text_color=ON_ACCENT,
-                     font=ctk.CTkFont(size=16, weight="bold")).pack(side="left")
-        ctk.CTkLabel(logo, text="TOOLBOX", font=ctk.CTkFont(size=17, weight="bold")).pack(side="left", padx=(9, 0))
+        name = ctk.CTkButton(bar, text="Windows Toolbox", width=0, height=36, corner_radius=8, fg_color="transparent",
+                             hover_color=HOVER, text_color=TEXT, font=ctk.CTkFont(size=17, weight="bold"),
+                             cursor="hand2", command=lambda: webbrowser.open(GITHUB_URL))
+        name.grid(row=0, column=0, padx=(12, 20), pady=12)
+        Tooltip(name, f"Auf GitHub öffnen\n{GITHUB_URL}")
 
         tabs = ctk.CTkFrame(bar, fg_color="transparent")
         tabs.grid(row=0, column=1, sticky="w")
@@ -283,10 +453,6 @@ class ToolboxApp(ctk.CTk):
             page.on_show()
 
     # --- Hilfen für Programmseiten ---
-    def tool_settings(self, tool_id):
-        """Eigene Einstellungen einer Programmseite (werden mit den Toolbox-Einstellungen gespeichert)."""
-        return self.settings["tools"].setdefault(tool_id, {})
-
     def save(self):
         if save_settings(self.settings):
             self.toast("Gespeichert ✓")
@@ -369,8 +535,24 @@ class ToolboxApp(ctk.CTk):
         self.stop_tray()
         self.destroy()
 
+    def neu_starten(self):
+        """Startet eine neue Toolbox und beendet diese. Die neue wartet mit --nach <pid>, bis diese wirklich zu ist –
+        sonst fände sie die alte noch laufend und holte nur deren Fenster nach vorne."""
+        exe = str(TOOLBOX_EXE) if TOOLBOX_EXE.exists() else winutil.pythonw_exe()
+        try:
+            subprocess.Popen([exe, str(Path(__file__).resolve()), "--nach", str(os.getpid())],
+                             cwd=str(ROOT), creationflags=winutil.CREATE_NO_WINDOW)
+        except OSError:
+            logging.exception("Neue Toolbox konnte nicht gestartet werden")
+            self.toast("Neustart fehlgeschlagen", error=True)
+            return
+        self.quit_app()
+
     def instance_server(self):
-        """Nimmt "show" von einem zweiten Toolbox-Start entgegen und holt dann dieses Fenster nach vorne."""
+        """Befehle über eine lokale Verbindung, je einer pro Verbindung, Antwort "ok":
+          show    ein zweiter Toolbox-Start holt damit dieses Fenster nach vorne
+          status  läuft die Toolbox? (setup.ps1 fragt vor dem Einrichten)
+          quit    beenden (setup.ps1, damit es runtime\\ erneuern bzw. löschen kann)"""
         try:
             server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             if sys.platform != "win32":
@@ -389,14 +571,21 @@ class ToolboxApp(ctk.CTk):
                 with conn:
                     try:
                         conn.settimeout(1)
-                        if conn.recv(16).strip() == b"show":
-                            self.ui_queue.put("show")
+                        command = conn.recv(16).strip()
+                        if command in (b"show", b"quit"):
+                            self.ui_queue.put(command.decode())
+                        if command in (b"show", b"status", b"quit"):
                             conn.sendall(b"ok\n")
                     except OSError:
                         pass
 
 
 def main():
+    if "--nach" in sys.argv:                     # Neustart (neu_starten): erst warten, bis die alte Toolbox zu ist
+        try:
+            winutil.wait_for_exit(int(sys.argv[sys.argv.index("--nach") + 1]), timeout=10)
+        except (IndexError, ValueError):
+            pass
     if bring_existing_to_front():
         return
     try:
