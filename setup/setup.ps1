@@ -467,7 +467,8 @@ function Entfernen {
     }
 
     Write-Host ""
-    Write-Host "Fertig. Den Ordner kannst du jetzt löschen (daten\ enthält deine Einstellungen). PawnIO bleibt installiert (entfernen: winget uninstall namazso.PawnIO)." -ForegroundColor Green
+    Write-Host "Fertig. Den Ordner kannst du jetzt löschen (daten\ enthält deine Einstellungen)." -ForegroundColor Green
+    Write-Host "PawnIO bleibt installiert (entfernen: winget uninstall namazso.PawnIO)." -ForegroundColor Green
 }
 
 
