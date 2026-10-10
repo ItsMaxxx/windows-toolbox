@@ -23,6 +23,7 @@ Die Toolbox findet jede Datei src/<programm>/<programm>_gui.py mit einem Eintrag
 
 import json
 import os
+import tkinter as tk
 import tkinter.font as tkfont
 from dataclasses import dataclass
 
@@ -103,18 +104,68 @@ class Section:
         self.title, self.elements = title, elements
 
 
+class Tooltip:
+    """Kleines Hinweisfenster, solange die Maus über widget ist. text darf mehrere Zeilen haben (z. B. „•“-Punkte)."""
+
+    def __init__(self, widget, text):
+        self.widget, self.text, self.fenster = widget, text, None
+        widget.bind("<Enter>", self.zeigen, add="+")
+        widget.bind("<Leave>", self.verstecken, add="+")
+
+    def zeigen(self, event=None):
+        if self.fenster:
+            return
+        dunkel = ctk.get_appearance_mode() == "Dark"                 # Farben passend zu Hell/Dunkel
+        farbe = lambda paar: paar[1] if dunkel else paar[0]         # noqa: E731
+        # Schlichtes tk statt CustomTkinter: CTkToplevel setzt verzögert Symbol und Titelleiste, und CTk-Widgets in
+        # einem tk.Toplevel verträgt die DPI-Überwachung von CustomTkinter nicht – beides unnötig für ein Hinweisfenster
+        self.fenster = fenster = tk.Toplevel(self.widget)
+        fenster.withdraw()
+        fenster.overrideredirect(True)                              # ohne Titelleiste
+        fenster.attributes("-topmost", True)
+        fenster.configure(bg=farbe(BORDER))                         # 1 px Rand
+        # Größen wie bei den CTk-Bausteinen mit der Windows-Skalierung malnehmen (negative Schriftgröße = Pixel)
+        s = ctk.ScalingTracker.get_widget_scaling(self.widget)
+        schrift = (ctk.ThemeManager.theme["CTkFont"]["family"], -round(12 * s))
+        tk.Label(fenster, text=self.text, justify="left", anchor="w", wraplength=round(400 * s), bg=farbe(CARD),
+                 fg=farbe(TEXT), font=schrift, padx=round(10 * s), pady=round(8 * s)).pack(padx=1, pady=1)
+        fenster.update_idletasks()
+        x, y = self.widget.winfo_rootx(), self.widget.winfo_rooty() + self.widget.winfo_height() + 6
+        x = min(x, self.widget.winfo_screenwidth() - fenster.winfo_reqwidth() - 8)   # nicht über den Bildschirmrand
+        fenster.geometry(f"+{x}+{y}")
+        fenster.deiconify()
+
+    def verstecken(self, event=None):
+        if self.fenster:
+            self.fenster.destroy()
+            self.fenster = None
+
+
+def info_symbol(master, text):
+    """Rundes „i“, das beim Drüberfahren text als Tooltip zeigt."""
+    symbol = ctk.CTkLabel(master, text="i", width=18, height=18, corner_radius=9, fg_color=BUTTON, text_color=MUTED,
+                          font=ctk.CTkFont(size=11, weight="bold"), cursor="question_arrow")
+    Tooltip(symbol, text)
+    return symbol
+
+
 class Element:
-    """Grundform: Beschriftung links (falls label), Bedienelement rechts – ohne label über die ganze Breite."""
+    """Grundform: Beschriftung links (falls label), Bedienelement rechts – ohne label über die ganze Breite.
+    info: Erklärung, die beim Drüberfahren über ein „i“ hinter der Beschriftung erscheint."""
     sticky = "w"
 
-    def __init__(self, label=None, key=None, name=None):
-        self.label, self.key, self.name = label, key, name
+    def __init__(self, label=None, key=None, name=None, info=None):
+        self.label, self.key, self.name, self.info = label, key, name, info
 
     def place(self, page, card, row):
         """Baut den Baustein ab Zeile row ein und gibt die Zahl der belegten Zeilen zurück."""
         self.widget = self.create(page, card)
         if self.label:
-            ctk.CTkLabel(card, text=self.label, anchor="w").grid(row=row, column=0, sticky="w", padx=(18, 12), pady=4)
+            beschriftung = ctk.CTkFrame(card, fg_color="transparent")
+            ctk.CTkLabel(beschriftung, text=self.label, anchor="w").pack(side="left")
+            if self.info:
+                info_symbol(beschriftung, self.info).pack(side="left", padx=(6, 0))
+            beschriftung.grid(row=row, column=0, sticky="w", padx=(18, 12), pady=4)
             self.widget.grid(row=row, column=1, sticky=self.sticky, padx=(0, 18), pady=4)
         else:
             self.widget.grid(row=row, column=0, columnspan=2, sticky=self.sticky, padx=18, pady=4)
@@ -179,8 +230,8 @@ class Buttons(Element):
 class Choice(Element):
     """Auswahlknöpfe nebeneinander. options: {"Anzeige": Wert} oder eine Liste, wenn Anzeige = Wert."""
 
-    def __init__(self, label, key, options, name=None):
-        super().__init__(label, key, name)
+    def __init__(self, label, key, options, name=None, info=None):
+        super().__init__(label, key, name, info)
         self.options = options if isinstance(options, dict) else {o: o for o in options}
 
     def create(self, page, card):

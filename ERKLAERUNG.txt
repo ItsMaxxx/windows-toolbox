@@ -99,7 +99,7 @@ LibreHardwareMonitor herunter, installiert den Treiber PawnIO und die geplante A
 windows-toolbox\
 ├─ Einrichten.cmd          Doppelklick-Starter für setup\setup.ps1 (einrichten). Beliebig oft ausführbar.
 ├─ Entfernen.cmd           Doppelklick-Starter für setup\setup.ps1 -Entfernen (Gegenstück).
-├─ Toolbox.cmd             Startet die Toolbox mit runtime\pythonw.exe.
+├─ Toolbox.cmd             Startet die Toolbox mit runtime\Toolbox.exe (fehlt sie: runtime\pythonw.exe).
 ├─ __init__.py             Macht den Ordner zum Python-Paket, damit „python -m src.gui.toolbox“ geht (Zed).
 ├─ requirements.txt        Liste der Python-Pakete: customtkinter, pystray, pillow, pythonnet.
 ├─ README.md               Übersicht für GitHub.
@@ -108,16 +108,18 @@ windows-toolbox\
 ├─ .gitattributes          Sorgt dafür, dass .cmd/.ps1 immer Windows-Zeilenenden (CRLF) haben.
 ├─ runtime\                (nicht im Repo) Eigenes Python + Pakete. Legt Einrichten.cmd an.
 │  ├─ python.exe / pythonw.exe / python314.dll / python314._pth / Lib\ / DLLs\ …
-│  └─ HardwareMonitor.exe  Kopie von pythonw.exe, damit der Prozess im Task-Manager so heißt.
+│  ├─ Toolbox.exe          pythonw.exe mit Namen „Toolbox“ und eigenem Symbol (für den Task-Manager).
+│  └─ HardwareMonitor.exe  dasselbe mit Namen „Hardware-Monitor“.
 ├─ setup\
-│  └─ setup.ps1            Das eigentliche Einrichtungs-/Entfernen-Skript (PowerShell).
+│  ├─ setup.ps1            Das eigentliche Einrichtungs-/Entfernen-Skript (PowerShell).
+│  └─ exe_anlegen.py       Legt Toolbox.exe / HardwareMonitor.exe an (Namen und Symbol in die Kopie schreiben).
 └─ src\
    ├─ gui\                 Die Toolbox (gemeinsame Oberfläche)
    │  ├─ toolbox.py        Hauptfenster, findet Programmseiten automatisch, Tray, Einzelinstanz.
    │  ├─ base.py           Farben, Theme und Baukasten (Section, Text, Choice, Slider …, ToolPage).
    │  ├─ winutil.py        UAC, unsichtbare Befehle, PowerShell, Aufgabenplanung.
    │  ├─ platzhalter.py    Leere Seite für Tabs ohne Programm.
-   │  ├─ toolbox.ico       Fenster- und Tray-Symbol.
+   │  ├─ toolbox.ico       Fenster-, Tray- und .exe-Symbol: ⚒ auf Grün (#3ddc97), wie das Logo oben links.
    │  ├─ toolbox_settings.json  (entsteht) Einstellungen der Toolbox.
    │  └─ toolbox.log            (entsteht) Fehlerprotokoll.
    └─ hardware_monitor\    Das Tool „Hardware-Monitor“
@@ -265,9 +267,30 @@ python.exe vs. pythonw.exe
   nicht. Deshalb schreiben Toolbox und Monitor alles in .log-Dateien.
   → https://docs.python.org/3/using/windows.html
 
-HardwareMonitor.exe
+Toolbox.exe und HardwareMonitor.exe
   pythonw.exe ist nur ein winziger Starter, der python314.dll aus demselben Ordner lädt. Eine umbenannte Kopie
-  funktioniert deshalb genauso – im Task-Manager steht dann aber „HardwareMonitor.exe“ statt „pythonw.exe“.
+  funktioniert deshalb genauso – sie muss aber in runtime\ liegen, sonst findet sie die DLL nicht („python314.dll
+  was not found“).
+  Den Namen in der App-Liste des Task-Managers nimmt Windows NICHT aus dem Dateinamen, sondern aus der eingebauten
+  Versionsinfo (Feld „FileDescription“), das Symbol aus den eingebauten Symbol-Ressourcen. Bei einer reinen Kopie
+  stünde also weiter „Python“ mit Python-Logo da. setup\exe_anlegen.py ersetzt deshalb in der Kopie:
+    - die Versionsinfo (VS_VERSIONINFO: ein Baum aus Blöcken mit Länge, Typ, Name und Wert, alles auf 4 Byte
+      ausgerichtet) – FileDescription „Toolbox“ bzw. „Hardware-Monitor“, ProductName „Toolbox“,
+    - das Symbol: jedes Bild aus toolbox.ico wird eine RT_ICON-Ressource, dazu ein Verzeichnis (RT_GROUP_ICON), das
+      auf sie verweist,
+  über die Windows-Funktionen BeginUpdateResource / UpdateResource / EndUpdateResource (kernel32, per ctypes).
+  Vorher wird die digitale Signatur der Python Software Foundation entfernt (Eintrag „Security“ im PE-Kopf leeren,
+  Signaturdaten am Dateiende abschneiden): nach der Änderung wäre sie ungültig, und „ungültig signiert“ wirkt auf
+  Virenscanner verdächtiger als „unsigniert“.
+  Windows merkt sich Programmnamen außerdem im „MuiCache“ (Registry, HKCU\Software\Classes\Local Settings\…\
+  MuiCache). Stand dort von einer früheren reinen Kopie noch „Python“, zeigte der Task-Manager den alten Namen –
+  exe_anlegen.py löscht daher die Einträge der beiden .exe.
+  → https://learn.microsoft.com/de-de/windows/win32/menurc/vs-versioninfo
+  → https://learn.microsoft.com/de-de/windows/win32/api/winbase/nf-winbase-updateresourcew
+
+Apps vs. Hintergrundprozesse im Task-Manager
+  Unter „Apps“ steht nur, was ein sichtbares Fenster hat. Der Hardware-Monitor mit geschlossenem Detailfenster (nur
+  Tray-Icons) steht deshalb unter „Hintergrundprozesse“ – wie jedes Programm, das nur im Infobereich sitzt.
 
 Bytecode und __pycache__
   Python übersetzt .py-Dateien beim Import in Bytecode (.pyc) und speichert ihn in __pycache__-Ordnern. Das Projekt
@@ -418,7 +441,8 @@ Ports
 
 Das eigene Protokoll
   Pro Verbindung genau ein Befehl als Textzeile („status\n“), Antwort ist eine JSON-Zeile, dann wird geschlossen.
-    status  → {"ok": true, "pid": 1234, "cpu": 52.0, "gpu": 41.0, "order": ["cpu", "gpu"]}
+    status  → {"ok": true, "pid": 1234, "cpu": 52.0, "gpu": 41.0, "order": ["cpu", "gpu"], "icons": ["cpu", "gpu"]}
+              (icons = die angezeigten Icons; ohne GPU-Temperatur nur ["cpu"])
     reload  → {"ok": true}   (Monitor liest danach hardware_monitor_settings.json neu)
     quit    → {"ok": true}   (Monitor beendet sich)
   JSON = einfaches Textformat für Daten (Zahlen, Texte, Listen, Objekte).  → https://www.json.org/json-de.html
@@ -680,9 +704,12 @@ Schritt 2 – runtime\ anlegen (nur wenn noch nicht da)
   Danach (IMMER): `pip install -r requirements.txt` (holt fehlende/neue Pakete, z. B. nach git pull) und eine
   Prüfung `import tkinter, customtkinter, pystray, PIL, clr`. Schlägt die fehl → Abbruch mit Hinweis.
 
-Schritt 3 – HardwareMonitor.exe
-  Kopie von runtime\pythonw.exe. Per Hash-Vergleich wird geprüft, ob sie aktuell ist. Läuft der Monitor gerade,
-  ist die Datei gesperrt → nur eine Warnung.
+Schritt 3 – Toolbox.exe und HardwareMonitor.exe
+  Ruft für beide setup\exe_anlegen.py auf (siehe 3.2): Kopie von runtime\pythonw.exe mit eigenem Namen und Symbol.
+  Das Skript baut die neue Datei als „….exe.neu“ und vergleicht sie Byte für Byte mit der vorhandenen – gleich →
+  „schon aktuell“. Läuft das Programm gerade, ist die Datei gesperrt → Exitcode 2. Beim Hardware-Monitor beendet
+  setup.ps1 ihn dann per „quit“, versucht es bis zu 10 s lang erneut (der Prozess räumt nach dem Beenden noch kurz
+  auf) und startet ihn in Schritt 6 neu. Bei der Toolbox gibt es nur eine Warnung – sie muss man selbst schließen.
 
 Schritt 4 – LibreHardwareMonitor
   Ist lhm\LibreHardwareMonitorLib.dll da: Version prüfen (nur Warnung bei Abweichung). Sonst: ZIP von GitHub laden,
@@ -712,8 +739,9 @@ sonst Einrichten.
 ----------------------------------------------------------------------------------------------------------------
 
 Toolbox.cmd prüft, ob runtime\pythonw.exe existiert, und startet dann:
-    start "" runtime\pythonw.exe src\gui\toolbox.py
-Kurz blitzt die cmd-Konsole auf, dann läuft die Toolbox ohne Konsole.
+    start "" runtime\Toolbox.exe src\gui\toolbox.py
+(fehlt Toolbox.exe, z. B. vor dem erneuten Einrichten: runtime\pythonw.exe). Kurz blitzt die cmd-Konsole auf, dann
+läuft die Toolbox ohne Konsole – im Task-Manager als „Toolbox“.
 
 Alternativen:
     runtime\python.exe src\gui\toolbox.py      mit Konsole (Fehler erscheinen dort zusätzlich zum Log)
@@ -813,14 +841,22 @@ ToolInfo (dataclass)
 
 Bausteine
   Section(titel, *bausteine)      eine Karte mit Überschrift; darin die Bausteine untereinander.
-  Element                         Basisklasse: Beschriftung links (label), Bedienelement rechts. Wichtige Methoden:
+  Element                         Basisklasse: Beschriftung links (label), Bedienelement rechts. Mit info="…"
+                                  steht hinter der Beschriftung ein rundes „i“ (info_symbol), das den Text beim
+                                  Drüberfahren als Tooltip zeigt. Wichtige Methoden:
                                     place(page, card, row)  baut ein, gibt die Zahl belegter Zeilen zurück
                                     create(page, card)      erzeugt das eigentliche Widget
                                     refresh(page)           zeigt den aktuellen Wert aus page.data an
   Text(text, name, color, size, hidden)   Text über die ganze Breite (hidden → später page.show(name)).
   Buttons(Button(...), Button(...))      Knopfreihe. Button(text, command, name, width, style) mit style
                                           "normal" (grün), "grau", "rahmen", "gefahr" (roter Text).
-  Choice(label, key, optionen)           Auswahlknöpfe (CTkSegmentedButton). optionen = {"Anzeige": Wert} oder Liste.
+  Choice(label, key, optionen, info)     Auswahlknöpfe (CTkSegmentedButton). optionen = {"Anzeige": Wert} oder Liste.
+  Tooltip(widget, text)                  kleines Hinweisfenster bei <Enter>, weg bei <Leave>. Bewusst schlichtes tk
+                                          (tk.Toplevel ohne Titelleiste + tk.Label): CTkToplevel setzt verzögert Symbol
+                                          und Titelleiste, und CTk-Widgets in einem tk.Toplevel verträgt die DPI-
+                                          Überwachung von CustomTkinter nicht. Schrift und Abstände werden deshalb
+                                          selbst mit ScalingTracker.get_widget_scaling() an die Windows-Skalierung
+                                          angepasst; die Farben (hell/dunkel) nach ctk.get_appearance_mode().
   Combo(label, key, werte, names)        Aufklappliste mit freier Eingabe. names übersetzt gespeicherte Werte in
                                           Anzeige ({"auto": "Automatisch"}). Leer = Standardwert.
   Entry(label, key | command)            Eingabefeld; übernimmt bei Enter oder beim Verlassen.
@@ -909,7 +945,7 @@ HardwareMonitorPage(ToolPage)
   DEFAULT_SETTINGS im Monitor (ohne "window").
 
   layout(): Bereiche Status (Statuszeile + Starten/Beenden/Neu starten), Autostart (Schalter + Aufgabe einrichten),
-  Aktualisierung (zwei Choice), Anzeige (Reihenfolge, Sensor-Combos, zwei Slider), Detailfenster (Hinweis + Ordner
+  Aktualisierung (zwei Raten + Effizienzmodus mit „i“-Tooltip, Text in EFFIZIENZ_INFO), Anzeige (Reihenfolge, Sensor-Combos, zwei Slider), Detailfenster (Hinweis + Ordner
   öffnen), Erweitert (Aufgabenname, Ordner/Log/Einstellungsdatei öffnen, Alles zurücksetzen).
 
   on_change: hält „Gelb ab“ immer unter „Rot ab“ (zieht den anderen Regler mit); zeigt bei geänderter Icon-
@@ -947,7 +983,8 @@ Was beim Start passiert (Reihenfolge im Code):
  2. Einstellungen/Konstanten:
       LHM_DIR          wo LibreHardwareMonitorLib.dll liegt (lhm\ neben dem Skript, sonst im Repo, sonst C:\Tools\lhm)
       ICON_RATES       1, 2, 5, 10 s      POPUP_RATES  0,5 / 1 / 2 / 5 s
-      DEFAULT_SETTINGS icon_interval, popup_interval, icon_order, cpu_sensor, gpu_sensor, warn_temp, hot_temp, window
+      DEFAULT_SETTINGS icon_interval, popup_interval, icon_order, cpu_sensor, gpu_sensor, warn_temp, hot_temp, window,
+                       effizienzmodus ("auto"/"an"/"aus")
       CPU_SENSORS      ("Core (Tctl/Tdie)", "CPU Package", "Core Average") – Reihenfolge für „Automatisch“
       GPU_SENSORS      ("GPU Core", "GPU Hot Spot")
       IPC_PORT = 47815
@@ -958,7 +995,7 @@ Was beim Start passiert (Reihenfolge im Code):
  5. `nvidia = NvidiaTemp()` – versucht nvml.dll zu laden und die erste Nvidia-Karte zu öffnen. Ohne Nvidia:
     available = False, alles läuft über LHM.
  6. Übersetzungstabellen: HW_TYPES/SENSOR_TYPES (.NET-Enum → Text), HW_GERAET (LHM-Typ → „cpu“, „gpu“, „ram“,
-    „mainboard“, „laufwerk“, „netzwerk“; alles andere → „weitere“). Diese Gerätenamen benutzt
+    „mainboard“, „laufwerk“, „netzwerk“, „akku“; alles andere → „weitere“). Diese Gerätenamen benutzt
     detailfenster_inhalt.py in Gruppe("...").
  7. SETTINGS = load_settings() – jeder Wert wird geprüft (Raten müssen in den erlaubten Listen sein, 20 ≤ gelb < rot
     ≤ 120, window muss wie „480x640+1420+380“ aussehen …). Ungültiges → Standardwert.
@@ -999,7 +1036,10 @@ Klasse HardwareMonitorApp
     - fenster_bedarf: False = Fenster zu/minimiert, sonst die Menge der gebrauchten Geräte (None = alle).
     - Events stop/wake, lock, latest (letzter Snapshot), shown (was gerade in den Icons steht), ui_queue,
       current (aktuelle Icon-Werte für die Statusabfrage).
-    - Ein pystray.Icon pro Eintrag in icon_order, beide mit demselben Menü.
+    - kinds = die Icons, die es wirklich gibt: icon_order ohne "gpu", wenn gpu_hat_temperatur() nichts findet (kein
+      NVML und kein Temperatursensor an einer GPU – z. B. Intel-Onboard-Grafik). kinds bekommen auch measure_icons,
+      measure (collect(…, icons)), das Detailfenster (Kopfzeile) und die Statusabfrage ("icons").
+    - Ein pystray.Icon pro Eintrag in kinds, alle mit demselben Menü.
     - Threads vorbereiten: sensor_thread (sensor_loop), ipc_thread (ipc_server).
 
   Rechtsklick-Menü (make_menu, rate_menu)
@@ -1010,13 +1050,18 @@ Klasse HardwareMonitorApp
 
   run():
     Icons NACHEINANDER anmelden (run_detached + setup-Callback, auf ready warten) → feste Reihenfolge in der
-    Taskleiste. Effizienzmodus an. Threads starten. poll_queue per after(). root.mainloop().
+    Taskleiste. effizienz_anwenden(). Threads starten. poll_queue per after(). root.mainloop().
+
+  effizienz_anwenden()
+    Setzt den Effizienzmodus laut Einstellung "effizienzmodus": "auto" = an, solange das Fenster zu ist; "an" =
+    immer; "aus" = nie. Aufgerufen beim Start, beim Wechsel Fenster offen↔zu und nach "reload" (Toolbox geändert).
     Nach quit(): auf den Mess-Thread warten (max. 5 s), Fenster zerstören.
 
   sensor_loop() – der Mess-Thread (Herzstück)
       1. Icons sofort füllen (measure_icons).
       2. Übrige Hardware einschalten (LATER_HARDWARE, RAM dauert ~8 s) und einmal komplett messen („anwärmen“).
-         hardware_ready = True.
+         Aus dieser Messung: vorhanden = welche Geräte dieser PC hat (z. B. kein „mainboard“ am Laptop) – damit
+         blendet das Fenster Tabs ohne passende Geräte aus. hardware_ready = True.
       3. Schleife bis stop:
            needed = fenster_bedarf
            Fenster offen und Zeit fürs Fenster?  → measure(needed) → latest setzen → Icons aus dem Snapshot
@@ -1027,7 +1072,7 @@ Klasse HardwareMonitorApp
     update_icons zeichnet ein Icon nur neu, wenn sich die angezeigte ganze Zahl geändert hat.
 
   fenster_braucht(geraete) – vom Detailfenster aufgerufen
-    Merkt sich, was gebraucht wird; schaltet beim Wechsel offen↔zu den Effizienzmodus um; verwirft beim Schließen
+    Merkt sich, was gebraucht wird; ruft beim Wechsel offen↔zu effizienz_anwenden() auf; verwirft beim Schließen
     den alten Snapshot; weckt den Mess-Thread.
 
   ipc_server() – der IPC-Thread
@@ -1060,9 +1105,11 @@ Bausteine für detailfenster_inhalt.py (ähnlich wie base.py, nur fürs Detailfe
   Gruppe(geraet, *werte, name="*", titel=None)
                                          Werte EINES Gerätetyps. Gibt es mehrere passende Geräte (drei Laufwerke),
                                          erscheint die Gruppe für jedes einmal. name filtert Geräte nach Namen.
-  Wert(sensor, typ=None, text=None)      eine Zeile. * als Platzhalter. typ nur nötig, wenn derselbe Name mehrfach
+  Wert(sensor, typ=None, text=None, ohne=None)
+                                         eine Zeile. * als Platzhalter. typ nur nötig, wenn derselbe Name mehrfach
                                          vorkommt ("GPU Core" ist Temperatur, Auslastung UND Takt). typ darf deutsch
-                                         („Temperatur“) oder englisch („Temperature“) sein.
+                                         („Temperatur“) oder englisch („Temperature“) sein. ohne schließt Namen aus,
+                                         die trotz Platzhalter nicht dazugehören ("CPU Core #*", ohne="*Distance*").
   AlleSensoren()                         alles, was LHM findet (zum Nachschlagen)
   Hardwaredaten()                        der Tab mit den festen Daten (hardwaredaten.py)
 
@@ -1097,8 +1144,13 @@ Klasse Detailfenster
   Bildschirm liegt – sonst unten rechts auf dem Bildschirm, auf dem geklickt wurde, über der Taskleiste.
   speichern(): Geometrie → app.fenster_geometrie → hardware_monitor_settings.json ("window").
 
+  tabs_ausblenden(): Sobald app.vorhanden bekannt ist (nach dem Nachladen der Hardware), werden Tabs versteckt
+  (`notebook.hide`), deren Geräte der PC nicht hat – z. B. „Mainboard“ am Laptop, „Akku“ am Desktop. Läuft einmal
+  pro Stand (ausgeblendet_fuer); ist gerade ein versteckter Tab gewählt, springt ttk von selbst zum nächsten.
+  notebook.index("current") zählt versteckte Tabs mit – die Zuordnung zu self.tabs bleibt also gleich.
+
   aktualisieren() – wird bei jeder neuen Messung ("data") und bei Tabwechsel aufgerufen
-    - Kopfwerte setzen.
+    - Tabs ausblenden (siehe oben), Kopfwerte setzen.
     - Passt der Snapshot zum aktiven Tab? (Sind alle gebrauchten Geräte gemessen? `gebraucht <= gemessen`) Wenn
       nicht: „Lade Sensordaten …“ – die passende Messung kommt gleich, weil melden() den Mess-Thread geweckt hat.
     - „Signatur“-Trick: Die Liste wird nur dann komplett neu aufgebaut, wenn sich ihr Aufbau (Schlüssel/Texte)
@@ -1126,9 +1178,15 @@ Klasse Detailfenster
 
   FENSTER = [ Tab("Temperaturen", Gruppe("cpu", Wert(...), ...), Gruppe("gpu", ...)),
               Tab("CPU", ...), Tab("GPU", ...), Tab("RAM", ...), Tab("Mainboard", ...),
-              Tab("Laufwerke", ...), Tab("Netzwerk", ...), Tab("Hardwaredaten", Hardwaredaten()),
+              Tab("Laufwerke", ...), Tab("Netzwerk", ...), Tab("Akku", ...), Tab("Hardwaredaten", Hardwaredaten()),
               # Tab("Alles", AlleSensoren()),   ← zum Nachschlagen wieder einkommentieren
             ]
+
+  Die Sensornamen hängen von der Hardware ab: AMD meldet „Core (Tctl/Tdie)“ und „Package“, Intel „CPU Package“,
+  „Core Max“ und „CPU Core #1“ … Darum stehen die Namen für beide in denselben Gruppen – was es nicht gibt, erscheint
+  einfach nicht. Intel-Onboard-Grafik hat keine Temperatur, nur Leistung und Windows-Werte („D3D …“); dafür gibt es im
+  GPU-Tab eine eigene Gruppe mit name="Intel*" (bei Nvidia-Karten gibt es die D3D-Werte auch, die sollen dort aber
+  nicht erscheinen).
 
   ERKLAERUNGEN = [ (Sensortyp, regulärer Ausdruck, Text), ... ]
       Der erste passende Eintrag gewinnt. Das Muster muss auf den GANZEN Namen passen (re.fullmatch).
@@ -1150,6 +1208,7 @@ Klasse Detailfenster
             Anfang der Teilenummer raten, weil Windows oft „Unknown“ meldet), RAM_TYPEN, BUS_TYPEN, MEDIEN_TYPEN.
   Bereiche: prozessoren, grafikkarten, mainboard (+ BIOS), arbeitsspeicher, laufwerke, netzwerk, audio, usb_geraete.
             Jede Funktion liefert [(Gerätename, [(Feld, Wert), …]), …]. Virtuelle Geräte werden aussortiert.
+            audio nimmt PCI-, HDAUDIO- und INTELAUDIO\FUNC_-Geräte (Codec hinter Intel Smart Sound bei Laptops).
             usb_geraete fasst Einträge mit gleicher VID/PID zusammen (ein Gerät meldet sich oft mehrfach an).
   BEREICHE  Liste (Anzeigename, Funktion) – Reihenfolge im Tab.
   lesen()   ruft alle Bereiche auf; ein kaputter Bereich verhindert die anderen nicht.

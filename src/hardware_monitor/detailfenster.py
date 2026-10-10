@@ -40,9 +40,10 @@ class Tab:
 class Gruppe:
     """Werte eines Geräts, mit dem Gerätenamen als Überschrift.
 
-    geraet: "cpu", "gpu", "ram", "mainboard", "laufwerk", "netzwerk" oder "weitere"
+    geraet: "cpu", "gpu", "ram", "mainboard", "laufwerk", "netzwerk", "akku" oder "weitere"
             (steht bei `hardware_monitor.py --list` in eckigen Klammern).
             Gibt es mehrere passende Geräte (z. B. drei Laufwerke), erscheint die Gruppe für jedes einmal.
+            Hat der PC keins davon (z. B. keinen Akku), wird der Tab ausgeblendet.
     name:   nur Geräte, deren Name hierzu passt (* als Platzhalter), z. B. name="Total Memory"
     titel:  eigene Überschrift statt des Gerätenamens
     """
@@ -58,15 +59,18 @@ class Wert:
     typ:    nur nötig, wenn es den Namen mehrfach gibt ("GPU Core" ist Temperatur, Auslastung und Takt) –
             deutsch wie in --list ("Temperatur") oder englisch ("Temperature").
     text:   eigene Beschriftung statt des Sensornamens.
+    ohne:   Sensoren, die trotz Platzhalter nicht dazugehören, z. B. ohne="*Distance*" bei "CPU Core #*".
     """
 
-    def __init__(self, sensor, typ=None, text=None):
-        self.sensor, self.text = sensor, text
+    def __init__(self, sensor, typ=None, text=None, ohne=None):
+        self.sensor, self.text, self.ohne = sensor, text, ohne
         self.typ = LABEL_TYPES.get(typ, typ)            # "Temperatur" -> "Temperature"
 
     def passt(self, s):
+        name = s["name"].lower()
         return ((self.typ is None or s["type"] == self.typ)
-                and fnmatch.fnmatchcase(s["name"].lower(), self.sensor.lower()))
+                and fnmatch.fnmatchcase(name, self.sensor.lower())
+                and not (self.ohne and fnmatch.fnmatchcase(name, self.ohne.lower())))
 
 
 class AlleSensoren:
@@ -93,7 +97,7 @@ LABEL_TYPES = {label: typ for typ, label in TYPE_LABELS.items()}
 UNITS = {   # Sensortyp -> (Nachkommastellen, Einheit)
     "Temperature": (0, "°C"), "Load": (0, "%"), "Control": (0, "%"), "Level": (0, "%"),
     "Humidity": (0, "%"), "Clock": (0, "MHz"), "Frequency": (0, "Hz"), "Power": (1, "W"),
-    "Voltage": (3, "V"), "Current": (2, "A"), "Energy": (0, "mWh"), "Fan": (0, "RPM"),
+    "Voltage": (3, "V"), "Current": (2, "A"), "Fan": (0, "RPM"),
     "Flow": (0, "L/h"), "Data": (1, "GB"), "SmallData": (0, "MB"), "Timing": (1, "ns"),
     "Noise": (0, "dBA"), "Conductivity": (0, "µS/cm"), "Factor": (2, ""),
 }
@@ -119,6 +123,8 @@ def fmt_value(sensor_type, value):
         return f"{minutes // 60}:{minutes % 60:02d} h"
     if sensor_type == "Data" and value >= 1024:          # große Datenmengen lesbarer in TB
         return f"{num(value / 1024, 2)} TB"
+    if sensor_type == "Energy":                          # LHM liefert mWh, z. B. Akku-Kapazität
+        return f"{num(value / 1000, 1)} Wh"
     if sensor_type == "SmallData" and value >= 1024:     # z. B. Grafikspeicher lieber in GB
         return f"{num(value / 1024, 1)} GB"
     decimals, unit = UNITS.get(sensor_type, (1, ""))
@@ -255,7 +261,7 @@ HINWEIS = "Maus über einen Wert halten, um ihn erklärt zu bekommen. Klick auf 
 class Detailfenster:
     """Ein normales Fenster: verschieb- und vergrößerbar, ✕ blendet es nur aus. Position und Größe werden gespeichert.
 
-    app (HardwareMonitorApp) liefert: settings, order, current, snapshot() und
+    app (HardwareMonitorApp) liefert: settings, kinds (die angezeigten Icons), current, vorhanden, snapshot() und
     fenster_braucht(geraete) – sagt dem Mess-Thread, welche Geräte gerade gebraucht werden (False = Fenster zu).
     """
 
@@ -266,6 +272,7 @@ class Detailfenster:
         self.inhalt_stand = None                         # Änderungszeit der Datei beim letzten Laden
         self.fehler = None                               # Fehlermeldung, falls die Datei nicht geladen werden konnte
         self.tabs = []                                   # [(Tab, Treeview)]
+        self.ausgeblendet_fuer = None                    # vorhandene Geräte, nach denen Tabs zuletzt ausgeblendet wurden
         self.signatur = {}                               # je Treeview: Aufbau beim letzten Zeichnen
         self.sensoren = {}                               # Zeilen-Schlüssel -> Sensor (für die Erklärung)
         self.kopierbar = {}                              # Zeilen-Schlüssel -> Text, den ein Klick kopiert
@@ -290,7 +297,7 @@ class Detailfenster:
         kopf = ttk.Frame(win)
         kopf.pack(fill="x", padx=self.px(14), pady=(self.px(10), self.px(4)))
         self.kopf = {}
-        for kind in app.order:
+        for kind in app.kinds:                           # wie die Taskleisten-Icons – ohne GPU-Temperatur nur CPU
             ttk.Label(kopf, text=kind.upper(), style="KopfName.TLabel").pack(side="left", padx=(0, self.px(6)))
             self.kopf[kind] = ttk.Label(kopf, text="–", style="KopfWert.TLabel")
             self.kopf[kind].pack(side="left", padx=(0, self.px(24)))
@@ -377,6 +384,7 @@ class Detailfenster:
         for _, tree in self.tabs:
             tree.master.destroy()
         self.tabs, self.signatur = [], {}
+        self.ausgeblendet_fuer = None                    # neue Tabs sind alle sichtbar
 
         self.knoepfe = {}
         for tab in tabs:
@@ -427,7 +435,19 @@ class Detailfenster:
             self.notebook.select(titel.index(gewaehlt))
 
     def aktiver_tab(self):
-        return self.tabs[self.notebook.index("current")]
+        return self.tabs[self.notebook.index("current")]     # zählt ausgeblendete Tabs mit, passt also zu self.tabs
+
+    def tabs_ausblenden(self):
+        """Tabs für Geräte ausblenden, die es auf diesem PC nicht gibt (z. B. Mainboard-Sensoren am Laptop).
+        Geht erst, wenn nach dem Start alle Hardware geladen ist – vorher sind alle Tabs zu sehen."""
+        vorhanden = self.app.vorhanden
+        if vorhanden is None or vorhanden == self.ausgeblendet_fuer:
+            return
+        self.ausgeblendet_fuer = vorhanden               # vor hide(): das löst einen Tabwechsel und damit uns erneut aus
+        for tab, tree in self.tabs:
+            geraete = benoetigte_geraete(tab)            # leer bei Hardwaredaten, None bei AlleSensoren -> bleiben
+            if geraete and not geraete & vorhanden:
+                self.notebook.hide(tree.master)
 
     # --- Zeigen / verstecken ---
     def sichtbar(self):
@@ -498,6 +518,7 @@ class Detailfenster:
         """Neue Messwerte eintragen. Ändert sich der Aufbau (anderer Tab, neue Sensoren), wird die Liste neu gefüllt."""
         if not self.sichtbar() or not self.tabs:
             return
+        self.tabs_ausblenden()
         snap = self.app.snapshot()
         for kind, label in self.kopf.items():
             value = self.app.current.get(kind)

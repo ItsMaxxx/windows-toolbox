@@ -5,7 +5,8 @@ Einrichten und Entfernen der windows-toolbox. Aufgerufen von Einrichten.cmd bzw.
 Einrichten (ohne Parameter) – alles, was nach dem Klonen fehlt:
   1. Python finden (oder per winget installieren)
   2. runtime\ anlegen: eigenes Python im Projektordner, mit den Paketen aus requirements.txt
-  3. runtime\HardwareMonitor.exe anlegen (damit der Monitor im Task-Manager unter seinem Namen erscheint)
+  3. runtime\Toolbox.exe und runtime\HardwareMonitor.exe anlegen: Kopien von pythonw.exe mit eigenem Namen und Symbol,
+     damit beide im Task-Manager als eigene Programme erscheinen statt als „Python“ (setup\exe_anlegen.py)
   4. LibreHardwareMonitor herunterladen (feste Version) nach src\hardware_monitor\lhm\
   5. mit einer UAC-Abfrage: PawnIO installieren und die geplante Aufgabe HardwareMonitor einrichten
   6. Hardware-Monitor (neu) starten
@@ -29,6 +30,8 @@ $Root       = Split-Path -Parent $PSScriptRoot
 $Runtime    = Join-Path $Root 'runtime'
 $RuntimePy  = Join-Path $Runtime 'python.exe'
 $MonitorExe = Join-Path $Runtime 'HardwareMonitor.exe'
+$ToolboxExe = Join-Path $Runtime 'Toolbox.exe'
+$Symbol     = Join-Path $Root 'src\gui\toolbox.ico'
 $Script     = Join-Path $Root 'src\hardware_monitor\hardware_monitor.py'
 $Lhm        = Join-Path $Root 'src\hardware_monitor\lhm'
 $Aufgabe    = 'HardwareMonitor'                  # wie DEFAULT_TASK in hardware_monitor_gui.py
@@ -196,18 +199,28 @@ function Einrichten {
     if ($LASTEXITCODE -ne 0) { throw 'runtime\ ist unvollständig – Ordner runtime\ löschen und erneut einrichten' }
     Ok 'Pakete vollständig'
 
-    # 3. HardwareMonitor.exe
-    Schritt 'HardwareMonitor.exe'
-    $pythonw = Join-Path $Runtime 'pythonw.exe'
-    if ((Test-Path $MonitorExe) -and (Get-FileHash $MonitorExe).Hash -eq (Get-FileHash $pythonw).Hash) {
-        Ok 'schon da'
-    } else {
-        try {
-            Copy-Item $pythonw $MonitorExe -Force
-            Ok 'angelegt (Kopie von pythonw.exe)'
-        } catch {
-            Warnung 'Konnte nicht angelegt werden – läuft der Hardware-Monitor gerade? Dann nach dem Beenden erneut einrichten.'
+    # 3. Toolbox.exe und HardwareMonitor.exe (pythonw.exe mit eigenem Namen und Symbol)
+    Schritt 'Toolbox.exe und HardwareMonitor.exe'
+    $neuStarten = $false
+    foreach ($exe in @(@($ToolboxExe, 'Toolbox'), @($MonitorExe, 'Hardware-Monitor'))) {
+        $meldung = & $RuntimePy -B (Join-Path $PSScriptRoot 'exe_anlegen.py') $exe[0] $exe[1] $Symbol
+        # 2 = Datei gesperrt, weil das Programm läuft. Den Monitor dürfen wir kurz beenden (Schritt 6 startet ihn neu),
+        # die Toolbox nicht – da bleibt die alte Datei bis zum nächsten Einrichten.
+        if ($LASTEXITCODE -eq 2 -and $exe[0] -eq $MonitorExe -and (Monitor-Befehl 'status')) {
+            Info 'Hardware-Monitor läuft noch mit der alten Datei – wird kurz beendet …'
+            Monitor-Beenden
+            $neuStarten = $true
+            # Der Prozess räumt nach dem letzten IPC-Lebenszeichen noch kurz auf (LHM schließen) – so lange ist die
+            # Datei noch gesperrt. Bis zu 10 s erneut versuchen.
+            for ($i = 0; $i -lt 20; $i++) {
+                $meldung = & $RuntimePy -B (Join-Path $PSScriptRoot 'exe_anlegen.py') $exe[0] $exe[1] $Symbol
+                if ($LASTEXITCODE -ne 2) { break }
+                Start-Sleep -Milliseconds 500
+            }
         }
+        if ($LASTEXITCODE -eq 0) { Ok $meldung }
+        elseif ($LASTEXITCODE -eq 2) { Warnung "$meldung (z. B. Toolbox schließen)" }
+        else { Warnung $meldung }
     }
 
     # 4. LibreHardwareMonitor
@@ -242,14 +255,13 @@ function Einrichten {
     elseif ($task) { Info "Aufgabe $Aufgabe zeigt noch auf: $($task.Actions[0].Execute) $($task.Actions[0].Arguments)"; $schritte += 'aufgabe' }
     else { Info "Aufgabe $Aufgabe fehlt"; $schritte += 'aufgabe' }
 
-    $neuStarten = $false
     if ($schritte.Count -eq 0) {
         # nichts zu tun
     } elseif ($OhneAdmin) {
         Warnung 'übersprungen (-OhneAdmin)'
     } elseif (Als-Admin $schritte) {
         Ok 'erledigt'
-        $neuStarten = $schritte -contains 'aufgabe'
+        $neuStarten = $neuStarten -or ($schritte -contains 'aufgabe')
     } else {
         Warnung 'Nicht alles hat geklappt – Einrichten.cmd erneut ausführen.'
     }

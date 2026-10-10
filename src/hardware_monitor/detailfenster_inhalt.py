@@ -6,13 +6,19 @@ Was im Detailfenster des Hardware-Monitors steht – Tab für Tab, eine Zeile pr
   Reihenfolge:      so wie hier aufgeschrieben
 
 Die genauen Sensornamen stehen in der Ausgabe von `python hardware_monitor.py --list`
-(dort in eckigen Klammern auch das Gerät für Gruppe(...): cpu, gpu, ram, mainboard, laufwerk, netzwerk).
+(dort in eckigen Klammern auch das Gerät für Gruppe(...): cpu, gpu, ram, mainboard, laufwerk, netzwerk, akku).
 
   Gruppe("laufwerk", ...)          gilt für jedes Laufwerk einzeln
+  Gruppe("gpu", ..., name="Intel*")    nur Geräte, deren Name passt
   Wert("Fan #*")                   * steht für beliebigen Text – hier: alle Lüfter
   Wert("GPU Core", typ="Takt")     typ nur nötig, wenn es den Namen mehrfach gibt
   Wert("Package", text="CPU gesamt")   eigene Beschriftung
+  Wert("CPU Core #*", ohne="*Distance*")   Platzhalter, aber ohne die Namen, die hierzu passen
   Hardwaredaten()                  statt Gruppen: feste Daten wie Hersteller- und Produkt-IDs
+
+Die Namen unterscheiden sich je nach Hardware (AMD: „Core (Tctl/Tdie)“, Intel: „CPU Package“). Was es auf einem PC
+nicht gibt, wird einfach nicht angezeigt – daher stehen hier die Namen für beide nebeneinander. Tabs, deren Geräte
+der PC gar nicht hat (z. B. Mainboard-Sensoren am Laptop, Akku am Desktop), werden ausgeblendet.
 
 Gespeichert? Fenster schließen und wieder öffnen – die Änderungen sind sofort da.
 """
@@ -22,8 +28,10 @@ from detailfenster import AlleSensoren, Gruppe, Hardwaredaten, Tab, Wert  # noqa
 FENSTER = [
     Tab("Temperaturen",
         Gruppe("cpu",
-               Wert("Core (Tctl/Tdie)"),
-               Wert("CCD* (Tdie)")),
+               Wert("Core (Tctl/Tdie)"),                # AMD
+               Wert("CCD* (Tdie)"),
+               Wert("CPU Package", typ="Temperatur"),   # Intel
+               Wert("Core Max", typ="Temperatur")),
         Gruppe("gpu",
                Wert("GPU Core", typ="Temperatur"),
                Wert("GPU Hot Spot"),
@@ -33,13 +41,20 @@ FENSTER = [
         Gruppe("cpu",
                Wert("CPU Total"),
                Wert("CPU Core Max"),
-               Wert("Package", typ="Leistung"),
+               Wert("Package", typ="Leistung"),         # AMD
+               Wert("CPU Package", typ="Leistung"),     # Intel
+               Wert("CPU Cores", typ="Leistung"),
                Wert("Cores (Average)"),
                Wert("Cores (Average Effective)"),
+               Wert("CPU Core #*", typ="Takt"),         # Intel: Takt je Kern (ohne Durchschnitt)
                Wert("Core (Tctl/Tdie)"),
                Wert("CCD* (Tdie)"),
+               Wert("CPU Package", typ="Temperatur"),
+               Wert("Core Max", typ="Temperatur"),
+               Wert("CPU Core #*", typ="Temperatur", ohne="*Distance to TjMax"),
                Wert("Core (SVI2 TFN)"),
                Wert("SoC (SVI2 TFN)"),
+               Wert("CPU Core", typ="Spannung"),
                Wert("Bus Speed"))),
 
     Tab("GPU",
@@ -62,7 +77,15 @@ FENSTER = [
                Wert("GPU Fan *", typ="Lüfter"),
                Wert("GPU Fan *", typ="Lüftersteuerung"),
                Wert("GPU PCIe Rx"),
-               Wert("GPU PCIe Tx"))),
+               Wert("GPU PCIe Tx")),
+        Gruppe("gpu",                                   # Intel-Grafik: liefert nur Leistung und Windows-Werte
+               Wert("GPU Power", typ="Leistung"),
+               Wert("D3D 3D"),
+               Wert("D3D Dedicated Memory Used"),
+               Wert("D3D Shared Memory Used"),
+               Wert("D3D Shared Memory Free"),
+               Wert("D3D Shared Memory Total"),
+               name="Intel*")),
 
     Tab("RAM",
         Gruppe("ram",
@@ -121,6 +144,19 @@ FENSTER = [
                Wert("Data Downloaded"),
                Wert("Data Uploaded"))),
 
+    Tab("Akku",
+        Gruppe("akku",
+               Wert("Charge Level"),
+               Wert("Remaining Capacity"),
+               Wert("Remaining Time*"),
+               Wert("*Rate", typ="Leistung"),              # Discharge Rate bzw. Charge Rate
+               Wert("*Current"),
+               Wert("Voltage"),
+               Wert("Fully-Charged Capacity"),
+               Wert("Designed Capacity"),
+               Wert("Degradation Level"),
+               Wert("Cycle Count"))),
+
     # Feste Daten statt Messwerte: Hersteller, Modell, IDs, Seriennummern (siehe hardwaredaten.py)
     Tab("Hardwaredaten", Hardwaredaten()),
 
@@ -150,7 +186,7 @@ ERKLAERUNGEN = [
     ("Temperature", r"Core Max", "Die Temperatur des aktuell heißesten CPU-Kerns."),
     ("Temperature", r"Core Average", "Der Durchschnitt über alle CPU-Kerne."),
     ("Temperature", r"CPU Core #(\d+)", "Temperatur von CPU-Kern Nr. {0}."),
-    ("Temperature", r"Distance to TjMax", "Abstand bis zu der Temperatur, ab der sich die CPU drosselt – hier ist ein "
+    ("Temperature", r"(?:.* )?Distance to TjMax", "Abstand bis zu der Temperatur, ab der sich die CPU drosselt – hier ist ein "
                                           "höherer Wert besser."),
     # --- Temperaturen: GPU ---
     ("Temperature", r"GPU Core", "Die durchschnittliche Temperatur des Grafikchips – der klassische GPU-Wert."),
@@ -166,8 +202,8 @@ ERKLAERUNGEN = [
     ("Temperature", r"System|Motherboard", "Temperatur auf dem Mainboard, ungefähr die Lufttemperatur im Gehäuse."),
     ("Temperature", r"PCH|Chipset", "Temperatur des Chipsatzes auf dem Mainboard."),
     ("Temperature", r"VRM.*", "Temperatur der Spannungswandler, die die CPU mit Strom versorgen."),
-    ("Temperature", r"Temperature #(\d+)", "Unbenannter Temperaturfühler Nr. {0} am Mainboard; was er misst, hängt "
-                                           "vom Board ab."),
+    ("Temperature", r"Temperature #(\d+)", "Unbenannter Temperaturfühler Nr. {0}; was er misst, hängt vom Gerät ab "
+                                           "(bei SSDs meist Controller bzw. Speicherchips)."),
     ("Temperature", r"Temperature( \d+)?", "Temperatur des Laufwerks (Controller oder Speicherchips)."),
     ("Temperature", r"Composite Temperature", "Zusammengefasste Temperatur der SSD, nach der sie sich ggf. drosselt."),
     # --- Auslastung ---
@@ -186,7 +222,7 @@ ERKLAERUNGEN = [
     ("Load", r"(Total|Read|Write) Activity", "Wie viel Prozent der Zeit das Laufwerk gerade beschäftigt ist."),
     ("Load", r"Network Utilization", "Auslastung der Netzwerkverbindung im Verhältnis zu ihrer Maximalgeschwindigkeit."),
     # --- Takt ---
-    ("Clock", r"Core #(\d+)", "Aktueller Takt von CPU-Kern Nr. {0}."),
+    ("Clock", r"(?:CPU )?Core #(\d+)", "Aktueller Takt von CPU-Kern Nr. {0}."),
     ("Clock", r"Bus Speed", "Grundtakt, aus dem sich per Multiplikator der CPU-Takt ergibt (meist rund 100 MHz)."),
     ("Clock", r"Cores \(Average.*\)", "Durchschnittlicher Takt aller CPU-Kerne."),
     ("Clock", r"GPU Core", "Aktueller Takt des Grafikchips."),
@@ -195,18 +231,33 @@ ERKLAERUNGEN = [
     # --- Leistung ---
     ("Power", r"(CPU )?Package", "Gesamter Stromverbrauch des Prozessors."),
     ("Power", r"Core #(\d+) \(SMU\)", "Stromverbrauch von Kern Nr. {0}, gemeldet vom Prozessor selbst."),
-    ("Power", r"Cores", "Stromverbrauch aller Kerne zusammen."),
+    ("Power", r"(?:CPU )?Cores", "Stromverbrauch aller Kerne zusammen."),
     ("Power", r"SoC", "Stromverbrauch des I/O-Teils der CPU."),
+    ("Power", r"CPU Memory", "Stromverbrauch des Speicher-Controllers in der CPU."),
+    ("Power", r"CPU Platform", "Stromverbrauch des ganzen Geräts laut Prozessor (CPU, Chipsatz, Speicher …) – "
+                               "nicht bei jedem Gerät verlässlich."),
     ("Power", r"GPU (Package|Power)", "Gesamter Stromverbrauch der Grafikkarte."),
+    ("Power", r"Discharge Rate", "Leistung, die gerade aus dem Akku entnommen wird."),
+    ("Power", r"Charge Rate", "Leistung, mit der der Akku gerade geladen wird."),
     # --- Spannung ---
     ("Voltage", r"Core \(SVI\d? ?TFN\)", "Kernspannung der CPU, gemeldet vom Spannungsregler."),
     ("Voltage", r"SoC \(SVI\d? ?TFN\)", "Spannung des I/O-Teils der CPU."),
-    ("Voltage", r"Vcore|CPU Core|CPU VCore", "Kernspannung der CPU, gemessen vom Mainboard."),
+    ("Voltage", r"Vcore|CPU VCore", "Kernspannung der CPU, gemessen vom Mainboard."),
+    ("Voltage", r"CPU Core", "Kernspannung der CPU."),
+    ("Voltage", r"CPU Core #(\d+)", "Spannung von CPU-Kern Nr. {0}."),
     ("Voltage", r"\+?(12|5|3[.,]3)V", "Spannung der {0}-Volt-Leitung vom Netzteil; sollte nahe am Sollwert liegen "
                                       "(etwa ±5 %)."),
     ("Voltage", r"VBat|Vbat|CMOS Battery|Battery", "Spannung der Knopfzelle auf dem Mainboard; liegt sie unter etwa "
                                                    "2,8 V, sollte sie bald getauscht werden."),
     ("Voltage", r"GPU Core", "Spannung des Grafikchips."),
+    ("Voltage", r"Voltage", "Aktuelle Spannung des Akkus."),
+    # --- Akku ---
+    ("Current", r"Discharge Current", "Strom, der gerade aus dem Akku fließt."),
+    ("Current", r"Charge Current", "Strom, mit dem der Akku gerade geladen wird."),
+    ("Energy", r"Remaining Capacity", "Energie, die gerade noch im Akku steckt."),
+    ("Energy", r"Fully-Charged Capacity", "Energie, die der Akku heute voll geladen speichert – sinkt mit dem Alter."),
+    ("Energy", r"Designed Capacity", "Energie, die der Akku laut Hersteller im Neuzustand speichert."),
+    ("TimeSpan", r"Remaining Time.*", "Geschätzte Restlaufzeit bei der aktuellen Leistungsaufnahme."),
     # --- Lüfter ---
     ("Fan", r"GPU Fan( \d+)?", "Drehzahl des Grafikkarten-Lüfters; 0 RPM im Leerlauf ist normal, viele Karten "
                                "stoppen ihre Lüfter dann."),
@@ -228,7 +279,11 @@ ERKLAERUNGEN = [
     ("SmallData", r"GPU Memory Total", "Gesamtgröße des Grafikspeichers (VRAM)."),
     ("SmallData", r"D3D Dedicated Memory Used", "Grafikspeicher, den Windows-Programme gerade belegen."),
     ("SmallData", r"D3D Shared Memory Used", "Arbeitsspeicher, den die Grafikkarte zusätzlich mitbenutzt – steigt, "
-                                             "wenn der Grafikspeicher knapp wird."),
+                                             "wenn der Grafikspeicher knapp wird. Bei Onboard-Grafik ohne eigenen "
+                                             "Grafikspeicher ist das ihr ganzer Speicher."),
+    ("SmallData", r"D3D Shared Memory Free", "Arbeitsspeicher, den die Grafik noch zusätzlich belegen dürfte."),
+    ("SmallData", r"D3D Shared Memory Total", "Wie viel Arbeitsspeicher Windows der Grafik höchstens überlässt "
+                                              "(meist die Hälfte)."),
     # --- Durchsatz ---
     ("Throughput", r"Read Rate", "Aktuelle Lesegeschwindigkeit des Laufwerks."),
     ("Throughput", r"Write Rate", "Aktuelle Schreibgeschwindigkeit des Laufwerks."),
@@ -251,6 +306,8 @@ TYP_ERKLAERUNGEN = {   # Rückfall, wenn kein genauerer Eintrag oben passt
     "Power": "Aktuelle Leistungsaufnahme in Watt.",
     "Voltage": "Gemessene Spannung in Volt.",
     "Current": "Gemessene Stromstärke in Ampere.",
+    "Energy": "Eine Energiemenge in Wattstunden.",
+    "TimeSpan": "Eine Zeitdauer in Stunden und Minuten.",
     "Fan": "Lüfterdrehzahl in Umdrehungen pro Minute.",
     "Control": "Ansteuerung eines Lüfters oder einer Pumpe in Prozent.",
     "Data": "Eine Datenmenge.",

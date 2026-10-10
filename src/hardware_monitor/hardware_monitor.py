@@ -66,7 +66,9 @@ DEFAULT_SETTINGS = {
     "warn_temp": 60,                 # ab hier gelb
     "hot_temp": 80,                  # ab hier rot
     "window": "",                    # Größe und Position des Detailfensters, z. B. "480x640+1420+380" (merkt es sich selbst)
+    "effizienzmodus": "auto",        # "auto" = nur bei geschlossenem Fenster, "an" = immer, "aus" = nie
 }
+EFFIZIENZ = ("auto", "an", "aus")
 SETTINGS_FILE = Path(__file__).with_name("hardware_monitor_settings.json")
 
 # Bei "auto": welcher Sensor im Tray-Icon angezeigt wird – der erste aus der Liste, den es gibt
@@ -179,7 +181,7 @@ SENSOR_TYPES = enum_table(SensorType, tuple(TYPE_LABELS))
 HW_GERAET = {
     "Cpu": "cpu", "GpuNvidia": "gpu", "GpuAmd": "gpu", "GpuIntel": "gpu", "Memory": "ram",
     "Motherboard": "mainboard", "SuperIO": "mainboard", "EmbeddedController": "mainboard",
-    "Storage": "laufwerk", "Network": "netzwerk",
+    "Storage": "laufwerk", "Network": "netzwerk", "Battery": "akku",
 }
 
 
@@ -203,11 +205,12 @@ def pick(hardware, kind, priority):
     return None
 
 
-def collect(geraete=None):
+def collect(geraete=None, icons=("cpu", "gpu")):
     """Liest die Sensoren.
 
     geraete: welche Geräte gelesen werden, z. B. {"gpu", "laufwerk"} (Namen wie in HW_GERAET); None = alle.
-             Die CPU wird immer gelesen, ihre Temperatur steht im Icon. Nur für die Icons: collect(set()).
+             Die Geräte aus icons werden immer gelesen, ihre Temperatur steht im Icon. Nur für die Icons: collect(set()).
+    icons:   welche Icons es gibt – ohne GPU-Icon (keine GPU-Temperatur) muss die GPU nicht mitgelesen werden.
 
     Ergebnis (ein "Snapshot"):
       hardware: [{"id", "geraet", "kind" ("cpu"/"gpu"/None), "name",
@@ -217,9 +220,9 @@ def collect(geraete=None):
     """
     # Wird die GPU nicht gebraucht, reicht fürs GPU-Icon NVML – wenn dort "GPU Core" steht (bei "auto" der Fall).
     # Andere Sensoren (Hot Spot, Memory Junction, …) kennt NVML nicht -> dann wie bisher über LHM.
-    use_nvml = geraete is not None and "gpu" not in geraete and nvml_fuer_gpu_icon()
+    use_nvml = geraete is not None and "gpu" not in geraete and "gpu" in icons and nvml_fuer_gpu_icon()
     if geraete is not None:
-        geraete = set(geraete) | {"cpu"} | (set() if use_nvml else {"gpu"})
+        geraete = set(geraete) | (set(icons) - ({"gpu"} if use_nvml else set()))
     hardware = []
     for top in pc.Hardware:
         top_type = enum_name(top.HardwareType, HW_TYPES)
@@ -288,14 +291,30 @@ def icon_sensor_suchen(kind, priority):
     return None
 
 
-def icon_werte():
-    """Nur die beiden Temperaturen für die Icons: {"cpu": Wert, "gpu": Wert} (None = keiner da).
+def gpu_hat_temperatur():
+    """Gibt es eine GPU-Temperatur? Intel-Onboard-Grafik (z. B. Iris Xe) meldet keine – dann bleibt das GPU-Icon weg,
+    statt dauerhaft „--“ zu zeigen."""
+    if nvidia.available:
+        return True
+    for hw in pc.Hardware:
+        if HW_GERAET.get(enum_name(hw.HardwareType, HW_TYPES)) == "gpu":
+            hw.Update()                          # manche Sensoren gibt es erst nach dem ersten Update
+            if any(s.SensorType == SensorType.Temperature for s in hw.Sensors):
+                return True
+    return False
+
+
+def icon_werte(kinds=("cpu", "gpu")):
+    """Nur die Temperaturen für die Icons: {"cpu": Wert, "gpu": Wert} (None = keiner da).
 
     Je Gerät ein Update() und ein einziger gelesener Wert. collect() würde dafür jeden CPU-Sensor (Takt, Last,
     Leistung, Spannung je Kern – bei einem 6-Kerner rund 50) einzeln über pythonnet abfragen.
+    kinds: welche Icons es gibt (ohne GPU-Icon wird die GPU gar nicht angesprochen).
     """
     werte = {}
     for kind, key, defaults in (("cpu", "cpu_sensor", CPU_SENSORS), ("gpu", "gpu_sensor", GPU_SENSORS)):
+        if kind not in kinds:
+            continue
         if kind == "gpu" and nvml_fuer_gpu_icon():
             werte[kind] = nvidia.read()
             continue
@@ -337,6 +356,8 @@ def load_settings():
         settings["warn_temp"], settings["hot_temp"] = warn, hot
     if isinstance(saved.get("window"), str) and re.fullmatch(r"\d+x\d+\+-?\d+\+-?\d+", saved["window"]):
         settings["window"] = saved["window"]
+    if saved.get("effizienzmodus") in EFFIZIENZ:
+        settings["effizienzmodus"] = saved["effizienzmodus"]
     return settings
 
 
@@ -451,6 +472,7 @@ class HardwareMonitorApp:
         self.fenster = None                      # Detailfenster – wird erst beim ersten Öffnen gebaut
         self.fenster_bedarf = False              # was das Fenster gerade zeigt: False = zu, sonst Geräte (None = alle)
         self.hardware_ready = False              # True, sobald die übrige Hardware nachgeladen ist
+        self.vorhanden = None                    # Geräte mit Sensoren auf diesem PC, z. B. {"cpu", "gpu", "akku"}
 
         self.stop = threading.Event()
         self.wake = threading.Event()            # weckt den Mess-Thread vorzeitig (Fenster geöffnet, Rate geändert)
@@ -460,12 +482,16 @@ class HardwareMonitorApp:
         self.ui_queue = queue.Queue()            # Nachrichten aus den anderen Threads an tkinter
         self.settings = SETTINGS                 # dieselben Einstellungen wie überall im Skript
         self.order = list(self.settings["icon_order"])
-        self.ready = {kind: threading.Event() for kind in self.order}
+        # Icons, die es wirklich gibt: ohne GPU-Temperatur (Intel-Onboard-Grafik) kein GPU-Icon
+        self.kinds = [kind for kind in self.order if kind != "gpu" or gpu_hat_temperatur()]
+        if "gpu" not in self.kinds:
+            logging.info("Keine GPU-Temperatur gefunden – das GPU-Icon wird nicht angezeigt.")
+        self.ready = {kind: threading.Event() for kind in self.kinds}
         self.current = {"cpu": None, "gpu": None}    # aktuelle Icon-Werte, für die Statusabfrage der GUI
 
         self.icons = {
             kind: pystray.Icon(f"hardware_monitor_{kind}", make_icon(kind, None), kind.upper(), self.make_menu())
-            for kind in self.order
+            for kind in self.kinds
         }
         self.sensor_thread = threading.Thread(target=self.sensor_loop, daemon=True)
         self.ipc_thread = threading.Thread(target=self.ipc_server, daemon=True)
@@ -514,13 +540,19 @@ class HardwareMonitorApp:
     def fenster_braucht(self, geraete):
         """Meldet das Fenster: welche Geräte es gerade zeigt (False = zu oder minimiert)."""
         if geraete != self.fenster_bedarf:
-            if (geraete is False) != (self.fenster_bedarf is False):
-                effizienzmodus(geraete is False)    # nur bei geschlossenem Fenster sparsam laufen
+            war_zu = self.fenster_bedarf is False
             self.fenster_bedarf = geraete
+            if (geraete is False) != war_zu:
+                self.effizienz_anwenden()        # bei "auto": nur bei geschlossenem Fenster sparsam laufen
             if geraete is False:                 # alte Werte verwerfen – beim Öffnen sonst kurz „Live“ mit altem Stand
                 with self.lock:
                     self.latest = EMPTY
             self.wake.set()                      # sofort passend messen
+
+    def effizienz_anwenden(self):
+        """Effizienzmodus laut Einstellung: "auto" nur bei geschlossenem Fenster, "an" immer, "aus" nie."""
+        modus = self.settings["effizienzmodus"]
+        effizienzmodus(modus == "an" or (modus == "auto" and self.fenster_bedarf is False))
 
     def fenster_geometrie(self, geometry):
         """Meldet das Fenster beim Schließen: Größe und Position, z. B. "480x640+1420+380"."""
@@ -535,7 +567,7 @@ class HardwareMonitorApp:
     # --- Hintergrund-Thread: misst und aktualisiert die Icons ---
     def measure(self, geraete):
         try:
-            snap = collect(geraete)
+            snap = collect(geraete, self.kinds)
         except Exception:
             logging.exception("Fehler beim Auslesen der Sensoren")
             snap = dict(EMPTY)
@@ -545,7 +577,7 @@ class HardwareMonitorApp:
     def measure_icons(self):
         """Nur die beiden Icon-Werte (sparsamer als measure(), siehe icon_werte())."""
         try:
-            return icon_werte()
+            return icon_werte(self.kinds)
         except Exception:
             logging.exception("Fehler beim Auslesen der Icon-Werte")
             ICON_SENSOREN.clear()                # beim nächsten Mal neu suchen
@@ -570,7 +602,9 @@ class HardwareMonitorApp:
         try:
             self.update_icons(self.measure_icons())          # Icons sofort mit echten Werten füllen …
             enable_hardware(LATER_HARDWARE)                  # … dann den Rest nachladen (RAM dauert ~8 s)
-            self.measure(None)                   # einmal alles "anwärmen": die erste Messung liefert teils 0
+            snap = self.measure(None)            # einmal alles "anwärmen": die erste Messung liefert teils 0
+            # Das Fenster blendet damit Tabs aus, die es hier nicht gibt (z. B. Mainboard am Laptop, Akku am Desktop)
+            self.vorhanden = {hw["geraet"] for hw in snap["hardware"]} or None     # Messung fehlgeschlagen -> alle zeigen
             self.hardware_ready = True
             next_icon = next_window = 0.0
             while not self.stop.is_set():
@@ -644,7 +678,7 @@ class HardwareMonitorApp:
     def handle_command(self, command):
         if command == "status":
             return {"ok": True, "pid": os.getpid(), "cpu": self.current["cpu"], "gpu": self.current["gpu"],
-                    "order": self.order}
+                    "order": self.order, "icons": self.kinds}
         if command in ("reload", "quit"):
             self.ui_queue.put(command)
             return {"ok": True}
@@ -659,6 +693,7 @@ class HardwareMonitorApp:
         ICON_SENSOREN.clear()                    # Icon-Sensoren neu suchen (z. B. anderer Sensor gewählt)
         for icon in self.icons.values():
             icon.update_menu()
+        self.effizienz_anwenden()                # z. B. in der Toolbox auf „Immer an“ gestellt
         if self.fenster:
             self.fenster.aktualisieren()
         self.wake.set()
@@ -693,10 +728,10 @@ class HardwareMonitorApp:
 
     def run(self):
         # Icons nacheinander anmelden, damit die Reihenfolge in der Taskleiste immer gleich ist
-        for kind in self.order:
+        for kind in self.kinds:
             self.icons[kind].run_detached(setup=lambda ic, k=kind: (setattr(ic, "visible", True), self.ready[k].set()))
             self.ready[kind].wait(timeout=5)
-        effizienzmodus(True)                     # Fenster ist zu – aus erst, wenn es geöffnet wird (fenster_braucht)
+        self.effizienz_anwenden()                # Fenster ist zu – bei "auto" also an, bis es geöffnet wird
         self.sensor_thread.start()
         self.ipc_thread.start()
         self.root.after(100, self.poll_queue)

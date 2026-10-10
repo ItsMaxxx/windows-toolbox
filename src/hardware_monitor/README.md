@@ -1,8 +1,11 @@
 # Hardware-Monitor
 
-Zeigt CPU- und GPU-Temperatur als zwei Zahlen im Infobereich der Taskleiste. Ein Klick auf eines der Icons öffnet ein
-Detailfenster mit fast allen Hardware-Werten in Tabs (CPU, GPU, RAM, Mainboard, Laufwerke, Netzwerk, …) und dem Tab
+Zeigt CPU- und GPU-Temperatur als zwei Zahlen im Infobereich der Taskleiste (ohne GPU-Temperatur, z. B. bei
+Intel-Onboard-Grafik, nur die CPU). Ein Klick auf eines der Icons öffnet ein
+Detailfenster mit fast allen Hardware-Werten in Tabs (CPU, GPU, RAM, Mainboard, Laufwerke, Netzwerk, Akku) und dem Tab
 **Hardwaredaten**: Hersteller, Modelle, Hersteller- und Produkt-IDs, Seriennummern und Treiber aller Komponenten.
+Läuft auf AMD- und Intel-Systemen, Desktop wie Laptop; Tabs für Geräte, die der PC nicht hat (z. B. Mainboard-Sensoren
+am Laptop, Akku am Desktop), werden ausgeblendet.
 Die Sensoren liest [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) (LHM) über
 pythonnet.
 
@@ -41,9 +44,11 @@ und die geplante Aufgabe `HardwareMonitor`. Von Hand ginge es so:
    die das Programm beim Anmelden mit Adminrechten startet – ohne UAC-Abfrage. Ohne Aufgabe startet *Starten* in der
    Toolbox das Programm direkt, dann fragt Windows jedes Mal nach.
 
-**Womit es läuft:** Gibt es `runtime\HardwareMonitor.exe` (eine Kopie von `pythonw.exe` im Projekt-Python), nutzen
-Aufgabe und *Starten* diese – dann heißt der Prozess im Task-Manager „HardwareMonitor.exe“ statt „pythonw.exe“.
-Sonst das `pythonw.exe` des Pythons, mit dem die Toolbox läuft.
+**Womit es läuft:** Gibt es `runtime\HardwareMonitor.exe` (`pythonw.exe` des Projekt-Pythons mit eigener
+Dateibeschreibung und eigenem Symbol, angelegt von `setup\exe_anlegen.py`), nutzen Aufgabe und *Starten* diese – dann
+steht im Task-Manager „Hardware-Monitor“ mit dem Toolbox-Symbol statt „Python“. Sonst das `pythonw.exe` des Pythons,
+mit dem die Toolbox läuft. Ist das Detailfenster zu, steht der Monitor dort unter „Hintergrundprozesse“ statt unter
+„Apps“ – so hält Windows es mit jedem Programm ohne sichtbares Fenster.
 
 ## Starten und prüfen
 
@@ -85,6 +90,7 @@ laufende Programm übernimmt die Werte sofort. Fehlende oder ungültige Werte be
 | `icon_order` | `["cpu", "gpu"]` | Reihenfolge der Icons – wirkt erst nach Neustart des Programms |
 | `cpu_sensor` / `gpu_sensor` | `"auto"` | Sensor im Icon; `auto` nimmt den ersten vorhandenen aus `CPU_SENSORS` bzw. `GPU_SENSORS` |
 | `warn_temp` / `hot_temp` | `60` / `80` | ab hier gelb bzw. rot |
+| `effizienzmodus` | `"auto"` | Effizienzmodus von Windows 11: `auto` = nur bei geschlossenem Fenster, `an` = immer, `aus` = nie |
 | `window` | `""` | Größe und Position des Detailfensters (setzt das Fenster selbst) |
 
 Die Standardwerte stehen doppelt: `DEFAULT_SETTINGS` in `hardware_monitor.py` und `defaults` in
@@ -103,8 +109,11 @@ Tab("GPU",
 ```
 
 - Geräte für `Gruppe(...)`: `cpu`, `gpu`, `ram`, `mainboard`, `laufwerk` (gilt für jedes Laufwerk einzeln),
-  `netzwerk`, `weitere`.
-- `typ=` ist nur nötig, wenn es denselben Namen mehrfach gibt; `text=` setzt eine eigene Beschriftung.
+  `netzwerk`, `akku`, `weitere`. `name=` beschränkt eine Gruppe auf Geräte mit passendem Namen (z. B. `"Intel*"`).
+- `typ=` ist nur nötig, wenn es denselben Namen mehrfach gibt; `text=` setzt eine eigene Beschriftung; `ohne=` schließt
+  Namen aus, die trotz `*` nicht dazugehören (`Wert("CPU Core #*", ohne="*Distance*")`).
+- Die Namen hängen von der Hardware ab (AMD: `Core (Tctl/Tdie)`, Intel: `CPU Package`). Was es auf dem PC nicht gibt,
+  wird nicht angezeigt – daher stehen die Namen für beide nebeneinander in der Datei.
 - Die genauen Namen zeigt `--list`. Den früheren Tab „Alles“ (alle Sensoren) kann man in `detailfenster_inhalt.py`
   wieder einkommentieren.
 - Gespeicherte Änderungen erscheinen beim nächsten Öffnen des Fensters, ohne Neustart.
@@ -153,7 +162,12 @@ Der Port steht als `IPC_PORT` in `hardware_monitor.py` **und** `hardware_monitor
 - **Nur ein Wert pro Icon**: Für die Icons wird nur der eine Temperatursensor gelesen (`icon_werte()`), nicht alle
   ~50 CPU-Sensoren einzeln über pythonnet. Der Sensor wird einmal gesucht und danach direkt abgefragt.
 - **Effizienzmodus von Windows 11**: Bei geschlossenem Fenster läuft das Programm im Effizienzmodus (Blatt-Symbol im
-  Task-Manager: stromsparend eingeplant, niedrigste Priorität), bei offenem Fenster normal.
+  Task-Manager: stromsparend eingeplant, niedrigste Priorität), bei offenem Fenster normal. Einstellbar in der Toolbox
+  (*Aktualisierung → Effizienzmodus*: Automatisch / Immer an / Aus; das „i“ daneben erklärt die drei). Von Hand im
+  Task-Manager umgeschaltet, setzt das Programm beim nächsten Öffnen oder Schließen des Fensters wieder seinen Modus.
+- **Kein GPU-Icon ohne GPU-Temperatur**: Beim Start prüft `gpu_hat_temperatur()`, ob es eine GPU-Temperatur gibt
+  (Nvidia per NVML oder irgendein Temperatursensor einer GPU in LHM). Wenn nicht, entfällt das GPU-Icon, und die GPU
+  wird für die Icons gar nicht erst gelesen.
 - **Kaum Aufwachen im Leerlauf**: Die Fernsteuerung wartet ohne Timeout auf Verbindungen; bei geschlossenem Fenster
   sieht die Oberfläche nur alle 250 ms nach Klicks aufs Icon (offen: 100 ms).
 - **Fenster offen**: Gemessen werden nur die Geräte des gewählten Tabs; die Icons bekommen die Werte mit.
@@ -164,6 +178,12 @@ Der Port steht als `IPC_PORT` in `hardware_monitor.py` **und** `hardware_monitor
 ## Fehlersuche
 
 - **CPU zeigt `--` oder fehlt**: Programm läuft ohne Adminrechte, oder PawnIO ist nicht installiert.
+- **Kein GPU-Icon**: Die Grafik hat keinen Temperatursensor – bei Intel-Onboard-Grafik (z. B. Iris Xe) normal
+  (steht auch so im Log).
+- **Task-Manager zeigt noch „Python“**: `Einrichten.cmd` erneut ausführen (legt die `.exe`-Dateien neu an und löscht
+  den Namens-Zwischenspeicher von Windows), danach Task-Manager und Programm neu starten.
+- **Ein Tab zeigt „Keine passenden Sensoren“**: Die Hardware nennt ihre Sensoren anders; `--list` zeigt die Namen,
+  die dann in `detailfenster_inhalt.py` ergänzt werden.
 - **Startet gar nicht**: `hardware_monitor.log` ansehen (Toolbox: *Erweitert → Log öffnen*). Häufig fehlt `lhm/` oder
   es ist die .NET-10-Variante von LHM.
 - **Toolbox zeigt „Gestoppt“, obwohl die Icons da sind**: Port 47815 war beim Start belegt; das Programm versucht es

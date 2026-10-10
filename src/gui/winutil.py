@@ -119,7 +119,7 @@ def task_command(name, script, exe=None):
     Entspricht dem, was man sonst von Hand in der Aufgabenplanung einstellt: Trigger "Bei Anmeldung",
     "Mit höchsten Privilegien", auch im Akkubetrieb, ohne die 3-Tage-Zeitbegrenzung.
     exe: Programm, das das Skript ausführt (Standard: pythonw.exe des laufenden Pythons).
-    Braucht Adminrechte – register_task() holt sie per UAC; setup\setup.ps1 ruft es schon mit Adminrechten auf.
+    Braucht Adminrechte – register_task() holt sie per UAC; setup\\setup.ps1 ruft es schon mit Adminrechten auf.
     """
     script = Path(script)
     lines = [

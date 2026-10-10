@@ -45,7 +45,7 @@ PLACEHOLDERS = [
 
 VERSION = "1.0"
 SETTINGS_FILE = APP_DIR / "toolbox_settings.json"
-ICON_FILE = APP_DIR / "toolbox.ico"        # Werkzeugkoffer auf blauem Grund
+ICON_FILE = APP_DIR / "toolbox.ico"        # ⚒ auf grünem Grund, wie das Logo oben links
 GUI_PORT = 47816                 # damit ein zweiter Start nur das schon laufende Fenster nach vorne holt
 
 APPEARANCE = {"Hell": "light", "Dunkel": "dark", "System": "system"}

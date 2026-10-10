@@ -37,7 +37,8 @@ PCI_HERSTELLER = {
     "1987": "Phison", "126F": "Silicon Motion", "1CC1": "ADATA", "2646": "Kingston", "C0A9": "Crucial",
     "1344": "Micron", "3842": "EVGA", "1DA2": "Sapphire", "174B": "Sapphire", "196E": "PNY", "19DA": "Zotac",
     "1682": "XFX", "148C": "PowerColor", "1569": "Palit", "10B0": "Gainward", "1028": "Dell", "103C": "HP",
-    "17AA": "Lenovo", "1025": "Acer", "1B21": "ASMedia", "1D6A": "Aquantia",
+    "17AA": "Lenovo", "1025": "Acer", "1B21": "ASMedia", "1D6A": "Aquantia", "14F1": "Conexant / Senary",
+    "152D": "Quanta", "1D72": "Xiaomi", "19E5": "Huawei",
 }
 # USB-Herstellerkennungen (Auszug)
 USB_HERSTELLER = {
@@ -119,8 +120,9 @@ def pci_felder(pnp):
     ven, dev, subsys, rev = (g.upper() if g else None for g in m.groups())
     felder = [("Hersteller-ID", mit_namen(ven, PCI_HERSTELLER)), ("Produkt-ID", dev)]
     if subsys and subsys != "00000000":
-        # PCI: SUBSYS_<Modell><Hersteller>, HD-Audio umgekehrt: SUBSYS_<Hersteller><Modell>
-        sub_dev, sub_ven = (subsys[4:], subsys[:4]) if pnp.upper().startswith("HDAUDIO") else (subsys[:4], subsys[4:])
+        # PCI: SUBSYS_<Modell><Hersteller>, Audio-Codecs umgekehrt: SUBSYS_<Hersteller><Modell>
+        codec = re.match(r"HDAUDIO\\|INTELAUDIO\\FUNC_", pnp, re.I)
+        sub_dev, sub_ven = (subsys[4:], subsys[:4]) if codec else (subsys[:4], subsys[4:])
         felder += [("Platinen-Hersteller", mit_namen(sub_ven, PCI_HERSTELLER)), ("Subsystem-ID", sub_dev)]
     if rev:
         felder.append(("Revision", rev))
@@ -244,7 +246,9 @@ def audio():
     geraete = []
     for s in abfrage("SELECT Name, PNPDeviceID FROM Win32_SoundDevice"):
         pnp = s["PNPDeviceID"] or ""
-        if not re.match(r"(PCI|HDAUDIO)\\", pnp, re.I):
+        # INTELAUDIO\FUNC_: Codec hinter Intel Smart Sound (Laptops) – die übrigen INTELAUDIO-Einträge sind nur
+        # Anschlüsse dieses Controllers (Mikrofon, Bluetooth, USB)
+        if not re.match(r"(PCI|HDAUDIO|INTELAUDIO\\FUNC_)", pnp, re.I):
             continue                             # USB-Audio steht bei den USB-Geräten, virtuelle fehlen ganz
         name = wert(s["Name"]) or "Audiogerät"
         m = re.search(r"VEN_10EC&DEV_0([0-9A-F]{3})", pnp, re.I)

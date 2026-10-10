@@ -20,14 +20,15 @@ windows-toolbox/
 ├─ requirements.txt
 ├─ runtime/               eigenes Python mit allen Paketen (legt Einrichten.cmd an, nicht im Repo)
 ├─ setup/
-│  └─ setup.ps1           was Einrichten.cmd und Entfernen.cmd machen
+│  ├─ setup.ps1           was Einrichten.cmd und Entfernen.cmd machen
+│  └─ exe_anlegen.py      Toolbox.exe / HardwareMonitor.exe: pythonw.exe mit eigenem Namen und Symbol
 └─ src/
    ├─ gui/
    │  ├─ toolbox.py       Hauptfenster; findet die Programmseiten automatisch
    │  ├─ base.py          Baukasten für Programmseiten (Section, Text, Choice, Slider, …)
    │  ├─ winutil.py       Windows-Helfer (UAC, Aufgabenplanung)
    │  ├─ platzhalter.py   leere Seite für Tabs ohne Programm
-   │  └─ toolbox.ico      Symbol der Toolbox
+   │  └─ toolbox.ico      Symbol der Toolbox (⚒ auf Grün, wie das Logo im Fenster)
    └─ hardware_monitor/
       ├─ hardware_monitor.py       Hardware-Monitor (läuft eigenständig): Sensoren, Tray-Icons, IPC
       ├─ detailfenster_inhalt.py   WAS im Detailfenster steht – hier passt du das Fenster an
@@ -48,8 +49,9 @@ Danach **Doppelklick auf `Einrichten.cmd`** – sonst ist nichts nötig, nicht e
 1. sucht ein installiertes Python ab 3.10 (fehlt es, installiert es Python 3.14 per winget),
 2. kopiert es nach `runtime\` (ohne Doku und Tests, ~90 MB) und installiert dort die Pakete aus `requirements.txt` –
    dieses Python nutzt nur, was in `runtime\` liegt, nichts aus dem installierten Python oder `%APPDATA%\Python`,
-3. legt `runtime\HardwareMonitor.exe` an (Kopie von `pythonw.exe`, damit der Monitor im Task-Manager unter seinem
-   Namen erscheint),
+3. legt `runtime\Toolbox.exe` und `runtime\HardwareMonitor.exe` an: Kopien von `pythonw.exe` mit eigener
+   Dateibeschreibung und eigenem Symbol (`setup\exe_anlegen.py`), damit beide im Task-Manager als „Toolbox“ und
+   „Hardware-Monitor“ erscheinen statt als „Python“,
 4. lädt LibreHardwareMonitor 0.9.6 von GitHub (Prüfsumme wird kontrolliert) nach `src\hardware_monitor\lhm\`,
 5. holt **einmal** Adminrechte (UAC-Abfrage) und installiert damit PawnIO (Treiber für CPU- und Mainboard-Sensoren)
    und die geplante Aufgabe `HardwareMonitor` (startet den Monitor beim Anmelden mit Adminrechten, ohne Nachfrage),
@@ -59,9 +61,10 @@ Jeder Schritt prüft vorher, ob er schon erledigt ist – `Einrichten.cmd` läss
 z. B. nach einem `git pull` (neue Pakete) oder **nach dem Verschieben des Ordners**: dann wird nur die Aufgabe neu
 eingerichtet. Mit `-OhneAdmin` (im Terminal: `Einrichten.cmd -OhneAdmin`) entfallen Schritt 5 und 6.
 
-**Toolbox starten**: Doppelklick auf `Toolbox.cmd` (nutzt `runtime\`; dabei blitzt kurz eine Konsole auf). Ganz ohne
-Konsole geht es mit einer Verknüpfung auf `runtime\pythonw.exe` mit dem Argument `"<Ordner>\src\gui\toolbox.py"` und
-dem Symbol `src\gui\toolbox.ico` – die muss nach dem Verschieben aber angepasst werden.
+**Toolbox starten**: Doppelklick auf `Toolbox.cmd` (startet `runtime\Toolbox.exe`; dabei blitzt kurz eine Konsole
+auf). Ganz ohne Konsole geht es mit einer Verknüpfung auf `runtime\Toolbox.exe` mit dem Argument
+`"<Ordner>\src\gui\toolbox.py"` – das Symbol bringt die `.exe` schon mit. Nach dem Verschieben muss die Verknüpfung
+aber angepasst werden.
 
 **Portabel**: Nach dem Einrichten steckt alles im Ordner. Verschieben oder auf einen anderen PC kopieren, dort
 `Einrichten.cmd` erneut ausführen – fertig. Außerhalb des Ordners liegen nur PawnIO (ein Treiber muss in Windows
@@ -127,7 +130,8 @@ Wert hinzufügen = Zeile schreiben, Wert weglassen = Zeile löschen. Die genauen
   Die GPU-Temperatur fürs Icon kommt bei Nvidia direkt aus `nvml.dll` (Teil des Treibers). LHMs komplettes
   GPU-Update kostet ~90 ms pro Messung, NVML nur einen Bruchteil davon. Das gilt für „Automatisch“ und „GPU Core“, andere
   GPU-Sensoren laufen weiter über LHM. Für die Icons wird nur der eine Temperatursensor gelesen, und bei geschlossenem
-  Fenster läuft der Monitor im Effizienzmodus von Windows 11.
+  Fenster läuft der Monitor im Effizienzmodus von Windows 11 (einstellbar: Automatisch / Immer an / Aus). Hat die
+  Grafik keine Temperatur (z. B. Intel-Onboard-Grafik), gibt es nur das CPU-Icon und die GPU wird nicht gelesen.
 - **Schneller Start**: Zuerst werden nur CPU und GPU geöffnet (Icons nach Sekundenbruchteilen), die übrige Hardware
   lädt danach im Hintergrund nach. Allein der RAM braucht dabei ~8 s; bis dahin zeigt das Detailfenster „Lade Sensordaten …“.
 - **Kein `__pycache__`**: `toolbox.py` setzt gleich am Anfang `sys.dont_write_bytecode = True`, dadurch legt Python

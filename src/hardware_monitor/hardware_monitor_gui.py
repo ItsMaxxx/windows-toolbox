@@ -18,7 +18,8 @@ from base import (BAD, GOOD, MUTED, WARN, Button, Buttons, Choice, Combo, Entry,
 
 FOLDER = Path(__file__).resolve().parent
 SCRIPT = FOLDER / "hardware_monitor.py"
-# Von Einrichten.cmd angelegt: Kopie von pythonw.exe im Projekt-Python – so heißt der Prozess im Task-Manager
+# Von Einrichten.cmd angelegt: pythonw.exe mit eigenem Namen und Symbol – so heißt der Prozess im Task-Manager
+# „Hardware-Monitor“ statt „Python“ (setup\exe_anlegen.py)
 MONITOR_EXE = FOLDER.parents[1] / "runtime" / "HardwareMonitor.exe"
 IPC_PORT = 47815                 # muss zu IPC_PORT in hardware_monitor.py passen
 DEFAULT_TASK = "HardwareMonitor"
@@ -29,6 +30,13 @@ ORDERS = {"CPU zuerst": ["cpu", "gpu"], "GPU zuerst": ["gpu", "cpu"]}
 AUTO = {"auto": "Automatisch"}
 CPU_CHOICES = ["Automatisch", "Core (Tctl/Tdie)", "CPU Package", "Core Max", "Core Average", "CCD1 (Tdie)", "CCD2 (Tdie)"]
 GPU_CHOICES = ["Automatisch", "GPU Core", "GPU Hot Spot", "GPU Memory Junction"]
+EFFIZIENZ = {"Automatisch": "auto", "Immer an": "an", "Aus": "aus"}
+EFFIZIENZ_INFO = (                # Tooltip am „i“ neben der Auswahl
+    "Effizienzmodus von Windows 11 (grünes Blatt im Task-Manager):\n\n"
+    "•  Automatisch: an, solange das Detailfenster zu ist – beim Öffnen aus, damit es flüssig bleibt.\n"
+    "•  Immer an: auch bei offenem Fenster. Am sparsamsten, das Fenster reagiert evtl. träger.\n"
+    "•  Aus: läuft immer mit normaler Priorität."
+)
 
 
 def ipc(command, timeout=0.6):
@@ -67,7 +75,7 @@ class HardwareMonitorPage(ToolPage):
     settings_file = FOLDER / "hardware_monitor_settings.json"
     defaults = {                 # muss zu DEFAULT_SETTINGS in hardware_monitor.py passen
         "icon_interval": 2, "popup_interval": 1, "icon_order": ["cpu", "gpu"],
-        "cpu_sensor": "auto", "gpu_sensor": "auto", "warn_temp": 60, "hot_temp": 80,
+        "cpu_sensor": "auto", "gpu_sensor": "auto", "warn_temp": 60, "hot_temp": 80, "effizienzmodus": "auto",
     }
     visible = False
     poll_job = None
@@ -92,7 +100,8 @@ class HardwareMonitorPage(ToolPage):
                     Text("Wie oft gemessen wird. Seltener = sparsamer. "
                          "Die Icons lesen nur CPU und GPU, das geöffnete Fenster die Geräte des gewählten Tabs."),
                     Choice("Taskleisten-Icons", "icon_interval", ICON_RATES),
-                    Choice("Detailfenster", "popup_interval", POPUP_RATES)),
+                    Choice("Detailfenster", "popup_interval", POPUP_RATES),
+                    Choice("Effizienzmodus", "effizienzmodus", EFFIZIENZ, info=EFFIZIENZ_INFO)),
             Section("Anzeige",
                     Choice("Reihenfolge der Icons", "icon_order", ORDERS),
                     Text("Wird nach „Neu starten“ übernommen", name="order_hint", color=WARN, hidden=True),
@@ -173,9 +182,12 @@ class HardwareMonitorPage(ToolPage):
     def show_status(self, status):
         running = bool(status and status.get("ok"))
         self.running_order = status.get("order") if running else None
-        self.w["status"].configure(
-            text=f"●  Läuft  ·  CPU {fmt_temp(status.get('cpu'))}  ·  GPU {fmt_temp(status.get('gpu'))}"
-            if running else "●  Gestoppt", text_color=GOOD if running else MUTED)
+        if running:                              # nur die Icons, die es gibt (ohne GPU-Temperatur kein GPU-Icon)
+            werte = [f"{kind.upper()} {fmt_temp(status.get(kind))}" for kind in status.get("icons", ["cpu", "gpu"])]
+            text = "  ·  ".join(["●  Läuft"] + werte)
+        else:
+            text = "●  Gestoppt"
+        self.w["status"].configure(text=text, text_color=GOOD if running else MUTED)
         self.enable("start", not running)
         self.enable("stop", running)
         self.enable("restart", running)
