@@ -11,6 +11,8 @@ Voraussetzung:  einmal Setup.exe (legt runtime\\ und die Starter-.exe an)
 
 Programme werden automatisch gefunden: jeder Ordner programme\\<programm>\\ mit einer programm.json (Name, Tab,
 Beschreibung, Version …); deren "seite" ist die Datei mit der Programmseite (SEITE, optional PROGRAMM).
+Links erscheinen nur die eingerichteten (daten\\installiert.json, schreibt Setup.exe); einrichten und entfernen lassen
+sie sich in den Einstellungen unter „Programme“.
 Einstellungen der Toolbox: daten\\toolbox.json, Fehler: daten\\logs\\toolbox.log (siehe daten.py).
 """
 
@@ -27,6 +29,7 @@ import sys
 import threading
 import webbrowser
 from pathlib import Path
+from tkinter import messagebox
 
 import customtkinter as ctk
 from PIL import Image
@@ -43,7 +46,7 @@ import winutil  # noqa: E402
 from base import (BAD, BAR, BORDER, GOOD, HOVER, MUTED, SELECTED, TEXT, Button, Buttons, Choice,  # noqa: E402
                   Section, Switch, Text, ToolInfo, ToolPage, Tooltip, apply_font, apply_theme)
 
-CATEGORIES = ["Allgemein", "Werkzeuge", "Medien", "Netzwerk"]     # Tabs oben, in dieser Reihenfolge
+CATEGORIES = ["Allgemein", "Werkzeuge", "Medien", "Netzwerk", "Games"]     # Tabs oben, in dieser Reihenfolge
 
 AUSWEIS = json.loads((APP_DIR / "programm.json").read_text(encoding="utf-8"))    # wie bei jedem Programm
 VERSION = AUSWEIS["version"]
@@ -54,6 +57,9 @@ GITHUB_URL = "https://github.com/ItsMaxxx/windows-toolbox"     # Knopf „Window
 # startet auch der Starter Toolbox.exe im Hauptordner; für den Neustart geht es direkt, ohne den Umweg.
 TOOLBOX_EXE = ROOT / "runtime" / "Toolbox.exe"
 SETUP_EXE = ROOT / "Setup.exe"
+UNINSTALL_EXE = ROOT / "Uninstall.exe"
+# Welche Programme eingerichtet sind – schreibt setup.ps1 (Installierte-Speichern), die Toolbox liest nur
+INSTALLIERT_FILE = daten.einstellungen("installiert")
 GUI_PORT = AUSWEIS["port"]       # ein zweiter Start holt nur das laufende Fenster nach vorne; setup.ps1 sagt "quit"
 
 APPEARANCE = {"Hell": "light", "Dunkel": "dark", "System": "system"}
@@ -67,14 +73,34 @@ logging.basicConfig(filename=daten.log("toolbox"), level=logging.INFO,
 
 
 # ---------- Programme finden ----------
-def find_tools():
-    """Liest jede programme\\<programm>\\programm.json, lädt die darin genannte Seite und baut daraus das ToolInfo.
-    Ein fehlerhaftes Programm wird nur protokolliert, damit die übrigen trotzdem erscheinen."""
-    tools = []
+def find_ausweise():
+    """Alle programme\\<programm>\\programm.json – eingerichtet oder nicht. "ordner" ergänzt den Programmordner.
+    Ein kaputter Ausweis wird nur protokolliert, damit die übrigen trotzdem erscheinen."""
+    ausweise = []
     for ausweis_datei in sorted(PROGRAMME_DIR.glob("*/programm.json")):
         try:
             ausweis = json.loads(ausweis_datei.read_text(encoding="utf-8"))
-            file = ausweis_datei.with_name(ausweis["seite"])
+            ausweis["ordner"] = ausweis_datei.parent
+            ausweise.append(ausweis)
+        except (OSError, ValueError):
+            logging.exception("Ausweis %s konnte nicht gelesen werden", ausweis_datei)
+    return ausweise
+
+
+def installierte_ids(ausweise):
+    """IDs der eingerichteten Programme laut daten\\installiert.json. Fehlt die Datei (oder ist sie kaputt): alle –
+    so war es, bevor man Programme einzeln einrichten konnte. Dieselbe Regel hat setup.ps1 (Installierte)."""
+    ids = daten.lesen(INSTALLIERT_FILE, {"programme": None})["programme"]
+    return {a["id"] for a in ausweise if not isinstance(ids, list) or a["id"] in ids}
+
+
+def find_tools(ausweise):
+    """Lädt zu jedem Ausweis die darin genannte Seite und baut daraus das ToolInfo.
+    Ein fehlerhaftes Programm wird nur protokolliert, damit die übrigen trotzdem erscheinen."""
+    tools = []
+    for ausweis in ausweise:
+        try:
+            file = ausweis["ordner"] / ausweis["seite"]
             spec = importlib.util.spec_from_file_location(file.stem, file)
             module = importlib.util.module_from_spec(spec)
             sys.modules[file.stem] = module
@@ -82,11 +108,13 @@ def find_tools():
             tools.append(ToolInfo(ausweis["id"], ausweis["name"], ausweis["kategorie"], ausweis.get("beschreibung", ""),
                                   module.SEITE, getattr(module, "PROGRAMM", None)))
         except Exception:
-            logging.exception("Programm %s konnte nicht geladen werden", ausweis_datei.parent)
+            logging.exception("Programm %s konnte nicht geladen werden", ausweis["ordner"])
     return tools
 
 
-TOOLS = find_tools()
+AUSWEISE = find_ausweise()
+INSTALLIERT = installierte_ids(AUSWEISE)                 # ändert sich nur über setup.ps1 – das startet die Toolbox neu
+TOOLS = find_tools([a for a in AUSWEISE if a["id"] in INSTALLIERT])
 
 
 # ---------- Einstellungen ----------
@@ -174,6 +202,10 @@ class GuiSettingsPage(ToolPage):
                     Switch("Beim Schließen in den Infobereich minimieren", key="close_to_tray"),
                     Text("Die Toolbox läuft dann unten rechts als Symbol weiter. Doppelklick bzw. Klick öffnet sie "
                          "wieder, Rechtsklick → Beenden schließt sie ganz.")),
+            Section("Programme",
+                    Text("Eingerichtete Programme erscheinen links. Installieren und Entfernen laufen in einem eigenen "
+                         "Fenster; die Toolbox schließt sich dabei kurz und startet danach von selbst neu."),
+                    *[self.programm_zeile(a) for a in AUSWEISE]),
             Section("Beenden und Neustart",
                     Text("●  Prüfe Programme …", name="programme"),
                     Buttons(Button("Neu starten", self.app.neu_starten, name="nur_neu"),
@@ -194,6 +226,35 @@ class GuiSettingsPage(ToolPage):
             ctk.set_appearance_mode(APPEARANCE[value])
         elif key == "close_to_tray" and not value:
             self.app.stop_tray()
+
+    # --- Programme ---
+    def programm_zeile(self, ausweis):
+        """Eine Zeile je Programm: Name und Version, die Beschreibung im „i“, daneben Installieren bzw. Entfernen."""
+        knopf = f"programm_{ausweis['id']}"
+        if ausweis["id"] in INSTALLIERT:
+            button = Button("Entfernen", lambda: self.einrichten(ausweis, False), name=knopf, style="gefahr")
+        else:
+            button = Button("Installieren", lambda: self.einrichten(ausweis, True), name=knopf)
+        return Buttons(button, label=f"{ausweis['name']} {ausweis.get('version', '')}".strip(),
+                       info=ausweis.get("beschreibung") or None)
+
+    def einrichten(self, ausweis, an):
+        """Setup.exe bzw. Uninstall.exe -Programme <id> in einem eigenen Fenster. Beide beenden die Toolbox und
+        starten sie am Ende neu – dann mit der geänderten Liste links."""
+        if not an and not messagebox.askyesno(
+                "Programm entfernen",
+                f"{ausweis['name']} entfernen?\n\nEs wird beendet, Autostart und heruntergeladene Dateien werden "
+                "gelöscht. Deine Einstellungen bleiben – über „Installieren“ ist es jederzeit wieder da.",
+                icon="warning", parent=self):
+            return
+        exe = SETUP_EXE if an else UNINSTALL_EXE
+        try:
+            os.startfile(str(exe), arguments=f"-Programme {ausweis['id']}", cwd=str(ROOT))
+        except OSError:
+            logging.exception("%s konnte nicht gestartet werden", exe.name)
+            self.app.toast(f"{exe.name} startete nicht", error=True)
+            return
+        self.enable(f"programm_{ausweis['id']}", False)
 
     # --- Beenden und Neustart ---
     def on_show(self):
@@ -285,7 +346,8 @@ class GuiSettingsPage(ToolPage):
 UPDATE_INFO = (
     "Holt den neuesten Stand von GitHub (git pull) und führt danach Setup.exe aus:\n\n"
     "•  Die Toolbox schließt sich kurz, Pakete in runtime\\ werden auf die Versionen aus requirements.txt gebracht.\n"
-    "•  Danach starten Toolbox und Hardware-Monitor mit dem neuen Code.\n\n"
+    "•  Danach starten die Toolbox und die eingerichteten Programme (z. B. der Hardware-Monitor) mit dem neuen "
+    "Code. Neue Programme richtest du selbst ein: unter „Programme“ → Installieren.\n\n"
     "Eigene Änderungen am Code bleiben unangetastet: Passen sie nicht zum neuen Stand, bricht das Update mit einer "
     "Meldung ab. Einstellungen in daten\\ bleiben sowieso erhalten."
 )
@@ -406,7 +468,10 @@ class ToolboxApp(ctk.CTk):
             button.grid(row=row, column=0, sticky="ew", padx=8, pady=2)
             self.sidebar_buttons[tool.id] = button
         if not tools:
-            ctk.CTkLabel(self.sidebar, text="Noch keine Programme", text_color=MUTED).grid(
+            # Nur auf „Installieren“ verweisen, wenn es für diesen Tab auch etwas zu installieren gibt
+            fehlt = any(a.get("kategorie") == category and a["id"] not in INSTALLIERT for a in AUSWEISE)
+            text = "Noch keine Programme –\ninstallieren unter ⚙ → Programme" if fehlt else "Noch keine Programme"
+            ctk.CTkLabel(self.sidebar, text=text, text_color=MUTED, justify="left").grid(
                 row=1, column=0, sticky="w", padx=12)
             self.show_page(None)
             return

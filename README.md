@@ -6,6 +6,7 @@ Sammlung kleiner, selbst geschriebener Windows-Tools mit einer gemeinsamen Oberf
 |---|---|---|
 | **Toolbox** (GUI) | `toolbox/` | Oberfläche für alle Tools: Tabs oben, Programmliste links, Einstellungen rechts, Zahnrad für die GUI selbst |
 | **Hardware-Monitor** | `programme/hardware_monitor/` | CPU- und GPU-Temperatur als Zahlen in der Taskleiste; Klick öffnet ein Fenster mit Hardware-Werten in Tabs und allen Hardwaredaten (Hersteller-/Produkt-IDs, Seriennummern) ([README](programme/hardware_monitor/README.md)) |
+| **Cube Game** | `programme/cube_game/` | Kleines Spiel: weißer Würfel (WASD) weicht roten Würfeln aus, die vom Rand kommen; Rekord wird gespeichert ([README](programme/cube_game/README.md)) |
 
 Jedes Tool hat in seinem Ordner eine eigene `README.md` mit Einrichtung, Bedienung und Technik.
 
@@ -19,7 +20,7 @@ windows-toolbox/
 ├─ __init__.py            damit Zed die Skripte als Modul starten kann (Play-Button)
 ├─ requirements.txt       Python-Pakete mit festen Versionen
 ├─ runtime/               wegwerfbar: eigenes Python mit Paketen (legt Setup.exe an)
-├─ daten/                 gehört dir: toolbox.json, eine <programm>.json je Programm, logs/ – das Einzige zum Sichern
+├─ daten/                 gehört dir: toolbox.json, eine <programm>.json je Programm, installiert.json, logs/
 ├─ setup/
 │  ├─ setup.ps1           was Setup.exe und Uninstall.exe machen
 │  ├─ setup_exe.cs        Quelltext von Setup.exe und Uninstall.exe (neu bauen: setup_exe_bauen.ps1)
@@ -35,6 +36,7 @@ windows-toolbox/
 │  ├─ toolbox.ico         Symbol der Toolbox (blauer Werkzeugkoffer) – auch für Setup.exe und Uninstall.exe
 │  └─ programm.ico        Standardsymbol der Programme (⚒ auf Grün), z. B. für den Hardware-Monitor
 └─ programme/
+   ├─ cube_game/                   Spiel (pygame-ce) – Aufbau siehe programme/cube_game/README.md
    └─ hardware_monitor/            ein Programm = ein Ordner, alles darin
       ├─ programm.json             Ausweis: Name, Tab, Beschreibung, Version, Skript, Starter, Port, Aufgabe, Downloads
       ├─ HardwareMonitor.exe       Starter (legt Setup.exe an)
@@ -54,6 +56,7 @@ Die Aufteilung folgt einer einfachen Regel: **Code** (`toolbox/`, `programme/`, 
 daten/
 ├─ toolbox.json              Einstellungen der Toolbox
 ├─ hardware_monitor.json     Einstellungen des Hardware-Monitors
+├─ installiert.json          welche Programme eingerichtet sind (schreibt Setup.exe)
 └─ logs/
    ├─ toolbox.log
    └─ hardware_monitor.log
@@ -68,14 +71,18 @@ git clone https://github.com/ItsMaxxx/windows-toolbox.git
 ```
 Danach **Doppelklick auf `Setup.exe`** – sonst ist nichts nötig, nicht einmal ein installiertes Python. `Setup.exe`
 öffnet ein Konsolenfenster und führt darin `setup\setup.ps1` aus (eine `.ps1` direkt doppelzuklicken würde sie nur im
-Editor öffnen). Es läuft ohne Adminrechte und fragt nur für Schritt 5 einmal nach. Das Skript:
+Editor öffnen). Es läuft ohne Adminrechte und fragt nur für Schritt 5 einmal nach.
+
+Zuerst fragt ein kleines Fenster, **welche Programme** eingerichtet werden sollen: Die Toolbox ist immer dabei, die
+übrigen per Kästchen (oder *Alle auswählen*). Die Auswahl landet in `daten\installiert.json`; die Toolbox zeigt links
+nur diese Programme. Fehlt die Datei (Einrichtung von vor dieser Auswahl), gelten alle als eingerichtet. Danach:
 
 1. sucht ein installiertes **Python 3.14** – genau diese Version, keine ältere oder neuere (fehlt es, installiert es
    Python 3.14 per winget),
 2. kopiert es nach `runtime\` (ohne Doku und Tests, ~90 MB) und installiert dort die Pakete aus `requirements.txt` in
    **festen Versionen** – dieses Python nutzt nur, was in `runtime\` liegt, nichts aus dem installierten Python oder
    `%APPDATA%\Python`,
-3. legt für jedes Programm (laut seiner `programm.json`) zwei `.exe` an:
+3. legt für jedes gewählte Programm (laut seiner `programm.json`) zwei `.exe` an:
    - den **Starter** zum Doppelklicken – `Toolbox.exe` im Hauptordner, `HardwareMonitor.exe` im Programmordner. Er
      findet `runtime\` und sein Skript relativ zum eigenen Ort, braucht also keine Argumente und funktioniert (samt
      Verknüpfungen) auch nach dem Verschieben. Übersetzt wird er aus `setup\starter.cs` mit `csc.exe`, dem
@@ -85,14 +92,20 @@ Editor öffnen). Es läuft ohne Adminrechte und fragt nur für Schritt 5 einmal 
      „Hardware-Monitor“ erscheinen statt als „Python“,
 4. lädt die Downloads aus den `programm.json` (feste Version, Prüfsumme wird kontrolliert), z. B. LibreHardwareMonitor
    0.9.6 nach `programme\hardware_monitor\lhm\`,
-5. holt **einmal** Adminrechte (UAC-Abfrage) und installiert damit PawnIO (Treiber für CPU- und Mainboard-Sensoren)
-   und die geplante Aufgabe `HardwareMonitor` (startet `HardwareMonitor.exe` beim Anmelden mit Adminrechten, ohne
-   Nachfrage),
-6. startet den Hardware-Monitor (bzw. neu, wenn er noch mit dem alten Programm lief).
+5. nur mit Hardware-Monitor: holt **einmal** Adminrechte (UAC-Abfrage) und installiert damit PawnIO (Treiber für
+   CPU- und Mainboard-Sensoren) und die geplante Aufgabe `HardwareMonitor` (startet `HardwareMonitor.exe` beim
+   Anmelden mit Adminrechten, ohne Nachfrage),
+6. nur mit Hardware-Monitor: startet ihn (bzw. neu, wenn er noch mit dem alten Programm lief).
 
 Jeder Schritt prüft vorher, ob er schon erledigt ist – `Setup.exe` lässt sich also jederzeit erneut ausführen,
 z. B. nach einem `git pull` (neue Pakete) oder **nach dem Verschieben des Ordners**: dann wird nur die Aufgabe neu
 eingerichtet. Mit `-OhneAdmin` (im Terminal: `Setup.exe -OhneAdmin`) entfallen Schritt 5 und 6.
+
+**Programme einzeln installieren und entfernen**: In der Toolbox unter Zahnrad → *Programme* – je Programm ein Knopf
+*Installieren* bzw. *Entfernen*. Das ruft `Setup.exe -Programme <id>` bzw. `Uninstall.exe -Programme <id>` auf
+(geht auch von Hand im Terminal, mehrere mit Komma). Entfernen beendet das Programm, löscht seine Aufgabe, den Starter
+und die Downloads; der Code bleibt im Repo, die Einstellungen in `daten\` auch. Wer im Auswahlfenster von `Setup.exe`
+ein Häkchen wegnimmt, entfernt das Programm genauso.
 
 **`Setup.exe` und `Uninstall.exe`** liegen als einzige `.exe` fertig gebaut im Repo – nach dem Klonen gibt es ja noch
 nichts, was sie bauen könnte. Es sind kleine C#-Programme aus `setup\setup_exe.cs` (nach einer Änderung dort mit
@@ -118,9 +131,10 @@ testen, dann mit `runtime\python.exe -m pip freeze` in `requirements.txt` eintra
 
 **Aktualisieren**: In den Einstellungen der Toolbox (Zahnrad → *Aktualisieren*). Das holt den neuesten Stand von
 GitHub (`git pull`, nur als Fast-Forward – eigene Änderungen werden nie überschrieben; passen sie nicht dazu, bricht
-es mit einer Meldung ab) und führt danach `Setup.exe -Neustart` aus: Pakete auf den neuen Stand bringen,
-Toolbox und Hardware-Monitor mit dem neuen Code neu starten. Von Hand geht dasselbe mit `git pull` und
-`Setup.exe -Neustart`.
+es mit einer Meldung ab) und führt danach `Setup.exe -Neustart` aus (ohne Auswahlfenster): Pakete auf den neuen
+Stand bringen, die Toolbox und die eingerichteten Programme mit dem neuen Code neu starten. Neue Programme aus dem
+Update erscheinen unter *Programme* zum Installieren. Von Hand geht dasselbe mit `git pull` und `Setup.exe -Neustart`.
+Aktualisiert wird immer alles auf einmal – der Code aller Programme kommt mit demselben `git pull`.
 
 Läuft die Toolbox beim Einrichten, wird sie vorher beendet (sie hält sonst Dateien in `runtime\` fest) und am Ende
 wieder gestartet.
@@ -131,7 +145,8 @@ der Hardware-Monitor) – gestoppte bleiben beim Neustart gestoppt.
 
 **Entfernen**: `Uninstall.exe` beendet Toolbox und Hardware-Monitor, löscht die Aufgabe und auf Wunsch alles Erzeugte
 (`runtime\`, die Starter, `lhm\`). Danach kann der Ordner gelöscht werden. PawnIO bleibt installiert
-(`winget uninstall namazso.PawnIO`).
+(`winget uninstall namazso.PawnIO`). Nur einzelne Programme entfernen: siehe *Programme einzeln installieren und
+entfernen* oben.
 
 ## Prüfen
 
@@ -168,8 +183,8 @@ Wert hinzufügen = Zeile schreiben, Wert weglassen = Zeile löschen. Die genauen
      "starter": "MeinProgramm.exe"
    }
    ```
-   `kategorie` ist der Tab oben. `skript` und `starter` braucht es nur, wenn das Tool ein eigenes Programm hat –
-   `Setup.exe` legt dann `MeinProgramm.exe` an – mit dem grünen ⚒ (`toolbox/programm.ico`), oder mit eigenem
+   `kategorie` ist der Tab oben (Allgemein, Werkzeuge, Medien, Netzwerk oder Games – `CATEGORIES` in
+   `toolbox.py`). `skript` und `starter` braucht es nur, wenn das Tool ein eigenes Programm hat – `Setup.exe` legt dann `MeinProgramm.exe` an – mit dem grünen ⚒ (`toolbox/programm.ico`), oder mit eigenem
    Symbol über `"symbol": "mein.ico"`. Braucht es etwas zum Herunterladen, kommt das als `downloads` dazu (Vorbild:
    `programme/hardware_monitor/programm.json`).
 3. Die Seite für die GUI (`seite`) wird mit den Bausteinen aus `toolbox/base.py` nur beschrieben, Laden und Speichern

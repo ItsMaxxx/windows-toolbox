@@ -1,0 +1,10 @@
+{
+  "id": "cube_game",
+  "name": "Cube Game",
+  "version": "0.1",
+  "kategorie": "Games",
+  "beschreibung": "Du bist der weiße Würfel – weich den roten aus, so lange du kannst (cube_game).",
+  "seite": "cube_game_gui.py",
+  "skript": "cube_game.py",
+  "starter": "CubeGame.exe"
+}

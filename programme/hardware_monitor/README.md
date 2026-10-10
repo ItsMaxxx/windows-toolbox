@@ -72,14 +72,19 @@ ein zweiter Start beendet sich sofort.
   sofort gemessen, die Liste zeigt dafür kurz „Lade Sensordaten …“. Bei geschlossenem oder minimiertem Fenster werden
   nur CPU und GPU für die Icons gemessen – deshalb lädt das Fenster beim Öffnen kurz. Direkt nach dem Programmstart
   dauert es länger (~10 s), weil dann noch die übrige Hardware nachgeladen wird (vor allem der RAM).
-- **Klick auf einen Gerätenamen** (fette Überschrift, in jedem Tab) kopiert ihn in die Zwischenablage, z. B.
-  „G.Skill F4-3200C16-8GTZRX“ bei einem RAM-Riegel. Im Tab „Hardwaredaten“ kopiert ein Klick auf eine Zeile ihren Wert
-  (z. B. die Hardware-ID). Die Fußzeile bestätigt das kurz; beim Drüberfahren zeigt sie den vollen Wert.
+- **Klick auf einen Wert oder Gerätenamen** kopiert ihn in die Zwischenablage, z. B. „2786“ bei der Produkt-ID oder
+  „G.Skill F4-3200C16-8GTZRX“ bei einem RAM-Riegel – aber nur direkt auf dem Text (die Hand als Mauszeiger zeigt es).
+  Ein Klick auf die Beschriftung davor („Produkt-ID“) oder ins Leere daneben markiert nur die Zeile. Die Fußzeile
+  bestätigt das Kopieren kurz; beim Drüberfahren zeigt sie den vollen Wert.
+- **Mehrere Zeilen kopieren**: markieren – mit gedrückter Maustaste darüberziehen, Strg+Klick (einzelne dazu),
+  Umschalt+Klick (bis hierhin) oder Strg+A (alle) – und mit Strg+C kopieren, z. B. „Hersteller-ID: 10DE“ und
+  „Produkt-ID: 2786“ untereinander. Überschriften kommen nur mit ihrem Namen mit, eingerückt wie in der Liste.
+  Dasselbe steht im Rechtsklick-Menü der Liste; Esc oder ein Klick ins Leere hebt die Markierung auf.
 - **Buttons im Tab „Hardwaredaten“**: „⧉ Kopieren“ rechts in jeder Bereichszeile (Prozessor, Grafikkarte, …) kopiert
   den ganzen Bereich als Text – alle Geräte darin mit ihren Feldern, z. B. zum Einfügen in ein Forum. Oben kopiert
   „Alles kopieren“ alle Hardwaredaten (mit Computername und Datum), „Modellnamen kopieren“ nur die Modellnamen: je
   Bereich eine Zeile, darunter jedes Gerät mit einem Tab davor (gleiche Geräte zusammengefasst, z. B. „2× G.Skill …“).
-- **Rechtsklick**: Aktualisierungsrate der Icons (1–10 s) und des Fensters (0,5–5 s), Beenden.
+- **Rechtsklick aufs Icon**: Aktualisierungsrate der Icons (1–10 s) und des Fensters (0,5–5 s), Beenden.
 - **Zahlenfarbe**: grün, ab `warn_temp` gelb, ab `hot_temp` rot (Standard 60 / 80 °C).
 
 ## Einstellungen

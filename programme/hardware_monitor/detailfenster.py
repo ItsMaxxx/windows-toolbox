@@ -19,6 +19,7 @@ import logging
 import re
 import threading
 import tkinter as tk
+import tkinter.font as tkfont
 from ctypes import wintypes
 from pathlib import Path
 from tkinter import ttk
@@ -169,6 +170,20 @@ def erklaere(sensor, inhalt):
 
 
 # ---------- Vom Inhalt zur Liste ----------
+def sichtbare_zeilen(tree, parent=""):
+    """Alle Zeilen einer Treeview in Anzeigereihenfolge – ohne die in zugeklappten Bereichen."""
+    for key in tree.get_children(parent):
+        yield key
+        if tree.item(key, "open"):
+            yield from sichtbare_zeilen(tree, key)
+
+
+def vorfahren(tree, key):
+    """Die übergeordneten Zeilen von key (für die Einrückung beim Kopieren)."""
+    while key := tree.parent(key):
+        yield key
+
+
 def benoetigte_geraete(tab):
     """Welche Geräte der Mess-Thread für diesen Tab lesen muss (None = alle)."""
     if ist_hwdaten(tab):
@@ -247,9 +262,12 @@ def dunkle_titelleiste(window):
 # ---------- Das Fenster ----------
 # dieselben Farben wie die dunkle Toolbox (toolbox/base.py) – das Fenster nutzt ttk statt CustomTkinter
 BG, BG_LIST, FG, SUB, HOVER, AKZENT = "#0a1d2c", "#152736", "#e2e8f0", "#8fa3b8", "#213443", "#3ddc97"
+MARKIERT = "#1d4f47"             # markierte Zeilen (wie gewählte Einträge in der Toolbox)
+SCHRIFT, SCHRIFT_GRUPPE = ("Segoe UI", 9), ("Segoe UI Semibold", 10)       # Zeilen bzw. Gerätenamen
 GROESSE = (560, 640)             # Startgröße bei 100 % Skalierung
 TITELLEISTE = 32                 # Höhe der Windows-Titelleiste (zählt bei der Fenstergröße nicht mit)
-HINWEIS = "Maus über einen Wert halten, um ihn erklärt zu bekommen. Klick auf einen Gerätenamen kopiert ihn."
+HINWEIS = ("Klick auf einen Wert oder Gerätenamen kopiert ihn. Mehrere Zeilen: markieren (ziehen, Strg- oder "
+           "Umschalt+Klick, Strg+A) und mit Strg+C kopieren. Maus über einen Wert erklärt ihn.")
 
 
 class Detailfenster:
@@ -269,7 +287,9 @@ class Detailfenster:
         self.ausgeblendet_fuer = None                    # vorhandene Geräte, nach denen Tabs zuletzt ausgeblendet wurden
         self.signatur = {}                               # je Treeview: Aufbau beim letzten Zeichnen
         self.sensoren = {}                               # Zeilen-Schlüssel -> Sensor (für die Erklärung)
-        self.kopierbar = {}                              # Zeilen-Schlüssel -> Text, den ein Klick kopiert
+        self.kopierbar = {}                              # Zeilen-Schlüssel -> (Spalte, Text), den ein Klick kopiert
+        self.druck = None                                # gedrückte Maustaste in der Liste: Klick oder Ziehen?
+        self.schriften = {}                              # zum Ausmessen der Texte (ueber_wert)
         self.knoepfe = {}                                # je Treeview: Bereichszeile -> „Kopieren“-Button darüber
         self.meldung_job = None                          # „… kopiert“ steht gerade in der Fußzeile
         self.hwdaten = None                              # zuletzt gelesene Hardwaredaten (hardwaredaten.lesen())
@@ -312,6 +332,11 @@ class Detailfenster:
         self.fuss.bind("<Configure>", lambda e: self.fuss.configure(wraplength=e.width))
 
         win.protocol("WM_DELETE_WINDOW", self.verstecken)          # ✕ blendet nur aus
+        for taste in ("<Control-c>", "<Control-C>"):
+            win.bind(taste, lambda e: self.auswahl_kopieren())
+        for taste in ("<Control-a>", "<Control-A>"):
+            win.bind(taste, lambda e: self.alles_markieren())
+        win.bind("<Escape>", lambda e: self.tabs and self.aktiver_tab()[1].selection_set(()))
         for event in ("<Map>", "<Unmap>"):                           # minimiert = nichts messen
             win.bind(event, lambda e: e.widget is win and self.sichtbarkeit())
         win.update_idletasks()
@@ -324,7 +349,7 @@ class Detailfenster:
         style = ttk.Style(win)
         style.theme_use("clam")                          # das einzige eingebaute Design, das sich dunkel färben lässt
         style.configure(".", background=BG, foreground=FG, bordercolor=BG, lightcolor=BG, darkcolor=BG,
-                        troughcolor=BG_LIST, focuscolor=BG, font=("Segoe UI", 9))
+                        troughcolor=BG_LIST, focuscolor=BG, font=SCHRIFT)
         style.configure("KopfName.TLabel", foreground=SUB, font=("Segoe UI", 11))
         style.configure("KopfWert.TLabel", font=("Segoe UI Semibold", 18))
         style.configure("Fuss.TLabel", foreground=SUB)
@@ -336,7 +361,8 @@ class Detailfenster:
                   expand=[("selected", (0, 0, 0, 0))])  # gewählten Tab nicht vergrößern (sonst wird es eng)
         style.configure("Treeview", background=BG_LIST, fieldbackground=BG_LIST, foreground=FG, borderwidth=0,
                         rowheight=self.px(22))
-        style.map("Treeview", background=[("selected", BG_LIST)], foreground=[("selected", FG)])
+        style.map("Treeview", background=[("selected", MARKIERT)], foreground=[("selected", FG)],
+                  bordercolor=[("focus", BG)])           # kein heller Rahmen, wenn die Liste den Fokus hat
         style.configure("Knopf.TButton", background=HOVER, foreground=AKZENT, bordercolor=HOVER, lightcolor=HOVER,
                         darkcolor=HOVER, focuscolor=HOVER, borderwidth=0, padding=(self.px(8), self.px(2)), width=0)
         style.map("Knopf.TButton", background=[("pressed", FG), ("active", AKZENT)],
@@ -397,7 +423,7 @@ class Detailfenster:
                     knopf.pack(side="right", padx=(self.px(6), 0))
                     knopf.bind("<Enter>", lambda e, h=hilfe: self.fusszeile(h))
                     knopf.bind("<Leave>", lambda e: self.fusszeile(HINWEIS))
-            tree = ttk.Treeview(frame, columns=("wert", "balken"), show="tree", selectmode="none")
+            tree = ttk.Treeview(frame, columns=("wert", "balken"), show="tree", selectmode="extended")
             if ist_hwdaten(tab):                         # Feldname links, langer Wert (IDs) daneben
                 tree.column("#0", width=self.px(300), stretch=True)     # breit genug für lange Gerätenamen
                 tree.column("wert", width=self.px(260), stretch=True, anchor="w")
@@ -407,7 +433,7 @@ class Detailfenster:
                 tree.column("wert", width=self.px(100), stretch=False, anchor="e")
                 tree.column("balken", width=self.px(100), stretch=False, anchor="center")
             tree.tag_configure("bereich", foreground=SUB, font=("Segoe UI Semibold", 9))
-            tree.tag_configure("gruppe", font=("Segoe UI Semibold", 10))
+            tree.tag_configure("gruppe", font=SCHRIFT_GRUPPE)
             tree.tag_configure("typ", foreground=SUB, font=("Segoe UI", 8))
             tree.tag_configure("hinweis", foreground=SUB)
             for stufe, rgb in AMPEL.items():             # Temperaturzeilen in Ampelfarbe
@@ -419,9 +445,13 @@ class Detailfenster:
                 tree.bind(event, lambda e, t=tree: self.win.after_idle(self.knoepfe_platzieren, t))
             scroll.pack(side="right", fill="y")
             tree.pack(side="left", fill="both", expand=True)
-            tree.bind("<Motion>", lambda e, t=tree: self.erklaeren(t.identify_row(e.y)))
-            tree.bind("<Leave>", lambda e: self.erklaeren(None))
-            tree.bind("<Button-1>", lambda e, t=tree: self.kopieren(t, e))
+            tree.bind("<Motion>", lambda e, t=tree: self.erklaeren(t, e))
+            tree.bind("<Leave>", lambda e, t=tree: self.erklaeren(t, None))
+            # Markieren per Klick, Strg+Klick und Umschalt+Klick macht ttk selbst – dazu kommen Ziehen und Kopieren
+            tree.bind("<ButtonPress-1>", lambda e, t=tree: self.druecken(t, e))
+            tree.bind("<B1-Motion>", lambda e, t=tree: self.ziehen(t, e))
+            tree.bind("<ButtonRelease-1>", lambda e, t=tree: self.loslassen(t, e))
+            tree.bind("<Button-3>", lambda e, t=tree: self.kontextmenue(t, e))
             self.notebook.add(frame, text=tab.titel)
             self.tabs.append((tab, tree))
 
@@ -563,33 +593,36 @@ class Detailfenster:
         self.sensoren, self.kopierbar = {}, {}
         for key, _, text, sensor in rows:
             if sensor is None:
-                if "gruppe" in tree.item(key, "tags"):  # Gerätename -> Klick kopiert ihn
-                    self.kopierbar[key] = text
+                if "gruppe" in tree.item(key, "tags"):  # Gerätename -> Klick darauf kopiert ihn
+                    self.kopierbar[key] = ("#0", text)
                 continue
             self.sensoren[key] = sensor
-            if sensor["type"] == "Info":                 # Hardwaredaten: fester Wert, Klick kopiert ihn
-                self.kopierbar[key] = sensor["value"]
+            if sensor["type"] == "Info":                 # Hardwaredaten: fester Wert, Klick darauf kopiert ihn
+                self.kopierbar[key] = ("#1", sensor["value"])
                 tree.item(key, values=(sensor["value"], ""))
                 continue
             is_temp = sensor["type"] == "Temperature"
-            values = (fmt_value(sensor["type"], sensor["value"]),
-                      balken(sensor["value"]) if sensor["type"] in BAR_TYPES else "")
-            tree.item(key, values=values,
+            wert = fmt_value(sensor["type"], sensor["value"])
+            self.kopierbar[key] = ("#1", wert)           # Messwert, so wie er gerade dasteht
+            tree.item(key, values=(wert, balken(sensor["value"]) if sensor["type"] in BAR_TYPES else ""),
                       tags=(temp_stufe(sensor["value"], self.app.settings),) if is_temp else ())
 
-    def erklaeren(self, key):
-        self.aktiver_tab()[1].configure(cursor="hand2" if key in self.kopierbar else "")
+    def erklaeren(self, tree, event):
+        """Maus über der Liste (event None = verlassen): Hand-Cursor genau über kopierbaren Werten, in der Fußzeile
+        die Erklärung der Zeile."""
+        key = tree.identify_row(event.y) if event else None
+        tree.configure(cursor="hand2" if key and self.ueber_wert(tree, key, event.x) else "")
         if self.fehler or self.meldung_job:
             return                                       # Fehlermeldung bzw. „… kopiert“ stehen lassen
         sensor = self.sensoren.get(key)
         if sensor and sensor["type"] == "Info":
             erklaerung = hardwaredaten.ERKLAERUNGEN.get(sensor["name"])
             text = (f"{sensor['name']}: {sensor['value']}\n"     # voller Wert, falls die Spalte zu schmal ist
-                    f"{erklaerung + ' ' if erklaerung else ''}Klick kopiert den Wert.")
+                    f"{erklaerung + ' ' if erklaerung else ''}Klick auf den Wert kopiert ihn.")
         elif sensor:
             text = f"{sensor['name']}: {erklaere(sensor, self.inhalt)}"
         elif key in self.kopierbar:
-            text = f"Klick kopiert „{self.kopierbar[key]}“."
+            text = f"Klick auf den Namen kopiert „{self.kopierbar[key][1]}“."
         else:
             text = HINWEIS
         self.fuss.configure(text=text, foreground=SUB)
@@ -599,14 +632,118 @@ class Detailfenster:
         if not (self.fehler or self.meldung_job):
             self.fuss.configure(text=text, foreground=SUB)
 
-    # --- Kopieren ---
-    def kopieren(self, tree, event):
-        """Klick auf einen Gerätenamen (oder bei Hardwaredaten auf einen Wert) kopiert ihn in die Zwischenablage."""
-        if tree.identify_element(event.x, event.y).endswith("indicator"):
-            return                                       # Klick aufs Dreieck klappt nur auf/zu
-        text = self.kopierbar.get(tree.identify_row(event.y))
+    # --- Markieren und Kopieren ---
+    # Ein Klick markiert die Zeile (das macht ttk, ebenso Strg+Klick und Umschalt+Klick). Liegt er genau auf einem
+    # Wert oder Gerätenamen, wird der zusätzlich kopiert – auf der Beschriftung davor oder im Leeren dahinter nicht.
+    # Mit gedrückter Maustaste über mehrere Zeilen ziehen markiert alle dazwischen; Strg+C kopiert die markierten.
+    def druecken(self, tree, event):
+        """Maustaste gedrückt: nur merken, wo – erst beim Loslassen steht fest, ob es ein Klick war oder Ziehen."""
+        key = tree.identify_row(event.y)
+        tree.focus_set()
+        if not key:
+            tree.selection_set(())                       # Klick ins Leere hebt die Markierung auf
+        self.druck = {"key": key, "x": event.x, "gezogen": False,
+                      "taste": bool(event.state & 0x0005),          # Umschalt oder Strg: nur markieren
+                      "dreieck": tree.identify_element(event.x, event.y).endswith("indicator")}  # nur auf-/zuklappen
+
+    def ziehen(self, tree, event):
+        """Mit gedrückter Maustaste über mehrere Zeilen: alle dazwischen markieren. Am Rand wird mitgescrollt."""
+        d = self.druck
+        if not d or not d["key"] or d["taste"] or d["dreieck"]:
+            return
+        if event.y < 0:
+            tree.yview_scroll(-1, "units")
+            key = tree.identify_row(1)
+        elif event.y >= tree.winfo_height():
+            tree.yview_scroll(1, "units")
+            key = tree.identify_row(tree.winfo_height() - 2)
+        else:
+            key = tree.identify_row(event.y)
+        if not key or (key == d["key"] and not d["gezogen"]):
+            return
+        zeilen = list(sichtbare_zeilen(tree))
+        if d["key"] not in zeilen or key not in zeilen:  # Liste wurde inzwischen neu aufgebaut
+            return
+        d["gezogen"] = True
+        a, b = sorted((zeilen.index(d["key"]), zeilen.index(key)))
+        tree.selection_set(zeilen[a:b + 1])
+
+    def loslassen(self, tree, event):
+        """Ein einfacher Klick (nicht gezogen, ohne Strg/Umschalt) genau auf einen Wert kopiert ihn."""
+        d, self.druck = self.druck, None
+        if not d or d["gezogen"] or d["taste"] or d["dreieck"] or tree.identify_row(event.y) != d["key"]:
+            return
+        text = self.ueber_wert(tree, d["key"], d["x"])
         if text:
             self.zwischenablage(text, f"„{text}“ kopiert")
+
+    def ueber_wert(self, tree, key, x):
+        """Der Text, den ein Klick an Stelle x in Zeile key kopiert – nur direkt auf dem Wert bzw. Gerätenamen, nicht
+        auf der Beschriftung daneben (z. B. „Produkt-ID“) oder im Leeren dahinter. Sonst None."""
+        spalte, text = self.kopierbar.get(key, (None, None))
+        box = tree.bbox(key, spalte) if text and tree.identify_column(x) == spalte else ""
+        if not box:
+            return None
+        links, oben, breite, hoehe = box
+        schrift = SCHRIFT_GRUPPE if "gruppe" in tree.item(key, "tags") else SCHRIFT
+        if schrift not in self.schriften:
+            self.schriften[schrift] = tkfont.Font(self.win, font=schrift)
+        laenge = self.schriften[schrift].measure(text)
+        if spalte == "#0":                               # Name: beginnt hinter Einrückung und Dreieck
+            start = links
+            while start < links + breite and tree.identify_element(start, oben + hoehe // 2) != "text":
+                start += 1
+        elif str(tree.column(spalte, "anchor")) == "e":  # Messwerte stehen rechtsbündig (str: Tk liefert ein Tcl-Objekt)
+            start = links + breite - self.px(5) - laenge
+        else:
+            start = links + self.px(5)                   # ttk lässt links etwa 5 px frei
+        return text if start - self.px(4) <= x <= start + laenge + self.px(4) else None
+
+    def zeile_als_text(self, tree, key):
+        """Eine Zeile zum Kopieren: „Feld: Wert“ – Überschriften (Gerät, Bereich, Sensortyp) nur mit ihrem Namen."""
+        spalte, wert = self.kopierbar.get(key, (None, None))
+        name = tree.item(key, "text")
+        return f"{name}: {wert}" if spalte == "#1" else name
+
+    def auswahl_kopieren(self):
+        """Strg+C: die markierten Zeilen des Tabs als Text, eingerückt wie in der Liste."""
+        if not self.tabs:
+            return
+        tree = self.aktiver_tab()[1]
+        markiert = set(tree.selection())
+        zeilen = [key for key in sichtbare_zeilen(tree) if key in markiert and key != "leer"]
+        if not zeilen:
+            self.bestaetigen("Nichts markiert – Zeilen anklicken oder mit gedrückter Maustaste darüberziehen.",
+                             farbe=SUB)
+            return
+        tiefe = {key: len(list(vorfahren(tree, key))) for key in zeilen}
+        oben = min(tiefe.values())
+        text = "\n".join("  " * (tiefe[key] - oben) + self.zeile_als_text(tree, key) for key in zeilen)
+        self.zwischenablage(text, "1 Zeile kopiert" if len(zeilen) == 1 else f"{len(zeilen)} Zeilen kopiert")
+
+    def alles_markieren(self):
+        """Strg+A: alle sichtbaren Zeilen des Tabs (zugeklappte bleiben außen vor)."""
+        if self.tabs:
+            tree = self.aktiver_tab()[1]
+            tree.selection_set([key for key in sichtbare_zeilen(tree) if key != "leer"])
+        return "break"
+
+    def kontextmenue(self, tree, event):
+        """Rechtsklick: Wert kopieren, markierte Zeilen kopieren, alles markieren. Eine nicht markierte Zeile wird
+        vorher markiert (wie im Explorer)."""
+        key = tree.identify_row(event.y)
+        if key and key not in tree.selection():
+            tree.selection_set(key)
+        menue = tk.Menu(self.win, tearoff=False, bg=BG_LIST, fg=FG, activebackground=HOVER, activeforeground=FG,
+                        disabledforeground=SUB, bd=0, font=SCHRIFT)
+        spalte, wert = self.kopierbar.get(key, (None, None))
+        menue.add_command(label="Wert kopieren" if spalte == "#1" else "Namen kopieren",
+                          state="normal" if wert else "disabled",
+                          command=lambda: self.zwischenablage(wert, f"„{wert}“ kopiert"))
+        menue.add_command(label="Markierte Zeilen kopieren", accelerator="Strg+C", command=self.auswahl_kopieren)
+        menue.add_separator()
+        menue.add_command(label="Alles markieren", accelerator="Strg+A", command=self.alles_markieren)
+        menue.tk_popup(event.x_root, event.y_root)
 
     def zwischenablage(self, text, meldung):
         self.win.clipboard_clear()

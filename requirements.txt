@@ -6,6 +6,7 @@ customtkinter==6.0.0
 pystray==0.19.5
 pillow==12.3.0
 pythonnet==3.2.1
+pygame-ce==2.5.8            # Cube Game (Community-Fork von pygame, hat Wheels für Python 3.14)
 
 # Abhängigkeiten der Pakete oben (pip würde sie sonst in der jeweils neuesten Version holen)
 darkdetect==0.8.0           # customtkinter

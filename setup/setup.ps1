@@ -4,9 +4,14 @@ Starter aus setup\setup_exe.cs, die fertig im Repo liegen (ein Doppelklick auf e
 öffnen). Neu bauen nach einer Änderung an setup_exe.cs: setup\setup_exe_bauen.ps1.
 
 Welche Programme es gibt, steht in den Ausweisen: toolbox\programm.json und programme\<programm>\programm.json
-(Name, Version, Skript, Starter-.exe, Downloads). Die Schritte 3 und 4 gelten für jedes Programm darin.
+(Name, Version, Skript, Starter-.exe, Downloads). Die Schritte 3 und 4 gelten für jedes eingerichtete Programm.
 
-Einrichten (ohne Parameter) – alles, was nach dem Klonen fehlt:
+Welche Programme eingerichtet sind, steht in daten\installiert.json (ohne die Toolbox – die ist immer dabei). Fehlt
+die Datei, gelten alle als eingerichtet: So war es, bevor man wählen konnte – und beim ersten Einrichten sind damit
+alle vorausgewählt. Die Toolbox liest dieselbe Datei und zeigt nur eingerichtete Programme.
+
+Einrichten (ohne Parameter) – erst ein kleines Fenster: welche Programme? (Abgewählte, die eingerichtet waren, werden
+entfernt.) Danach alles, was nach dem Klonen fehlt:
   1. Python $PythonVersion finden (oder per winget installieren) – genau diese Version, keine ältere oder neuere
   2. runtime\ anlegen: eigenes Python im Projektordner, mit den Paketen aus requirements.txt (feste Versionen)
   3. je Programm zwei .exe:
@@ -17,18 +22,26 @@ Einrichten (ohne Parameter) – alles, was nach dem Klonen fehlt:
          (setup\starter.cs, übersetzt mit csc.exe aus dem .NET Framework von Windows)
   4. je Programm die Downloads aus programm.json (feste Version, Prüfsumme), z. B. LibreHardwareMonitor nach
      programme\hardware_monitor\lhm\
-  5. mit einer UAC-Abfrage: PawnIO installieren und die geplante Aufgabe HardwareMonitor einrichten
-  6. Hardware-Monitor (neu) starten
+  5. nur mit Hardware-Monitor, mit einer UAC-Abfrage: PawnIO installieren und die geplante Aufgabe HardwareMonitor
+     einrichten
+  6. nur mit Hardware-Monitor: (neu) starten
   Jeder Schritt prüft vorher, ob er schon erledigt ist – Einrichten lässt sich also jederzeit erneut ausführen,
   z. B. nach dem Verschieben des Ordners (dann wird nur die Aufgabe neu eingerichtet) oder nach einem git pull.
+  Eine laufende Toolbox wird dafür beendet und am Ende wieder gestartet – mit der neuen Auswahl.
 
-  -OhneAdmin    nur Schritte 1–4, ohne UAC-Abfrage
-  -Neustart     Hardware-Monitor in Schritt 6 auf jeden Fall neu starten, damit er neuen Code lädt
-                (nach einem Update – „Aktualisieren“ in den Toolbox-Einstellungen übergibt das)
+  -Programme <ids>  diese Programme zusätzlich einrichten, ohne Fenster (mit Komma getrennt, z. B.
+                    -Programme hardware_monitor – so ruft „Installieren“ in der Toolbox das Skript auf).
+                    Schritte 3–6 dann nur für diese; 1–2 (Python, runtime\) brauchen alle, die laufen immer.
+  -OhneAdmin        nur Schritte 1–4, ohne UAC-Abfrage
+  -Neustart         ohne Fenster, die eingerichteten Programme wie bisher; Hardware-Monitor in Schritt 6 auf jeden
+                    Fall neu starten, damit er neuen Code lädt (nach einem Update – „Aktualisieren“ in den
+                    Toolbox-Einstellungen übergibt das)
 
 -Entfernen – das Gegenstück: Toolbox und Hardware-Monitor beenden, Aufgabe löschen, auf Wunsch alles Erzeugte und
   Heruntergeladene löschen (runtime\, Starter, Downloads). daten\ bleibt.
   PawnIO bleibt installiert, weil es auch andere Programme nutzen (entfernen: winget uninstall namazso.PawnIO).
+  Mit -Programme <ids> nur diese Programme: beenden, Aufgabe löschen, Starter und Downloads löschen, aus
+  daten\installiert.json streichen – ohne Rückfrage („Entfernen“ in der Toolbox fragt vorher selbst).
 
 -Admin <Schritte> – intern: der Teil mit Adminrechten. Das Skript startet sich dafür selbst nach einer UAC-Abfrage
   noch einmal (Schritte, mit Komma getrennt: pawnio, aufgabe, aufgabe-loeschen).
@@ -36,7 +49,7 @@ Einrichten (ohne Parameter) – alles, was nach dem Klonen fehlt:
 Aufteilung des Ordners: Code = Repo (toolbox\, programme\, setup\), runtime\ = wegwerfbar (Python und Pakete –
 lässt sich jederzeit neu einrichten), daten\ = Einstellungen (eine .json je Programm) und Logs.
 #>
-param([switch]$Entfernen, [switch]$OhneAdmin, [switch]$Neustart, [string]$Admin)
+param([switch]$Entfernen, [string]$Programme, [switch]$OhneAdmin, [switch]$Neustart, [string]$Admin)
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'         # Fortschrittsbalken bremsen Invoke-WebRequest stark aus
@@ -76,8 +89,37 @@ function Lade-Programm($datei) {
 }
 
 $Toolbox   = Lade-Programm (Join-Path $Root 'toolbox\programm.json')
-$Programme = @($Toolbox) + @(Get-ChildItem (Join-Path $Root 'programme\*\programm.json') | ForEach-Object { Lade-Programm $_.FullName })
-$Monitor   = $Programme | Where-Object id -eq 'hardware_monitor'
+$Alle      = @($Toolbox) + @(Get-ChildItem (Join-Path $Root 'programme\*\programm.json') | ForEach-Object { Lade-Programm $_.FullName })
+$Monitor   = $Alle | Where-Object id -eq 'hardware_monitor'
+
+# Welche Programme eingerichtet sind (ohne die Toolbox) – liest auch toolbox.py (installierte_ids)
+$InstalliertDatei = Join-Path $Root 'daten\installiert.json'
+
+function Installierte {
+    <# IDs der eingerichteten Programme. Fehlt die Datei (oder ist sie kaputt): alle. #>
+    if (Test-Path $InstalliertDatei) {
+        try { return @((Get-Content -Raw -Encoding UTF8 $InstalliertDatei | ConvertFrom-Json).programme | Where-Object { $_ }) }
+        catch { }
+    }
+    @($Alle | Where-Object id -ne 'toolbox' | ForEach-Object id)
+}
+
+function Installierte-Speichern($ids) {
+    New-Item -ItemType Directory -Force (Split-Path -Parent $InstalliertDatei) | Out-Null
+    $json = ConvertTo-Json @{ programme = @($ids) }
+    [IO.File]::WriteAllText($InstalliertDatei, $json, (New-Object Text.UTF8Encoding $false))   # ohne BOM, für Python
+}
+
+function Programm-Ids($text) {
+    <# "a,b" aus -Programme -> geprüfte IDs. Die Toolbox gehört nicht dazu, die ist immer eingerichtet. #>
+    $ids = @($text -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ -and $_ -ne 'toolbox' })
+    foreach ($id in $ids) {
+        if (-not ($Alle | Where-Object id -eq $id)) {
+            throw "Unbekanntes Programm: $id (bekannt: $(($Alle | Where-Object id -ne 'toolbox' | ForEach-Object id) -join ', '))"
+        }
+    }
+    $ids
+}
 
 # Aus den Ausweisen – dieselben Werte lesen toolbox.py und hardware_monitor_einstellungen.py
 $Aufgabe   = $Monitor.aufgabe                    # geplante Aufgabe, die den Monitor beim Anmelden startet
@@ -118,9 +160,12 @@ function Befehl-Senden($port, $befehl) {
     }
 }
 
-function Monitor-Beenden {
-    Monitor-Befehl 'quit' | Out-Null
-    for ($i = 0; $i -lt 50 -and (Monitor-Befehl 'status'); $i++) { Start-Sleep -Milliseconds 100 }   # bis zu 5 s
+function Monitor-Beenden { Programm-Beenden $Monitor }
+
+function Programm-Beenden($p) {
+    <# Beendet ein Programm über seinen Port ("port" in programm.json) und wartet bis zu 5 s darauf. #>
+    Befehl-Senden $p.port 'quit' | Out-Null
+    for ($i = 0; $i -lt 50 -and (Befehl-Senden $p.port 'status'); $i++) { Start-Sleep -Milliseconds 100 }
 }
 
 function Toolbox-Beenden {
@@ -190,6 +235,104 @@ function Starter-Bauen($p) {
 }
 
 
+# ---------- Auswahlfenster ----------
+function Auswahl-Fenster($vorher) {
+    <# Fragt in einem kleinen Fenster, welche Programme eingerichtet sein sollen ($vorher ist vorausgewählt).
+       Rückgabe: die gewählten IDs (ohne Toolbox, evtl. leer) – oder $null bei Abbrechen.
+       WinForms gehört zum .NET Framework von Windows – Python und damit tkinter gibt es an dieser Stelle ja noch nicht. #>
+    Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+    # Selbst skalieren statt von Windows unscharf hochzeichnen lassen (bei Anzeige-Skalierung über 100 %)
+    Add-Type -Namespace Toolbox -Name Dpi -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetProcessDPIAware();'
+    [Toolbox.Dpi]::SetProcessDPIAware() | Out-Null
+    [Windows.Forms.Application]::EnableVisualStyles()
+
+    $form = New-Object Windows.Forms.Form
+    $s = $form.CreateGraphics().DpiX / 96                 # Skalierung für feste Pixelmaße
+    $form.Text = 'Toolbox einrichten'
+    $form.Icon = New-Object Drawing.Icon (Join-Path $Root 'toolbox\toolbox.ico')
+    $form.Font = New-Object Drawing.Font('Segoe UI', 9)
+    $form.FormBorderStyle = 'FixedDialog'
+    $form.MaximizeBox = $form.MinimizeBox = $false
+    $form.StartPosition = 'CenterScreen'
+    $form.AutoSize = $true
+    $form.AutoSizeMode = 'GrowAndShrink'
+    $form.TopMost = $true                                 # nicht hinter dem Konsolenfenster verschwinden
+    $form.Add_Shown({ $form.Activate() })
+
+    $liste = New-Object Windows.Forms.TableLayoutPanel
+    $liste.AutoSize = $true
+    $liste.ColumnCount = 1
+    $liste.Padding = New-Object Windows.Forms.Padding ([int](14 * $s))
+    $form.Controls.Add($liste)
+
+    function Zeile($control, $abstandOben = 0, $einzug = 0) {
+        $control.AutoSize = $true
+        $control.Margin = New-Object Windows.Forms.Padding ([int]($einzug * $s)), ([int]($abstandOben * $s)), 0, 0
+        $liste.Controls.Add($control)
+    }
+
+    $titel = New-Object Windows.Forms.Label
+    $titel.Text = 'Welche Programme sollen eingerichtet werden?'
+    $titel.Font = New-Object Drawing.Font($form.Font, [Drawing.FontStyle]::Bold)
+    Zeile $titel
+
+    $grau = [Drawing.SystemColors]::GrayText
+    $kaestchen = @()
+    foreach ($p in $Alle) {
+        $box = New-Object Windows.Forms.CheckBox
+        $box.Text = "$($p.name) $($p.version)"
+        $box.Tag = $p.id
+        $box.Checked = $p.id -eq 'toolbox' -or $vorher -contains $p.id
+        $box.Enabled = $p.id -ne 'toolbox'                # die Toolbox ist immer dabei
+        Zeile $box 10
+        $kaestchen += $box
+        if ($p.beschreibung) {
+            $text = New-Object Windows.Forms.Label
+            $text.Text = $p.beschreibung
+            $text.ForeColor = $grau
+            $text.MaximumSize = New-Object Drawing.Size ([int](380 * $s)), 0      # lange Texte umbrechen
+            Zeile $text 0 18
+        }
+    }
+
+    $alle = New-Object Windows.Forms.LinkLabel
+    $alle.Text = 'Alle auswählen'
+    $alle.Add_LinkClicked({ foreach ($box in $kaestchen) { $box.Checked = $true } }.GetNewClosure())
+    Zeile $alle 12
+
+    $hinweis = New-Object Windows.Forms.Label
+    $hinweis.Text = "Abgewählte Programme werden entfernt, ihre Einstellungen bleiben.`n" +
+                    'Ändern geht jederzeit: Setup.exe erneut ausführen oder in der Toolbox unter Zahnrad → Programme.'
+    $hinweis.ForeColor = $grau
+    $hinweis.MaximumSize = New-Object Drawing.Size ([int](380 * $s)), 0
+    Zeile $hinweis 8
+
+    $knoepfe = New-Object Windows.Forms.FlowLayoutPanel
+    $knoepfe.FlowDirection = 'RightToLeft'
+    $abbrechen = New-Object Windows.Forms.Button
+    $abbrechen.Text = 'Abbrechen'
+    $abbrechen.DialogResult = 'Cancel'
+    $ok = New-Object Windows.Forms.Button
+    $ok.Text = 'Einrichten'
+    $ok.DialogResult = 'OK'
+    foreach ($knopf in $abbrechen, $ok) {
+        $knopf.AutoSize = $true
+        $knopf.MinimumSize = New-Object Drawing.Size ([int](88 * $s)), 0
+        $knoepfe.Controls.Add($knopf)
+    }
+    $form.AcceptButton = $ok
+    $form.CancelButton = $abbrechen
+    Zeile $knoepfe 14
+    $knoepfe.Dock = 'Fill'                                # nach Zeile: Knöpfe rechtsbündig über die volle Breite
+
+    $ergebnis = $form.ShowDialog()
+    $ids = @($kaestchen | Where-Object { $_.Checked -and $_.Tag -ne 'toolbox' } | ForEach-Object { $_.Tag })
+    $form.Dispose()
+    if ($ergebnis -ne 'OK') { return $null }
+    , $ids                                                # Komma: eine leere Liste bleibt eine Liste (nicht $null)
+}
+
+
 # ---------- Der Teil mit Adminrechten (läuft im eigenen Fenster) ----------
 function Admin-Schritte($schritte) {
     $ok = $true
@@ -240,9 +383,30 @@ function Runtime-Version {
 }
 
 function Einrichten {
+    # 0. Welche Programme: aus -Programme, wie bisher (-Neustart) oder aus dem Fenster
+    $vorher = Installierte
+    if ($Programme) { $ids = @($vorher) + @(Programm-Ids $Programme) | Select-Object -Unique }
+    elseif ($Neustart) { $ids = $vorher }
+    else {
+        $ids = Auswahl-Fenster $vorher
+        if ($null -eq $ids) { Write-Host 'Abgebrochen – nichts geändert.'; return }
+    }
+    $ids = @($ids)
+    Installierte-Speichern $ids                   # gleich speichern: Bricht unten etwas ab, gilt die Wahl trotzdem
+    # Schritte 3–6 für alle gewählten Programme – mit -Programme nur für die genannten (die übrigen sind ja schon
+    # eingerichtet). Python und runtime\ (1–2) brauchen alle, die werden immer geprüft.
+    $Auswahl = @($Alle | Where-Object {
+        if ($Programme) { (Programm-Ids $Programme) -contains $_.id } else { $_.id -eq 'toolbox' -or $ids -contains $_.id }
+    })
+    $mitMonitor = $Auswahl -contains $Monitor
+
     # Eine laufende Toolbox hält Dateien in runtime\ fest (Pakete, Toolbox.exe) -> vorher beenden, am Ende neu starten
     $toolboxLief = Toolbox-Beenden
     if ($toolboxLief) { Info 'Toolbox für die Einrichtung beendet – wird am Ende wieder gestartet.' }
+
+    foreach ($p in $Alle | Where-Object { $vorher -contains $_.id -and $ids -notcontains $_.id }) {
+        Programm-Entfernen $p                     # im Fenster abgewählt
+    }
 
     # 1. Python
     Schritt "Python $PythonVersion"
@@ -304,13 +468,13 @@ function Einrichten {
     & $RuntimePy -m pip install --disable-pip-version-check --no-warn-script-location --quiet `
         -r (Join-Path $Root 'requirements.txt')
     if ($LASTEXITCODE -ne 0) { throw 'Pakete konnten nicht installiert werden' }
-    & $RuntimePy -c 'import tkinter, customtkinter, pystray, PIL, clr'
+    & $RuntimePy -c 'import tkinter, customtkinter, pystray, PIL, clr, pygame'
     if ($LASTEXITCODE -ne 0) { throw 'runtime\ ist unvollständig – Ordner runtime\ löschen und erneut einrichten' }
     Ok 'Pakete vollständig'
 
     # 3. Je Programm: pythonw.exe-Kopie mit eigenem Namen und Symbol + Starter
     $neuStarten = [bool]$Neustart                 # Monitor in Schritt 6 neu starten (-Neustart: nach einem Update)
-    foreach ($p in $Programme | Where-Object StarterPfad) {
+    foreach ($p in $Auswahl | Where-Object StarterPfad) {
         Schritt "$($p.name): $(Split-Path -Leaf $p.StarterPfad)"
         $meldung = & $RuntimePy -B (Join-Path $PSScriptRoot 'exe_anlegen.py') $p.HostPfad $p.name $p.SymbolPfad
         # 2 = Datei gesperrt, weil das Programm läuft. Den Monitor dürfen wir kurz beenden (Schritt 6 startet ihn neu),
@@ -336,7 +500,7 @@ function Einrichten {
     }
 
     # 4. Je Programm: Downloads aus programm.json
-    foreach ($p in $Programme) {
+    foreach ($p in $Auswahl) {
         foreach ($d in @($p.downloads | Where-Object { $_ })) {
             Schritt "$($d.name) $($d.version) für $($p.name)"
             $ziel = Join-Path $p.Ordner $d.ordner
@@ -361,6 +525,18 @@ function Einrichten {
         }
     }
 
+    if ($mitMonitor) { Monitor-Einrichten $neuStarten }
+
+    Write-Host ""
+    if ($toolboxLief) {
+        Toolbox-Starten
+        Write-Host "Fertig. Die Toolbox wurde wieder gestartet." -ForegroundColor Green
+    } else {
+        Write-Host "Fertig. Die Toolbox startest du mit Toolbox.exe." -ForegroundColor Green
+    }
+}
+
+function Monitor-Einrichten($neuStarten) {
     # 5. Adminrechte: PawnIO und Aufgabe
     Schritt 'PawnIO und Autostart-Aufgabe'
     $schritte = @()
@@ -399,18 +575,70 @@ function Einrichten {
         Start-ScheduledTask -TaskName $Aufgabe
         Ok $(if ($laeuft) { 'neu gestartet' } else { 'gestartet' })
     }
+}
+
+
+# ---------- Entfernen ----------
+function Aufgabe-Loeschen {
+    if (-not (Get-ScheduledTask -TaskName $Aufgabe -ErrorAction SilentlyContinue)) {
+        Ok "Aufgabe $Aufgabe gibt es nicht"
+        return
+    }
+    try {
+        Unregister-ScheduledTask -TaskName $Aufgabe -Confirm:$false
+        Ok "Aufgabe $Aufgabe gelöscht"
+    } catch {                                     # die Aufgabe läuft mit Adminrechten – zum Löschen braucht es meist auch welche
+        if (Als-Admin @('aufgabe-loeschen')) { Ok "Aufgabe $Aufgabe gelöscht" } else { Warnung "Die Aufgabe $Aufgabe ist noch da." }
+    }
+}
+
+function Programm-Entfernen($p) {
+    <# Ein Programm wieder ausbauen: beenden, Aufgabe löschen, Starter, pythonw.exe-Kopie und Downloads löschen.
+       Der Code bleibt (gehört zum Repo), die Einstellungen in daten\ auch – Einrichten macht es wieder vollständig. #>
+    Schritt "$($p.name) entfernen"
+    $etwas = $false
+    if ($p.port -and (Befehl-Senden $p.port 'status')) { Programm-Beenden $p; Ok 'beendet'; $etwas = $true }
+    if ($p.id -eq $Monitor.id -and (Get-ScheduledTask -TaskName $Aufgabe -ErrorAction SilentlyContinue)) {
+        Aufgabe-Loeschen; $etwas = $true
+    }
+    $pfade = @($p.StarterPfad, $p.HostPfad, (Join-Path $Runtime "starter\$($p.id).cs")) +
+             @(@($p.downloads | Where-Object { $_ }) | ForEach-Object { Join-Path $p.Ordner $_.ordner }) |
+             Where-Object { $_ -and (Test-Path $_) }
+    foreach ($pfad in $pfade) {
+        # Ein gerade beendetes Programm hält seine .exe noch kurz fest – bis zu 10 s erneut versuchen
+        for ($i = 0; ; $i++) {
+            try { Remove-Item $pfad -Recurse -Force; Ok "gelöscht: $pfad"; break }
+            catch {
+                if ($i -ge 20) { Warnung "ließ sich nicht löschen: $pfad"; break }
+                Start-Sleep -Milliseconds 500
+            }
+        }
+        $etwas = $true
+    }
+    if (-not $etwas) { Ok 'war nicht eingerichtet' }
+}
+
+function Programme-Entfernen {
+    <# -Entfernen -Programme <ids>: nur diese Programme. Die Toolbox wird dafür beendet und danach neu gestartet,
+       damit sie die geänderte Auswahl zeigt. #>
+    if (($Programme -split ',' | ForEach-Object { $_.Trim() }) -contains 'toolbox') {
+        Warnung 'Die Toolbox selbst entfernt Uninstall.exe ohne -Programme.'
+    }
+    $ids = @(Programm-Ids $Programme)
+    if (-not $ids) { return }
+    $toolboxLief = Toolbox-Beenden
+    foreach ($p in $Alle | Where-Object { $ids -contains $_.id }) { Programm-Entfernen $p }
+    Installierte-Speichern @(Installierte | Where-Object { $ids -notcontains $_ })
 
     Write-Host ""
     if ($toolboxLief) {
         Toolbox-Starten
         Write-Host "Fertig. Die Toolbox wurde wieder gestartet." -ForegroundColor Green
     } else {
-        Write-Host "Fertig. Die Toolbox startest du mit Toolbox.exe." -ForegroundColor Green
+        Write-Host "Fertig." -ForegroundColor Green
     }
 }
 
-
-# ---------- Entfernen ----------
 function Entfernen {
     Schritt 'Toolbox beenden'
     if (Toolbox-Beenden) { Ok 'beendet' } else { Ok 'lief nicht' }
@@ -419,19 +647,10 @@ function Entfernen {
     if (Monitor-Befehl 'status') { Monitor-Beenden; Ok 'beendet' } else { Ok 'lief nicht' }
 
     Schritt "Aufgabe $Aufgabe löschen"
-    if (-not (Get-ScheduledTask -TaskName $Aufgabe -ErrorAction SilentlyContinue)) {
-        Ok 'gibt es nicht'
-    } else {
-        try {
-            Unregister-ScheduledTask -TaskName $Aufgabe -Confirm:$false
-            Ok 'gelöscht'
-        } catch {                                 # die Aufgabe läuft mit Adminrechten – zum Löschen braucht es meist auch welche
-            if (Als-Admin @('aufgabe-loeschen')) { Ok 'gelöscht' } else { Warnung 'Die Aufgabe ist noch da.' }
-        }
-    }
+    Aufgabe-Loeschen
 
     Schritt 'Erzeugte und heruntergeladene Dateien'
-    $pfade = @($Runtime) + @($Programme | ForEach-Object {
+    $pfade = @($Runtime) + @($Alle | ForEach-Object {
         $p = $_
         $p.StarterPfad
         @($p.downloads | Where-Object { $_ }) | ForEach-Object { Join-Path $p.Ordner $_.ordner }
@@ -459,5 +678,6 @@ function Entfernen {
 
 
 if ($Admin) { exit $(if (Admin-Schritte ($Admin -split ',')) { 0 } else { 1 }) }
+elseif ($Entfernen -and $Programme) { Programme-Entfernen }
 elseif ($Entfernen) { Entfernen }
 else { Einrichten }

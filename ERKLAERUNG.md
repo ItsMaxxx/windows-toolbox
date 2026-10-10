@@ -974,7 +974,7 @@ Ablauf beim Start (von oben nach unten, wie Python die Datei ausführt):
 
 1. Importe, `sys.dont_write_bytecode = True`, `APP_DIR`/`ROOT`/`PROGRAMME_DIR` bestimmen, `APP_DIR` in `sys.path`.
 2. `import daten`, `import winutil`, `from base import ...`, `from platzhalter import ...`.
-3. Konstanten: `CATEGORIES` (Tabs oben: Allgemein, Werkzeuge, Medien, Netzwerk), `PLACEHOLDERS` (die
+3. Konstanten: `CATEGORIES` (Tabs oben: Allgemein, Werkzeuge, Medien, Netzwerk, Games), `PLACEHOLDERS` (die
    „XXX“-Einträge), `AUSWEIS` (`toolbox\programm.json`) und daraus `VERSION`, `SETTINGS_FILE` (`daten\toolbox.json`),
    `ICON_FILE`, `TOOLBOX_EXE` (`runtime\Toolbox.exe`), `EINRICHTEN` (`Einrichten.cmd`), `GUI_PORT = 47816`,
    `APPEARANCE`, `DEFAULT_SETTINGS`.

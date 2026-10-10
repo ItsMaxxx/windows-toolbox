@@ -2,6 +2,7 @@
   "id": "toolbox",
   "name": "Toolbox",
   "version": "1.0",
+  "beschreibung": "Die Oberfläche für alle Programme – ist immer dabei.",
   "skript": "toolbox.py",
   "starter": "../Toolbox.exe",
   "symbol": "toolbox.ico",
