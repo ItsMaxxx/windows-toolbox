@@ -21,7 +21,8 @@ es über seine Seite in der Toolbox (*Allgemein → Hardware-Monitor*) oder per 
 | `detailfenster.py` | baut das Fenster aus `detailfenster_inhalt.py` (Farben, Layout, Ampelfarben) |
 | `hardwaredaten.py` | liest die festen Daten für den Tab „Hardwaredaten“ über WMI; `python hardwaredaten.py` gibt sie aus |
 | `hardware_monitor_gui.py` | Seite in der Toolbox: Status, Starten/Beenden, Autostart, Einstellungen |
-| `programm.json` | Ausweis: Name, Tab, Beschreibung, Version, Skript, Starter, Download von LibreHardwareMonitor |
+| `hardware_monitor_einstellungen.py` | Startwerte, erlaubte Werte, Laden und Speichern – gemeinsam für Programm und Seite |
+| `programm.json` | Ausweis: Name, Tab, Beschreibung, Version, Skript, Starter, Port, Aufgabe, Download von LibreHardwareMonitor |
 | `HardwareMonitor.exe` | Starter (legt `Setup.exe` an, nicht im Repo) – startet `hardware_monitor.py` ohne Argumente |
 | `lhm/` | LibreHardwareMonitor (nicht im Repo, siehe unten) |
 | `daten/hardware_monitor.json` (im Hauptordner) | Einstellungen (entsteht beim ersten Speichern, nicht im Repo) |
@@ -40,19 +41,18 @@ und die geplante Aufgabe `HardwareMonitor`. Von Hand ginge es so:
    ```
 3. **LibreHardwareMonitor**: `LibreHardwareMonitor.zip` (nicht die .NET-10-Variante) von den
    [GitHub-Releases](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/releases) nach `lhm\` in
-   diesem Ordner entpacken. Gesucht wird `LibreHardwareMonitorLib.dll` zuerst dort, dann in `runtime\lhm\` (dort lag
-   es kurzzeitig), dann in `C:\Tools\lhm`.
-4. **Autostart**: in der Toolbox auf *Aufgabe einrichten* klicken. Das legt die geplante Aufgabe `HardwareMonitor` an,
+   diesem Ordner entpacken.
+4. **Autostart**: in der Toolbox auf *Aufgabe einrichten* klicken. Das legt die geplante Aufgabe `HardwareMonitor`
+   (Name aus `"aufgabe"` in `programm.json`) an,
    die das Programm beim Anmelden mit Adminrechten startet – ohne UAC-Abfrage. Ohne Aufgabe startet *Starten* in der
    Toolbox das Programm direkt, dann fragt Windows jedes Mal nach.
 
 **Womit es läuft:** Aufgabe und *Starten* rufen den Starter `HardwareMonitor.exe` in diesem Ordner auf (ohne
 Argumente). Der startet `runtime\HardwareMonitor.exe` (`pythonw.exe` des Projekt-Pythons mit eigener
 Dateibeschreibung und eigenem Symbol, angelegt von `setup\exe_anlegen.py`) mit `hardware_monitor.py` und beendet
-sich – im Task-Manager steht dann „Hardware-Monitor“ mit dem Toolbox-Symbol statt „Python“. Fehlt der Starter, geht
-es wie früher direkt über `runtime\HardwareMonitor.exe` bzw. das `pythonw.exe` des Pythons, mit dem die Toolbox läuft.
-Der Name der Aufgabe steht in `daten\hardware_monitor.json` (`task_name`, einstellbar unter *Erweitert*). Ist das Detailfenster zu, steht der Monitor dort unter „Hintergrundprozesse“ statt unter
-„Apps“ – so hält Windows es mit jedem Programm ohne sichtbares Fenster.
+sich – im Task-Manager steht dann „Hardware-Monitor“ mit dem Toolbox-Symbol statt „Python“. Fehlt der Starter, zeigt
+die Toolbox einen Hinweis, `Setup.exe` auszuführen. Ist das Detailfenster zu, steht der Monitor im Task-Manager unter
+„Hintergrundprozesse“ statt unter „Apps“ – so hält Windows es mit jedem Programm ohne sichtbares Fenster.
 
 ## Starten und prüfen
 
@@ -96,10 +96,9 @@ laufende Programm übernimmt die Werte sofort. Fehlende oder ungültige Werte be
 | `warn_temp` / `hot_temp` | `60` / `80` | ab hier gelb bzw. rot |
 | `effizienzmodus` | `"auto"` | Effizienzmodus von Windows 11: `auto` = nur bei geschlossenem Fenster, `an` = immer, `aus` = nie |
 | `window` | `""` | Größe und Position des Detailfensters (setzt das Fenster selbst) |
-| `task_name` | `"HardwareMonitor"` | Name der Autostart-Aufgabe – nur für die Toolbox, der Monitor lässt ihn unverändert |
 
-Die Standardwerte stehen doppelt: `DEFAULT_SETTINGS` in `hardware_monitor.py` und `defaults` in
-`hardware_monitor_gui.py` – bei Änderungen beide anpassen.
+Startwerte, erlaubte Werte und die Prüfung beim Laden stehen in `hardware_monitor_einstellungen.py` – Monitor und
+Toolbox-Seite nutzen beide diese Datei.
 
 ## Detailfenster anpassen
 
@@ -157,7 +156,7 @@ Die Toolbox läuft ohne Adminrechte und darf das Programm daher nicht einfach be
 | `reload` | Einstellungen neu einlesen |
 | `quit` | Programm beenden |
 
-Der Port steht als `IPC_PORT` in `hardware_monitor.py` **und** `hardware_monitor_gui.py` und muss übereinstimmen.
+Der Port steht als `"port"` in `programm.json`; Monitor, Toolbox-Seite und `setup.ps1` lesen ihn von dort.
 
 ## Sparsamkeit
 

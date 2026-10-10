@@ -7,6 +7,8 @@
   "seite": "hardware_monitor_gui.py",
   "skript": "hardware_monitor.py",
   "starter": "HardwareMonitor.exe",
+  "port": 47815,
+  "aufgabe": "HardwareMonitor",
   "downloads": [
     {
       "name": "LibreHardwareMonitor",

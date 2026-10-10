@@ -2,7 +2,8 @@
 // baut erst Setup.exe). Beide machen nur eins: setup\setup.ps1 in einem Konsolenfenster ausführen.
 //   Setup.exe       setup.ps1 [Argumente]              (z. B. Setup.exe -OhneAdmin, Setup.exe -Neustart)
 //   Uninstall.exe   setup.ps1 -Entfernen [Argumente]   (übersetzt mit /define:ENTFERNEN)
-// Neu bauen nach einer Änderung hier: setup\setup_exe_bauen.ps1 ausführen und beide .exe committen.
+// Neu bauen nach einer Änderung hier oder in argumente.cs: setup\setup_exe_bauen.ps1 ausführen und beide .exe
+// committen.
 //
 // Was früher Einrichten.cmd / Entfernen.cmd taten, steht jetzt hier:
 //   - Konsole auf UTF-8, damit Umlaute richtig erscheinen (früher chcp 65001)
@@ -49,11 +50,11 @@ static class SetupExe
         }
         else
         {
-            StringBuilder argumente = new StringBuilder("-NoProfile -ExecutionPolicy Bypass -File " + Quote(skript));
+            StringBuilder argumente = new StringBuilder("-NoProfile -ExecutionPolicy Bypass -File " + Argumente.Quote(skript));
             if (Modus != "")
                 argumente.Append(' ').Append(Modus);
             foreach (string arg in args)
-                argumente.Append(' ').Append(Quote(arg));
+                argumente.Append(' ').Append(Argumente.Quote(arg));
 
             ProcessStartInfo info = new ProcessStartInfo("powershell.exe", argumente.ToString());
             info.UseShellExecute = false;        // gleiche Konsole, gleiche Rechte
@@ -75,22 +76,5 @@ static class SetupExe
             Console.ReadKey(true);
         }
         return code;
-    }
-
-    // Ein Argument so in Anführungszeichen setzen, wie Windows-Programme (auch PowerShell) es wieder auseinandernehmen:
-    // Backslashes vor einem " bzw. am Ende verdoppeln, " selbst als \" schreiben.
-    static string Quote(string arg)
-    {
-        StringBuilder sb = new StringBuilder("\"");
-        int backslashes = 0;
-        foreach (char c in arg)
-        {
-            if (c == '\\') { backslashes++; continue; }
-            sb.Append('\\', c == '"' ? backslashes * 2 + 1 : backslashes);
-            backslashes = 0;
-            sb.Append(c);
-        }
-        sb.Append('\\', backslashes * 2).Append('"');
-        return sb.ToString();
     }
 }

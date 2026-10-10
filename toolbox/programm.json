@@ -4,5 +4,6 @@
   "version": "1.0",
   "skript": "toolbox.py",
   "starter": "../Toolbox.exe",
-  "symbol": "toolbox.ico"
+  "symbol": "toolbox.ico",
+  "port": 47816
 }

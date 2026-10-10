@@ -47,9 +47,6 @@ $RuntimePy  = Join-Path $Runtime 'python.exe'
 $Symbol     = Join-Path $Root 'toolbox\programm.ico'   # Standardsymbol der Programme (⚒ auf Grün); die Toolbox hat
                                                      # ihr eigenes ("symbol" in toolbox\programm.json)
 $Csc        = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
-$Aufgabe    = 'HardwareMonitor'                  # wie DEFAULT_TASK in hardware_monitor_gui.py
-$IpcPort    = 47815                              # wie IPC_PORT in hardware_monitor.py
-$GuiPort    = 47816                              # wie GUI_PORT in toolbox.py
 
 # Python: genau diese Version (Major.Minor) – mit ihr sind die festen Paketversionen in requirements.txt geprüft.
 # Zum Wechseln: hier ändern, runtime\ löschen, Setup.exe ausführen, testen, requirements.txt anpassen.
@@ -81,6 +78,11 @@ function Lade-Programm($datei) {
 $Toolbox   = Lade-Programm (Join-Path $Root 'toolbox\programm.json')
 $Programme = @($Toolbox) + @(Get-ChildItem (Join-Path $Root 'programme\*\programm.json') | ForEach-Object { Lade-Programm $_.FullName })
 $Monitor   = $Programme | Where-Object id -eq 'hardware_monitor'
+
+# Aus den Ausweisen – dieselben Werte lesen toolbox.py und hardware_monitor_einstellungen.py
+$Aufgabe   = $Monitor.aufgabe                    # geplante Aufgabe, die den Monitor beim Anmelden startet
+$IpcPort   = $Monitor.port                       # Fernsteuerung des Monitors
+$GuiPort   = $Toolbox.port                       # Fernsteuerung der Toolbox
 
 
 # ---------- Helfer ----------
@@ -122,8 +124,7 @@ function Monitor-Beenden {
 }
 
 function Toolbox-Beenden {
-    <# $true, wenn die Toolbox lief (und jetzt beendet ist). Eine Toolbox von vor dieser Version kennt "status" und
-       "quit" noch nicht – die muss man selbst über das Symbol im Infobereich beenden. #>
+    <# $true, wenn die Toolbox lief (und jetzt beendet ist). #>
     if (-not (Toolbox-Befehl 'status')) { return $false }
     Toolbox-Befehl 'quit' | Out-Null
     for ($i = 0; $i -lt 50 -and (Toolbox-Befehl 'status'); $i++) { Start-Sleep -Milliseconds 100 }
@@ -159,7 +160,7 @@ function Relativ($von, $nach) {
 }
 
 function Starter-Bauen($p) {
-    <# Übersetzt setup\starter.cs für dieses Programm. Rückgabe: Meldung. Gebaut wird nur, wenn sich der erzeugte
+    <# Übersetzt setup\starter.cs (+ argumente.cs) für dieses Programm. Rückgabe: Meldung. Gebaut wird nur, wenn sich der erzeugte
        Quelltext oder das Symbol geändert hat (csc erzeugt bei jedem Lauf eine leicht andere Datei – ein
        Byte-Vergleich ginge nicht). #>
     $ordner = Split-Path -Parent $p.StarterPfad
@@ -167,7 +168,8 @@ function Starter-Bauen($p) {
         '%NAME%' = $p.name; '%VERSION%' = $p.version; '%HOST%' = (Split-Path -Leaf $p.HostPfad)
         '%RUNTIME%' = (Relativ $ordner $Runtime); '%SKRIPT%' = (Relativ $ordner $p.SkriptPfad)
     }
-    $quelle = Get-Content -Raw -Encoding UTF8 (Join-Path $PSScriptRoot 'starter.cs')
+    $quelle = (Get-Content -Raw -Encoding UTF8 (Join-Path $PSScriptRoot 'starter.cs')) + "`r`n" +
+              (Get-Content -Raw -Encoding UTF8 (Join-Path $PSScriptRoot 'argumente.cs'))
     foreach ($platzhalter in $werte.Keys) { $quelle = $quelle.Replace($platzhalter, $werte[$platzhalter]) }
     # Prüfsumme des Symbols mit in den Quelltext – so wird nach einem neuen Symbol auch neu gebaut
     $quelle += "`r`n// Symbol: $((Get-FileHash $p.SymbolPfad -Algorithm SHA256).Hash)`r`n"
@@ -330,7 +332,7 @@ function Einrichten {
         else { Warnung $meldung }
 
         try { Ok (Starter-Bauen $p) }
-        catch { Warnung "Starter nicht angelegt: $_ – das Programm startet trotzdem über runtime\$(Split-Path -Leaf $p.HostPfad)." }
+        catch { Warnung "Starter nicht angelegt: $_" }
     }
 
     # 4. Je Programm: Downloads aus programm.json
@@ -338,22 +340,6 @@ function Einrichten {
         foreach ($d in @($p.downloads | Where-Object { $_ })) {
             Schritt "$($d.name) $($d.version) für $($p.name)"
             $ziel = Join-Path $p.Ordner $d.ordner
-            # Früher lag es in runtime\ (Oktober 2026) bzw. in src\<programm>\ (davor) – einmalig hierher verschieben.
-            # Ein laufender Monitor hält die DLLs fest -> kurz beenden, Schritt 6 startet ihn neu.
-            $alt = @((Join-Path $Runtime $d.ordner), (Join-Path $Root "src\$($p.id)\$($d.ordner)")) |
-                Where-Object { Test-Path $_ } | Select-Object -First 1
-            if ($alt -and -not (Test-Path $ziel)) {
-                if ($p -eq $Monitor -and (Monitor-Befehl 'status')) {
-                    Info 'Hardware-Monitor nutzt noch den alten Ordner – wird kurz beendet …'
-                    Monitor-Beenden
-                    $neuStarten = $true
-                }
-                for ($i = 0; $i -lt 20; $i++) {      # Prozess räumt nach dem letzten IPC-Lebenszeichen noch kurz auf
-                    try { Move-Item $alt $ziel; break } catch { Start-Sleep -Milliseconds 500 }
-                }
-                if (Test-Path $ziel) { Ok "von $alt hierher verschoben" }
-                else { Warnung "$alt ließ sich nicht verschieben – wird neu geladen." }
-            }
             $pruefdatei = Join-Path $ziel $d.pruefdatei
             if (Test-Path $pruefdatei) {
                 $vorhanden = (Get-Item $pruefdatei).VersionInfo.ProductVersion -replace '\+.*$', ''

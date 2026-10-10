@@ -24,25 +24,26 @@ windows-toolbox/
 │  ├─ setup.ps1           was Setup.exe und Uninstall.exe machen
 │  ├─ setup_exe.cs        Quelltext von Setup.exe und Uninstall.exe (neu bauen: setup_exe_bauen.ps1)
 │  ├─ starter.cs          Vorlage für die Starter-.exe (Toolbox.exe, HardwareMonitor.exe, …)
+│  ├─ argumente.cs        gemeinsamer Teil von setup_exe.cs und starter.cs (Argumente weiterreichen)
 │  └─ exe_anlegen.py      runtime\Toolbox.exe / runtime\HardwareMonitor.exe: pythonw.exe mit eigenem Namen und Symbol
 ├─ toolbox/
-│  ├─ programm.json       Ausweis der Toolbox (Version, Skript, Starter)
+│  ├─ programm.json       Ausweis der Toolbox (Version, Skript, Starter, Port)
 │  ├─ toolbox.py          Hauptfenster; findet die Programme automatisch
 │  ├─ base.py             Baukasten für Programmseiten (Section, Text, Choice, Slider, …)
 │  ├─ winutil.py          Windows-Helfer (UAC, Aufgabenplanung)
-│  ├─ daten.py            wo Einstellungen und Logs liegen (daten/)
-│  ├─ platzhalter.py      leere Seite für Tabs ohne Programm
+│  ├─ daten.py            wo Einstellungen und Logs liegen (daten/), Lesen und Schreiben
 │  ├─ toolbox.ico         Symbol der Toolbox (blauer Werkzeugkoffer) – auch für Setup.exe und Uninstall.exe
 │  └─ programm.ico        Standardsymbol der Programme (⚒ auf Grün), z. B. für den Hardware-Monitor
 └─ programme/
    └─ hardware_monitor/            ein Programm = ein Ordner, alles darin
-      ├─ programm.json             Ausweis: Name, Tab, Beschreibung, Version, Skript, Starter, Downloads
+      ├─ programm.json             Ausweis: Name, Tab, Beschreibung, Version, Skript, Starter, Port, Aufgabe, Downloads
       ├─ HardwareMonitor.exe       Starter (legt Setup.exe an)
       ├─ hardware_monitor.py       Hardware-Monitor (läuft eigenständig): Sensoren, Tray-Icons, IPC
       ├─ detailfenster_inhalt.py   WAS im Detailfenster steht – hier passt du das Fenster an
       ├─ detailfenster.py          baut das Detailfenster daraus (wie base.py bei der Toolbox)
       ├─ hardwaredaten.py          liest Hersteller, Modelle, IDs und Seriennummern für den Tab „Hardwaredaten“
       ├─ hardware_monitor_gui.py   seine Seite in der Toolbox
+      ├─ hardware_monitor_einstellungen.py   Startwerte, Laden/Speichern – gemeinsam für Monitor und Seite
       └─ lhm/                      LibreHardwareMonitor (Download aus programm.json, nicht im Repo)
 ```
 
@@ -52,15 +53,13 @@ Die Aufteilung folgt einer einfachen Regel: **Code** (`toolbox/`, `programme/`, 
 ```
 daten/
 ├─ toolbox.json              Einstellungen der Toolbox
-├─ hardware_monitor.json     Einstellungen des Hardware-Monitors (auch der Name der Autostart-Aufgabe)
+├─ hardware_monitor.json     Einstellungen des Hardware-Monitors
 └─ logs/
    ├─ toolbox.log
    └─ hardware_monitor.log
 ```
 
-Zum Sichern oder Umziehen der Einstellungen reicht `daten/`. Wer von einer älteren Version kommt: Einstellungen und
-Logs von früher zieht jedes Programm beim nächsten Start selbst hierher um, `Setup.exe` verschiebt ein altes
-`lhm/` in den Programmordner.
+Zum Sichern oder Umziehen der Einstellungen reicht `daten/`.
 
 ## Einrichtung
 
@@ -209,7 +208,8 @@ Wert hinzufügen = Zeile schreiben, Wert weglassen = Zeile löschen. Die genauen
 - **GUI ↔ Hardware-Monitor**: Der Monitor läuft mit Adminrechten, die GUI ohne. Gesteuert wird über eine lokale
   Verbindung auf `127.0.0.1:47815` (Befehle `status`, `reload`, `quit`). Die GUI selbst lauscht auf Port `47816`
   (`show`, `status`, `quit`): ein zweiter Start holt damit nur das vorhandene Fenster nach vorne, `setup.ps1` beendet
-  sie damit vor dem Einrichten bzw. Entfernen.
+  sie damit vor dem Einrichten bzw. Entfernen. Beide Ports stehen als `"port"` in der jeweiligen `programm.json` –
+  daraus lesen sie Python und `setup.ps1`, ebenso den Namen der Autostart-Aufgabe (`"aufgabe"`).
 - **Sparsam**: Bei geschlossenem oder minimiertem Detailfenster liest der Monitor nur CPU und GPU, bei offenem Fenster
   nur die Geräte des gewählten Tabs; Raten im Rechtsklick-Menü oder in der GUI.
   Die GPU-Temperatur fürs Icon kommt bei Nvidia direkt aus `nvml.dll` (Teil des Treibers). LHMs komplettes

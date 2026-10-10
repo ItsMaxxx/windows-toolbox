@@ -26,7 +26,7 @@ Bausteine mit name sind danach als self.w[name] erreichbar, z. B. um eine Status
 Die Toolbox findet jedes Programm über programme/<programm>/programm.json; dessen "seite" ist die Datei mit SEITE.
 """
 
-import json
+import copy
 import os
 import tkinter as tk
 import tkinter.font as tkfont
@@ -100,10 +100,10 @@ class Programm:
     """Ein eigenständiges Programm eines Tools, das auch ohne die Toolbox weiterläuft (z. B. der Hardware-Monitor).
     Darüber kann die Toolbox es in ihren Einstellungen mit beenden und neu starten („Toolbox und alle Programme“).
 
-    Alle drei bekommen die Toolbox (app), laufen im Hintergrund (nicht im GUI-Thread) und dürfen etwas dauern:
-      laeuft(app)  -> True, wenn es gerade läuft
-      beenden(app) -> True, wenn es danach wirklich beendet ist (auf das Prozessende warten!)
-      starten(app) -> True, wenn der Start geklappt hat
+    Alle drei laufen im Hintergrund (nicht im GUI-Thread) und dürfen etwas dauern:
+      laeuft()  -> True, wenn es gerade läuft
+      beenden() -> True, wenn es danach wirklich beendet ist (auf das Prozessende warten!)
+      starten() -> True, wenn der Start geklappt hat
     """
     laeuft: Callable
     beenden: Callable
@@ -359,59 +359,6 @@ class Slider(Element):
         self.text_label.configure(text=self.text.format(value))
 
 
-class Check(Element):
-    """Häkchen, das alle Einträge aus items in die Liste page.data[key] aufnimmt bzw. daraus entfernt.
-    hint steht klein darunter."""
-
-    def __init__(self, text, key, items, hint=None, name=None):
-        super().__init__(key=key, name=name)
-        self.text, self.items, self.hint = text, list(items), hint
-
-    def place(self, page, card, row):
-        self.widget = ctk.CTkCheckBox(card, text=self.text, command=lambda: self.apply(page))
-        self.widget.grid(row=row, column=0, columnspan=2, sticky="w", padx=18, pady=(6, 0))
-        if self.hint:
-            ctk.CTkLabel(card, text=self.hint, text_color=MUTED, anchor="w", font=ctk.CTkFont(size=12)).grid(
-                row=row + 1, column=0, columnspan=2, sticky="w", padx=(50, 18))
-        return 2 if self.hint else 1
-
-    def apply(self, page):
-        others = [item for item in page.data[self.key] if item not in self.items]
-        page.set(self.key, (self.items if self.widget.get() else []) + others)
-
-    def refresh(self, page):
-        self.widget.select() if set(self.items) <= set(page.data[self.key]) else self.widget.deselect()
-
-
-class TextList(Element):
-    """Textfeld für die Liste page.data[key], ein Eintrag pro Zeile, mit Knopf zum Übernehmen.
-    Einträge aus exclude (z. B. die von Check-Häkchen) erscheinen nicht im Feld und bleiben erhalten."""
-
-    def __init__(self, text, key, exclude=(), button="Übernehmen", name=None):
-        super().__init__(key=key, name=name)
-        self.text, self.exclude, self.button = text, set(exclude), button
-
-    def place(self, page, card, row):
-        ctk.CTkLabel(card, text=self.text, anchor="w", font=ctk.CTkFont(size=12)).grid(
-            row=row, column=0, columnspan=2, sticky="w", padx=18, pady=(14, 4))
-        self.widget = ctk.CTkTextbox(card, height=90)
-        self.widget.grid(row=row + 1, column=0, columnspan=2, sticky="ew", padx=18)
-        ctk.CTkButton(card, text=self.button, width=160, command=lambda: self.apply(page)).grid(
-            row=row + 2, column=0, columnspan=2, sticky="w", padx=18, pady=(8, 4))
-        return 3
-
-    def apply(self, page):
-        kept = [item for item in page.data[self.key] if item in self.exclude]
-        for line in self.widget.get("1.0", "end").splitlines():
-            if line.strip() and line.strip() not in kept:
-                kept.append(line.strip())
-        page.set(self.key, kept)
-
-    def refresh(self, page):
-        self.widget.delete("1.0", "end")
-        self.widget.insert("1.0", "\n".join(item for item in page.data[self.key] if item not in self.exclude))
-
-
 # ---------- Seite ----------
 class ToolPage(ctk.CTkScrollableFrame):
     """Eine scrollbare Seite im Hauptbereich: Titel, Untertitel und die Bereiche aus layout()."""
@@ -456,18 +403,11 @@ class ToolPage(ctk.CTkScrollableFrame):
     # --- Werte ---
     def load(self):
         """Startwerte, überschrieben mit dem, was in settings_file steht (unbekannte Schlüssel bleiben erhalten)."""
-        data = json.loads(json.dumps(self.defaults))          # tiefe Kopie
-        try:
-            saved = json.loads(self.settings_file.read_text(encoding="utf-8"))
-            if isinstance(saved, dict):
-                data.update(saved)
-        except (AttributeError, OSError, ValueError):
-            pass
-        return data
+        return daten.lesen(self.settings_file, self.defaults)
 
     def save(self):
         try:
-            self.settings_file.write_text(json.dumps(self.data, indent=2, ensure_ascii=False), encoding="utf-8")
+            daten.schreiben(self.settings_file, self.data)
         except OSError as error:
             self.app.toast(f"Speichern fehlgeschlagen: {error.strerror or error}", error=True)
             return
@@ -494,7 +434,7 @@ class ToolPage(ctk.CTkScrollableFrame):
                 element.refresh(self)
 
     def reset(self):
-        self.data = json.loads(json.dumps(self.defaults))
+        self.data = copy.deepcopy(self.defaults)
         self.refresh()
         self.save()
 
@@ -513,7 +453,7 @@ class ToolPage(ctk.CTkScrollableFrame):
         """Datei oder Ordner mit dem passenden Programm öffnen."""
         try:
             os.startfile(path)
-        except (OSError, AttributeError):
+        except OSError:
             self.app.toast(f"Nicht gefunden: {path.name}", error=True)
 
     # --- Wird von der Toolbox bzw. von set() aufgerufen; Unterklassen können das überschreiben ---

@@ -6,9 +6,12 @@ Wo gespeicherte Daten liegen: im Ordner daten\\ im Hauptordner – getrennt vom 
     daten\\logs\\<programm>.log       Fehler und Hinweise (pythonw hat keine Konsole)
 
 Zum Sichern oder Mitnehmen reicht daten\\. Programmseiten bekommen ihre Datei automatisch (ToolPage.settings_file),
-eigenständige Programme holen sie mit daten.einstellungen("<programm>").
+eigenständige Programme holen sie mit daten.einstellungen("<programm>"). Gelesen und geschrieben wird überall mit
+lesen() und schreiben().
 """
 
+import copy
+import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,24 +21,29 @@ LOG_DIR = DATEN_DIR / "logs"
 
 def einstellungen(programm):
     """daten\\<programm>.json – z. B. einstellungen("toolbox") oder einstellungen("hardware_monitor")."""
-    return _datei(DATEN_DIR / f"{programm}.json", programm, f"{programm}_settings.json")
+    DATEN_DIR.mkdir(parents=True, exist_ok=True)
+    return DATEN_DIR / f"{programm}.json"
 
 
 def log(programm):
     """daten\\logs\\<programm>.log"""
-    return _datei(LOG_DIR / f"{programm}.log", programm, f"{programm}.log")
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    return LOG_DIR / f"{programm}.log"
 
 
-def _datei(pfad, programm, alter_name):
-    """Legt den Ordner an und zieht die Datei einmalig von ihrem alten Ort um, falls sie dort noch liegt:
-    daten\\<alter_name> (Oktober 2026) bzw. src\\<ordner>\\<alter_name> (davor, neben dem Skript)."""
-    ordner = "gui" if programm == "toolbox" else programm
-    frueher = [DATEN_DIR / alter_name, ROOT / "src" / ordner / alter_name]
+def lesen(datei, startwerte):
+    """Startwerte, überschrieben mit dem, was in datei steht. Unbekannte Schlüssel bleiben erhalten, ob die Werte
+    gültig sind, prüft der Aufrufer. Fehlt die Datei oder ist sie kaputt, gibt es einfach die Startwerte."""
+    daten = copy.deepcopy(startwerte)
     try:
-        pfad.parent.mkdir(parents=True, exist_ok=True)
-        alt = next((f for f in frueher if f.exists()), None)
-        if alt is not None and not pfad.exists():
-            alt.replace(pfad)
-    except OSError:
-        pass        # z. B. ein Log, das ein noch laufendes altes Programm offen hält – klappt beim nächsten Start
-    return pfad
+        gespeichert = json.loads(datei.read_text(encoding="utf-8"))
+        if isinstance(gespeichert, dict):
+            daten.update(gespeichert)
+    except (OSError, ValueError):
+        pass
+    return daten
+
+
+def schreiben(datei, daten):
+    """Speichert daten als lesbares JSON. Wirft OSError, wenn es nicht klappt."""
+    datei.write_text(json.dumps(daten, indent=2, ensure_ascii=False), encoding="utf-8")

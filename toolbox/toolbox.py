@@ -42,14 +42,8 @@ import daten  # noqa: E402
 import winutil  # noqa: E402
 from base import (BAD, BAR, BORDER, GOOD, HOVER, MUTED, SELECTED, TEXT, Button, Buttons, Choice,  # noqa: E402
                   Section, Switch, Text, ToolInfo, ToolPage, Tooltip, apply_font, apply_theme)
-from platzhalter import PlatzhalterPage  # noqa: E402
 
 CATEGORIES = ["Allgemein", "Werkzeuge", "Medien", "Netzwerk"]     # Tabs oben, in dieser Reihenfolge
-PLACEHOLDERS = [
-    ToolInfo("xxx-werkzeuge", "XXX", "Werkzeuge", "Platzhalter", PlatzhalterPage),
-    ToolInfo("xxx-medien", "XXX", "Medien", "Platzhalter", PlatzhalterPage),
-    ToolInfo("xxx-netzwerk", "XXX", "Netzwerk", "Platzhalter", PlatzhalterPage),
-]
 
 AUSWEIS = json.loads((APP_DIR / "programm.json").read_text(encoding="utf-8"))    # wie bei jedem Programm
 VERSION = AUSWEIS["version"]
@@ -60,7 +54,7 @@ GITHUB_URL = "https://github.com/ItsMaxxx/windows-toolbox"     # Knopf „Window
 # startet auch der Starter Toolbox.exe im Hauptordner; für den Neustart geht es direkt, ohne den Umweg.
 TOOLBOX_EXE = ROOT / "runtime" / "Toolbox.exe"
 SETUP_EXE = ROOT / "Setup.exe"
-GUI_PORT = 47816                 # ein zweiter Start holt nur das laufende Fenster nach vorne; setup.ps1 sagt "quit"
+GUI_PORT = AUSWEIS["port"]       # ein zweiter Start holt nur das laufende Fenster nach vorne; setup.ps1 sagt "quit"
 
 APPEARANCE = {"Hell": "light", "Dunkel": "dark", "System": "system"}
 DEFAULT_SETTINGS = {
@@ -92,27 +86,23 @@ def find_tools():
     return tools
 
 
-TOOLS = find_tools() + PLACEHOLDERS
+TOOLS = find_tools()
 
 
 # ---------- Einstellungen ----------
 def load_settings():
-    settings = json.loads(json.dumps(DEFAULT_SETTINGS))          # tiefe Kopie
-    try:
-        saved = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
-        if isinstance(saved, dict):
-            if saved.get("appearance") in APPEARANCE:
-                settings["appearance"] = saved["appearance"]
-            if isinstance(saved.get("close_to_tray"), bool):
-                settings["close_to_tray"] = saved["close_to_tray"]
-    except (OSError, ValueError):
-        pass
+    """Gespeicherte Einstellungen – Ungültiges bekommt den Startwert."""
+    settings = daten.lesen(SETTINGS_FILE, DEFAULT_SETTINGS)
+    if settings["appearance"] not in APPEARANCE:
+        settings["appearance"] = DEFAULT_SETTINGS["appearance"]
+    if not isinstance(settings["close_to_tray"], bool):
+        settings["close_to_tray"] = DEFAULT_SETTINGS["close_to_tray"]
     return settings
 
 
 def save_settings(settings):
     try:
-        SETTINGS_FILE.write_text(json.dumps(settings, indent=2, ensure_ascii=False), encoding="utf-8")
+        daten.schreiben(SETTINGS_FILE, settings)
         return True
     except OSError:
         logging.exception("Einstellungen der Toolbox konnten nicht gespeichert werden")
@@ -169,7 +159,7 @@ def bring_existing_to_front():
 
 # ---------- Einstellungsseite (Zahnrad) ----------
 class GuiSettingsPage(ToolPage):
-    """Einstellungen der Toolbox selbst – liegen in self.app.settings (toolbox_settings.json)."""
+    """Einstellungen der Toolbox selbst – liegen in self.app.settings (daten\\toolbox.json)."""
 
     def load(self):
         return self.app.settings
@@ -222,7 +212,7 @@ class GuiSettingsPage(ToolPage):
             zeilen = [f"●  {t.name}: {'läuft' if an else 'gestoppt'}" for t, an in zip(tools, zustaende or [])]
             self.w["programme"].configure(text="\n".join(zeilen), text_color=MUTED)
 
-        self.app.run_async(lambda: [t.programm.laeuft(self.app) for t in tools], zeigen)
+        self.app.run_async(lambda: [t.programm.laeuft() for t in tools], zeigen)
 
     def alle(self, neu):
         """Erst jedes laufende Programm beenden (und bei neu wieder starten), dann die Toolbox selbst.
@@ -237,9 +227,9 @@ class GuiSettingsPage(ToolPage):
             fehler = []
             for tool in tools:
                 p = tool.programm
-                if not p.laeuft(self.app):
+                if not p.laeuft():
                     continue                     # gestoppte Programme bleiben gestoppt – auch beim Neustart
-                if not p.beenden(self.app) or (neu and not p.starten(self.app)):
+                if not p.beenden() or (neu and not p.starten()):
                     fehler.append(tool.name)
             return fehler
 
@@ -355,7 +345,7 @@ class ToolboxApp(ctk.CTk):
         try:
             self.iconbitmap(str(ICON_FILE))      # nach iconbitmap() überschreibt CustomTkinter das Symbol nicht mehr
         except Exception:
-            pass                                 # z. B. außerhalb von Windows
+            pass                                 # toolbox.ico fehlt – dann eben mit dem Standardsymbol
 
     def build_topbar(self):
         """Kopfleiste wie auf der Website: Name (Knopf zum GitHub-Repo), Tabs als schlichte Links, Linie darunter."""
@@ -555,8 +545,6 @@ class ToolboxApp(ctk.CTk):
           quit    beenden (setup.ps1, damit es runtime\\ erneuern bzw. löschen kann)"""
         try:
             server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            if sys.platform != "win32":
-                server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             server.bind(("127.0.0.1", GUI_PORT))
             server.listen()
         except OSError:
@@ -588,11 +576,8 @@ def main():
             pass
     if bring_existing_to_front():
         return
-    try:
-        # Eigene App-ID: sonst zeigt die Taskleiste das Python-Symbol statt des Toolbox-Symbols
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Toolbox.Tools")
-    except Exception:
-        pass
+    # Eigene App-ID: sonst zeigt die Taskleiste das Python-Symbol statt des Toolbox-Symbols
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Toolbox.Tools")
     try:
         ToolboxApp().mainloop()
     except Exception:

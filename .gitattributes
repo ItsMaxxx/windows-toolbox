@@ -1,3 +1,2 @@
-# Windows-Skripte brauchen CRLF – auch wenn das Repo mit core.autocrlf=false geklont wird
-*.cmd text eol=crlf
+# PowerShell-Skripte brauchen CRLF – auch wenn das Repo mit core.autocrlf=false geklont wird
 *.ps1 text eol=crlf

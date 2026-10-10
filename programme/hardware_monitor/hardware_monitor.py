@@ -6,11 +6,12 @@ Dateien:
   hardware_monitor.py         dieses Programm: Sensoren lesen, Tray-Icons, Fernsteuerung durch die Toolbox
   detailfenster_inhalt.py     WAS im Detailfenster steht (Tabs, Werte) – hier passt du das Fenster an
   detailfenster.py            baut das Fenster daraus (muss normalerweise nicht angefasst werden)
+  hardware_monitor_einstellungen.py   Startwerte, Laden und Speichern – gemeinsam mit der Seite in der Toolbox
 
-Voraussetzungen:
+Voraussetzungen (richtet Setup.exe alles ein):
   - PawnIO installiert:            winget install namazso.PawnIO
-  - LibreHardwareMonitor-Release (LibreHardwareMonitor.zip) entpackt nach lhm/ in diesem Ordner (macht Setup.exe)
-  - Python-Pakete:                 pip install pythonnet pystray pillow
+  - LibreHardwareMonitor-Release (LibreHardwareMonitor.zip) entpackt nach lhm/ in diesem Ordner
+  - Python-Pakete aus requirements.txt
   - Start mit Adminrechten (sonst fehlen CPU- und Mainboard-Werte)
 
 Aufruf:
@@ -32,7 +33,6 @@ import json
 import logging
 import os
 import queue
-import re
 import socket
 import sys
 import threading
@@ -41,45 +41,19 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True                              # keine __pycache__-Ordner anlegen (wie bei der Toolbox)
 sys.path.insert(0, str(Path(__file__).resolve().parent))    # detailfenster finden – auch beim Start mit python -m
-sys.path.append(str(Path(__file__).resolve().parents[2] / "toolbox"))   # daten.py (gemeinsam mit der Toolbox)
-import daten  # noqa: E402
 from detailfenster import TYPE_LABELS, Detailfenster, fmt_value, temp_color  # noqa: E402
+# Startwerte, Raten, Port, Laden/Speichern – gemeinsam mit der Seite in der Toolbox
+from hardware_monitor_einstellungen import (ICON_RATES, IPC_PORT, LOG_FILE, POPUP_RATES, load_settings,  # noqa: E402
+                                            save_settings)
 
 
 # ---------- Einstellungen ----------
-# Ordner mit LibreHardwareMonitorLib.dll: lhm\ neben diesem Skript (legt Setup.exe an, siehe "downloads" in
-# programm.json), sonst runtime\lhm (dort lag es kurzzeitig), sonst C:\Tools\lhm
-SCRIPT_DIR = Path(__file__).resolve().parent
-LHM_CANDIDATES = [SCRIPT_DIR / "lhm", SCRIPT_DIR.parents[1] / "runtime" / "lhm", Path(r"C:\Tools\lhm")]
-LHM_DIR = next((str(d) for d in LHM_CANDIDATES if (d / "LibreHardwareMonitorLib.dll").exists()),
-               str(LHM_CANDIDATES[0]))
-
-# Auswahl im Rechtsklick-Menü (Sekunden)
-ICON_RATES = (1, 2, 5, 10)      # Taskleisten-Icons (liest nur CPU und GPU)
-POPUP_RATES = (0.5, 1, 2, 5)    # geöffnetes Fenster (liest die Geräte des gewählten Tabs)
-
-# Startwerte. Geändert wird über das Rechtsklick-Menü oder die Toolbox-GUI;
-# beides landet in daten/hardware_monitor.json.
-DEFAULT_SETTINGS = {
-    "icon_interval": 2,
-    "popup_interval": 1,
-    "icon_order": ["cpu", "gpu"],    # Reihenfolge in der Taskleiste (wirkt nach Neustart des Programms)
-    "cpu_sensor": "auto",            # "auto" = erster vorhandener aus CPU_SENSORS, sonst ein Sensorname
-    "gpu_sensor": "auto",
-    "warn_temp": 60,                 # ab hier gelb
-    "hot_temp": 80,                  # ab hier rot
-    "window": "",                    # Größe und Position des Detailfensters, z. B. "480x640+1420+380" (merkt es sich selbst)
-    "effizienzmodus": "auto",        # "auto" = nur bei geschlossenem Fenster, "an" = immer, "aus" = nie
-}
-EFFIZIENZ = ("auto", "an", "aus")
-SETTINGS_FILE = daten.einstellungen("hardware_monitor")
+# Ordner mit LibreHardwareMonitorLib.dll (legt Setup.exe an, siehe "downloads" in programm.json)
+LHM_DIR = str(Path(__file__).resolve().parent / "lhm")
 
 # Bei "auto": welcher Sensor im Tray-Icon angezeigt wird – der erste aus der Liste, den es gibt
 CPU_SENSORS = ("Core (Tctl/Tdie)", "CPU Package", "Core Average")
 GPU_SENSORS = ("GPU Core", "GPU Hot Spot")
-
-# Lokale Fernsteuerung für die Toolbox-GUI (nur von diesem PC aus erreichbar)
-IPC_PORT = 47815
 
 # Welche Hardware ausgelesen wird. Was du nicht brauchst, einfach rausnehmen.
 # Beim Start nur CPU und GPU – das reicht für die Icons und dauert nur Sekundenbruchteile.
@@ -92,7 +66,7 @@ LATER_HARDWARE = (
 )
 
 logging.basicConfig(
-    filename=daten.log("hardware_monitor"),
+    filename=LOG_FILE,
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
 )
@@ -335,46 +309,15 @@ def icon_werte(kinds=("cpu", "gpu")):
     return werte
 
 
-# ---------- Einstellungen speichern / laden ----------
-def load_settings():
-    """Liest die Einstellungen; alles Fehlende oder Ungültige bekommt den Startwert. Schlüssel, die nur die Toolbox
-    kennt (z. B. task_name), bleiben unverändert erhalten – sonst löschte save_settings() sie beim nächsten Speichern."""
-    settings = json.loads(json.dumps(DEFAULT_SETTINGS))          # tiefe Kopie
-    try:
-        saved = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return settings                          # keine oder kaputte Datei -> Startwerte
-    if not isinstance(saved, dict):
-        return settings
-    if saved.get("icon_interval") in ICON_RATES:
-        settings["icon_interval"] = saved["icon_interval"]
-    if saved.get("popup_interval") in POPUP_RATES:
-        settings["popup_interval"] = saved["popup_interval"]
-    if sorted(saved.get("icon_order") or []) == ["cpu", "gpu"]:
-        settings["icon_order"] = list(saved["icon_order"])
-    for key in ("cpu_sensor", "gpu_sensor"):
-        if isinstance(saved.get(key), str) and saved[key].strip():
-            settings[key] = saved[key].strip()
-    warn, hot = saved.get("warn_temp"), saved.get("hot_temp")
-    if isinstance(warn, (int, float)) and isinstance(hot, (int, float)) and 20 <= warn < hot <= 120:
-        settings["warn_temp"], settings["hot_temp"] = warn, hot
-    if isinstance(saved.get("window"), str) and re.fullmatch(r"\d+x\d+\+-?\d+\+-?\d+", saved["window"]):
-        settings["window"] = saved["window"]
-    if saved.get("effizienzmodus") in EFFIZIENZ:
-        settings["effizienzmodus"] = saved["effizienzmodus"]
-    for key, value in saved.items():
-        settings.setdefault(key, value)
-    return settings
+# ---------- Einstellungen ----------
+SETTINGS = load_settings()       # wird bei "reload" (aus der GUI) an Ort und Stelle aktualisiert
 
 
-def save_settings(settings):
+def settings_speichern():
     try:
-        SETTINGS_FILE.write_text(json.dumps(settings, indent=2, ensure_ascii=False), encoding="utf-8")
+        save_settings(SETTINGS)
     except OSError:
         logging.exception("Einstellungen konnten nicht gespeichert werden")
-
-
-SETTINGS = load_settings()       # wird bei "reload" (aus der GUI) an Ort und Stelle aktualisiert
 
 
 def rate_label(seconds):
@@ -405,15 +348,8 @@ STRIPE = {"cpu": (70, 140, 255), "gpu": (118, 185, 0)}     # Farbstreifen: blau 
 EMPTY = {"hardware": [], "cpu": None, "gpu": None, "geraete": set()}    # bevor die erste Messung fürs Fenster da ist
 
 
-def load_font(size):
-    try:
-        return ImageFont.truetype("arialbd.ttf", size)
-    except OSError:                       # außerhalb von Windows gibt es kein Arial
-        return ImageFont.load_default(size)
-
-
-FONT_BIG = load_font(44)     # für 2 Zeichen
-FONT_SMALL = load_font(31)   # für 3 Zeichen, z. B. "100"
+FONT_BIG = ImageFont.truetype("arialbd.ttf", 44)     # Arial fett, für 2 Zeichen
+FONT_SMALL = ImageFont.truetype("arialbd.ttf", 31)   # für 3 Zeichen, z. B. "100"
 
 
 def make_icon(kind, value):
@@ -426,16 +362,10 @@ def make_icon(kind, value):
     return img
 
 
-# ---------- Windows-Helfer (ohne Windows einfach wirkungslos) ----------
+# ---------- Windows-Helfer ----------
 def set_dpi_aware():
     """Sonst rendert Windows das Fenster bei 125/150 % Skalierung unscharf."""
-    try:
-        ctypes.windll.shcore.SetProcessDpiAwareness(1)
-    except Exception:
-        pass
-
-
-_mutex = None
+    ctypes.windll.shcore.SetProcessDpiAwareness(1)
 
 
 def effizienzmodus(an):
@@ -449,25 +379,23 @@ def effizienzmodus(an):
         _fields_ = [("Version", ctypes.c_ulong), ("ControlMask", ctypes.c_ulong), ("StateMask", ctypes.c_ulong)]
 
     drosseln = 0x1                                  # PROCESS_POWER_THROTTLING_EXECUTION_SPEED
-    try:
-        kernel32 = ctypes.windll.kernel32
-        prozess = ctypes.c_void_p(-1)               # Pseudo-Handle für den eigenen Prozess (GetCurrentProcess)
-        state = PROCESS_POWER_THROTTLING_STATE(1, drosseln, drosseln if an else 0)
-        kernel32.SetProcessInformation(prozess, 4, ctypes.byref(state), ctypes.sizeof(state))  # 4 = PowerThrottling
-        kernel32.SetPriorityClass(prozess, 0x40 if an else 0x20)                 # IDLE_ bzw. NORMAL_PRIORITY_CLASS
-    except (AttributeError, OSError):               # außerhalb von Windows / ältere Windows-Versionen
-        pass
+    kernel32 = ctypes.windll.kernel32
+    prozess = ctypes.c_void_p(-1)                   # Pseudo-Handle für den eigenen Prozess (GetCurrentProcess)
+    state = PROCESS_POWER_THROTTLING_STATE(1, drosseln, drosseln if an else 0)
+    # Ältere Windows-Versionen kennen PowerThrottling nicht – dann gibt der Aufruf nur False zurück, kein Fehler
+    kernel32.SetProcessInformation(prozess, 4, ctypes.byref(state), ctypes.sizeof(state))  # 4 = PowerThrottling
+    kernel32.SetPriorityClass(prozess, 0x40 if an else 0x20)                     # IDLE_ bzw. NORMAL_PRIORITY_CLASS
+
+
+_mutex = None                    # muss bis zum Programmende leben – sonst gibt Windows den Mutex wieder frei
 
 
 def already_running():
     """True, wenn das Programm schon läuft (wichtig, falls ein Launcher es doppelt startet)."""
     global _mutex
-    try:
-        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-        _mutex = kernel32.CreateMutexW(None, False, "Local\\HardwareMonitor_SingleInstance")
-        return ctypes.get_last_error() == 183           # ERROR_ALREADY_EXISTS
-    except Exception:
-        return False
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    _mutex = kernel32.CreateMutexW(None, False, "Local\\HardwareMonitor_SingleInstance")
+    return ctypes.get_last_error() == 183               # ERROR_ALREADY_EXISTS
 
 
 # ---------- Programm ----------
@@ -532,7 +460,7 @@ class HardwareMonitorApp:
 
     def set_rate(self, key, seconds):
         self.settings[key] = seconds
-        save_settings(self.settings)
+        settings_speichern()
         for icon in self.icons.values():
             icon.update_menu()                   # Markierung und Beschriftung in beiden Menüs auffrischen
         self.wake.set()                          # neue Rate sofort übernehmen
@@ -564,7 +492,7 @@ class HardwareMonitorApp:
         """Meldet das Fenster beim Schließen: Größe und Position, z. B. "480x640+1420+380"."""
         if self.settings.get("window") != geometry:
             self.settings["window"] = geometry
-            save_settings(self.settings)
+            settings_speichern()
 
     def snapshot(self):
         with self.lock:
@@ -651,8 +579,6 @@ class HardwareMonitorApp:
         while server is None and not self.stop.is_set():
             try:
                 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                if os.name != "nt":                      # nur Linux/macOS: Port direkt nach Neustart wieder nutzbar
-                    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 server.bind(("127.0.0.1", IPC_PORT))     # nur von diesem PC aus erreichbar
                 server.listen()
             except OSError:

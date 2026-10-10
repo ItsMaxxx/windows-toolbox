@@ -44,9 +44,9 @@ static class Starter
             return 1;
         }
 
-        StringBuilder argumente = new StringBuilder(Quote(skript));
+        StringBuilder argumente = new StringBuilder(Argumente.Quote(skript));
         foreach (string arg in args)
-            argumente.Append(' ').Append(Quote(arg));
+            argumente.Append(' ').Append(Argumente.Quote(arg));
 
         ProcessStartInfo info = new ProcessStartInfo(host, argumente.ToString());
         info.UseShellExecute = false;          // erbt so die Rechte des Starters (auch Adminrechte)
@@ -61,22 +61,5 @@ static class Starter
             return 1;
         }
         return 0;
-    }
-
-    // Ein Argument so in Anführungszeichen setzen, wie Windows-Programme (auch Python) es wieder auseinandernehmen:
-    // Backslashes vor einem " bzw. am Ende verdoppeln, " selbst als \" schreiben.
-    static string Quote(string arg)
-    {
-        StringBuilder sb = new StringBuilder("\"");
-        int backslashes = 0;
-        foreach (char c in arg)
-        {
-            if (c == '\\') { backslashes++; continue; }
-            sb.Append('\\', c == '"' ? backslashes * 2 + 1 : backslashes);
-            backslashes = 0;
-            sb.Append(c);
-        }
-        sb.Append('\\', backslashes * 2).Append('"');
-        return sb.ToString();
     }
 }

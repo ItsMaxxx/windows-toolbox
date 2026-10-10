@@ -24,6 +24,7 @@ from pathlib import Path
 from tkinter import ttk
 
 import hardwaredaten
+from hardwaredaten import num
 
 INHALT_DATEI = Path(__file__).with_name("detailfenster_inhalt.py")
 ICON_DATEI = Path(__file__).resolve().parents[2] / "toolbox" / "programm.ico"     # ⚒ auf Grün, wie alle Programme
@@ -105,10 +106,6 @@ UNITS = {   # Sensortyp -> (Nachkommastellen, Einheit)
     "Noise": (0, "dBA"), "Conductivity": (0, "µS/cm"), "Factor": (2, ""),
 }
 BAR_TYPES = {"Temperature", "Load", "Control", "Level", "Humidity"}      # Werte von 0–100 bekommen einen Balken
-
-
-def num(value, decimals):
-    return f"{value:.{decimals}f}".replace(".", ",")      # deutsches Komma
 
 
 def fmt_rate(bytes_per_s):
@@ -229,32 +226,26 @@ def arbeitsbereich(x, y):
         _fields_ = [("cbSize", ctypes.c_ulong), ("rcMonitor", ctypes.c_long * 4),
                     ("rcWork", ctypes.c_long * 4), ("dwFlags", ctypes.c_ulong)]
 
-    try:
-        user32 = ctypes.windll.user32
-        user32.MonitorFromPoint.restype = ctypes.c_void_p
-        user32.MonitorFromPoint.argtypes = [wintypes.POINT, ctypes.c_ulong]
-        monitor = user32.MonitorFromPoint(wintypes.POINT(x, y), 0)     # 0 = None, wenn dort kein Bildschirm ist
-        if not monitor:
-            return None
-        info = MONITORINFO(cbSize=ctypes.sizeof(MONITORINFO))
-        user32.GetMonitorInfoW.argtypes = [ctypes.c_void_p, ctypes.POINTER(MONITORINFO)]
-        return tuple(info.rcWork) if user32.GetMonitorInfoW(monitor, ctypes.byref(info)) else None
-    except (AttributeError, OSError):                    # außerhalb von Windows
+    user32 = ctypes.windll.user32
+    user32.MonitorFromPoint.restype = ctypes.c_void_p
+    user32.MonitorFromPoint.argtypes = [wintypes.POINT, ctypes.c_ulong]
+    monitor = user32.MonitorFromPoint(wintypes.POINT(x, y), 0)         # 0 = None, wenn dort kein Bildschirm ist
+    if not monitor:
         return None
+    info = MONITORINFO(cbSize=ctypes.sizeof(MONITORINFO))
+    user32.GetMonitorInfoW.argtypes = [ctypes.c_void_p, ctypes.POINTER(MONITORINFO)]
+    return tuple(info.rcWork) if user32.GetMonitorInfoW(monitor, ctypes.byref(info)) else None
 
 
 def dunkle_titelleiste(window):
     """Windows-Titelleiste im dunklen Design (passend zum Fensterinhalt)."""
-    try:
-        hwnd = ctypes.windll.user32.GetParent(window.winfo_id())
-        on = ctypes.c_int(1)
-        ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, 20, ctypes.byref(on), ctypes.sizeof(on))  # IMMERSIVE_DARK_MODE
-    except (AttributeError, OSError):
-        pass
+    hwnd = ctypes.windll.user32.GetParent(window.winfo_id())
+    on = ctypes.c_int(1)
+    ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, 20, ctypes.byref(on), ctypes.sizeof(on))  # IMMERSIVE_DARK_MODE
 
 
 # ---------- Das Fenster ----------
-# dieselben Farben wie die dunkle Toolbox (src/gui/base.py)
+# dieselben Farben wie die dunkle Toolbox (toolbox/base.py) – das Fenster nutzt ttk statt CustomTkinter
 BG, BG_LIST, FG, SUB, HOVER, AKZENT = "#0a1d2c", "#152736", "#e2e8f0", "#8fa3b8", "#213443", "#3ddc97"
 GROESSE = (560, 640)             # Startgröße bei 100 % Skalierung
 TITELLEISTE = 32                 # Höhe der Windows-Titelleiste (zählt bei der Fenstergröße nicht mit)
@@ -284,6 +275,7 @@ class Detailfenster:
         self.hwdaten = None                              # zuletzt gelesene Hardwaredaten (hardwaredaten.lesen())
         self.hwdaten_aktuell = False                     # False = beim nächsten Anzeigen neu lesen
         self.hwdaten_thread = None
+        self.hwdaten_neu = None                          # Ergebnis des Lese-Threads, bis hwdaten_warten() es übernimmt
 
         win = self.win = tk.Toplevel(root)
         win.withdraw()
@@ -488,7 +480,7 @@ class Detailfenster:
         self.win.geometry(f"{w}x{h}+{right - w - self.px(12)}+{bottom - h - self.px(12 + TITELLEISTE)}")
 
     def speichern(self):
-        """Position und Größe merken (in hardware_monitor_settings.json)."""
+        """Position und Größe merken (in daten\\hardware_monitor.json)."""
         if self.sichtbar():
             self.app.fenster_geometrie(self.win.geometry())
 

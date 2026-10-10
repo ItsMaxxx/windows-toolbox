@@ -11,7 +11,7 @@ und sofort eine UAC-Abfrage zeigt. setup.ps1 soll aber ohne Adminrechte laufen u
 $ErrorActionPreference = 'Stop'
 $Root   = Split-Path -Parent $PSScriptRoot
 $Csc    = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
-$Quelle = Join-Path $PSScriptRoot 'setup_exe.cs'
+$Quelle = (Join-Path $PSScriptRoot 'setup_exe.cs'), (Join-Path $PSScriptRoot 'argumente.cs')
 $Symbol = Join-Path $Root 'toolbox\toolbox.ico'
 
 foreach ($exe in @(@('Setup.exe', @()), @('Uninstall.exe', @('/define:ENTFERNEN')))) {

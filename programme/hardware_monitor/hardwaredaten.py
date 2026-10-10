@@ -97,6 +97,7 @@ def zahl(text):
 
 
 def num(value, decimals):
+    """Zahl mit deutschem Komma, z. B. num(2.54, 1) -> „2,5“ (auch für die Messwerte im Detailfenster)."""
     return f"{value:.{decimals}f}".replace(".", ",")
 
 
