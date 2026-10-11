@@ -480,6 +480,8 @@ class ToolboxApp(ctk.CTk):
 
     def show_tool(self, tool):
         self.selected[tool.category] = tool.id
+        for name, button in self.tab_buttons.items():       # wieder grün, falls vorher das Zahnrad gewählt war
+            self.mark(button, name == tool.category)
         self.mark(self.gear, False)
         for tool_id, button in self.sidebar_buttons.items():
             self.mark(button, tool_id == tool.id)
@@ -488,7 +490,7 @@ class ToolboxApp(ctk.CTk):
         self.show_page(self.pages[tool.id])
 
     def show_settings(self):
-        for button in self.sidebar_buttons.values():
+        for button in (*self.tab_buttons.values(), *self.sidebar_buttons.values()):
             self.mark(button, False)
         self.mark(self.gear, True)
         if "_settings" not in self.pages:
