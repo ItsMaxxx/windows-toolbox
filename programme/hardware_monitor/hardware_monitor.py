@@ -41,7 +41,7 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True                              # keine __pycache__-Ordner anlegen (wie bei der Toolbox)
 sys.path.insert(0, str(Path(__file__).resolve().parent))    # detailfenster finden – auch beim Start mit python -m
-from detailfenster import TYPE_LABELS, Detailfenster, fmt_value, temp_color  # noqa: E402
+from detailfenster import ICON_DATEI, TYPE_LABELS, Detailfenster, fmt_value, temp_color  # noqa: E402
 # Startwerte, Raten, Port, Laden/Speichern – gemeinsam mit der Seite in der Toolbox
 from hardware_monitor_einstellungen import (ICON_RATES, IPC_PORT, LOG_FILE, POPUP_RATES, load_settings,  # noqa: E402
                                             save_settings)
@@ -362,6 +362,47 @@ def make_icon(kind, value):
     return img
 
 
+def make_logo(kind):
+    """Programm-Logo mit dem Farbstreifen von CPU bzw. GPU – nur für die Taskleisten-Einstellungen, siehe TrayIcon."""
+    img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+    img.alpha_composite(Image.open(ICON_DATEI).convert("RGBA").resize((50, 50), Image.LANCZOS), (7, 0))
+    ImageDraw.Draw(img).rounded_rectangle([8, 55, 56, 63], radius=4, fill=STRIPE[kind])
+    return img
+
+
+class TrayIcon(pystray.Icon):
+    """pystray-Icon, das in den Taskleisten-Einstellungen mit Logo und eigenem Eintrag erscheint.
+
+    Windows führt jedes Tray-Icon unter Einstellungen > Personalisierung > Taskleiste > „Andere Symbole“ auf
+    (gespeichert in HKCU\\Control Panel\\NotifyIconSettings) und erkennt es an .exe + Nummer (uID). Dazu werden zwei
+    Methoden von pystray (Version fest in requirements.txt) ersetzt:
+      - _show: Windows merkt sich das Bild vom Anmelden und übernimmt spätere Änderungen nicht. Deshalb wird immer
+        mit dem Logo angemeldet und gleich danach das eigentliche Bild gesetzt – auch wenn pystray das Icon nach
+        einem Neustart des Explorers von selbst neu anmeldet (dann stünde sonst die Temperatur dort).
+      - _message: pystray schickt die Nummer unter falschem Namen mit (hID statt uID), sodass sie immer 0 ist –
+        CPU und GPU wären für Windows ein und dasselbe Icon.
+    """
+    UIDS = {"cpu": 1, "gpu": 2}                  # fest je Art – bleibt gleich, auch wenn die Reihenfolge wechselt
+
+    def __init__(self, kind, menu):
+        self.uid = self.UIDS[kind]
+        self.logo = make_logo(kind)
+        super().__init__(f"hardware_monitor_{kind}", make_icon(kind, None), kind.upper(), menu)
+
+    def _show(self):
+        bild = self.icon
+        self._icon = self.logo                   # direkt, nicht über self.icon – das würde schon NIM_MODIFY schicken
+        self._release_icon()
+        super()._show()                          # NIM_ADD mit Logo
+        self._icon = bild
+        self._update_icon()                      # NIM_MODIFY mit dem eigentlichen Bild
+
+    def _message(self, code, flags, **kwargs):
+        from pystray._util import win32
+        win32.Shell_NotifyIcon(code, win32.NOTIFYICONDATAW(
+            cbSize=ctypes.sizeof(win32.NOTIFYICONDATAW), hWnd=self._hwnd, uID=self.uid, uFlags=flags, **kwargs))
+
+
 # ---------- Windows-Helfer ----------
 def set_dpi_aware():
     """Sonst rendert Windows das Fenster bei 125/150 % Skalierung unscharf."""
@@ -423,10 +464,7 @@ class HardwareMonitorApp:
         self.ready = {kind: threading.Event() for kind in self.kinds}
         self.current = {"cpu": None, "gpu": None}    # aktuelle Icon-Werte, für die Statusabfrage der GUI
 
-        self.icons = {
-            kind: pystray.Icon(f"hardware_monitor_{kind}", make_icon(kind, None), kind.upper(), self.make_menu())
-            for kind in self.kinds
-        }
+        self.icons = {kind: TrayIcon(kind, self.make_menu()) for kind in self.kinds}
         self.sensor_thread = threading.Thread(target=self.sensor_loop, daemon=True)
         self.ipc_thread = threading.Thread(target=self.ipc_server, daemon=True)
 

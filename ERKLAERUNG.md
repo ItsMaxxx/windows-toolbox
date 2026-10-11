@@ -1343,6 +1343,20 @@ Farbstreifen (blau = CPU, grün = GPU). Zweistellig große Schrift, dreistellig 
 → https://pillow.readthedocs.io/en/stable/reference/ImageDraw.html
 → https://pillow.readthedocs.io/en/stable/handbook/text-anchors.html (`anchor="mm"` = Mitte/Mitte)
 
+`make_logo(kind)`: das Programm-Logo (`toolbox\programm.ico`) mit demselben Farbstreifen. Wird nur beim Anmelden
+gezeigt (siehe `TrayIcon`), weil sich Windows für Einstellungen > Personalisierung > Taskleiste > „Andere Symbole“ genau
+dieses Bild merkt (Registry: `HKCU\Control Panel\NotifyIconSettings`, Wert `IconSnapshot`). Der Name daneben
+kommt aus der Dateibeschreibung von `runtime\HardwareMonitor.exe`.
+
+`TrayIcon`: `pystray.Icon` mit zwei ersetzten Methoden (pystray-Version fest in requirements.txt):
+- `_show` meldet das Icon immer mit `make_logo` an und setzt gleich danach das eigentliche Bild. pystray ruft
+  `_show` auch nach einem Neustart des Explorers auf (Nachricht `TaskbarCreated`) – ohne den Ersatz würde sich
+  Windows dann die gerade angezeigte Temperatur merken.
+- `_message` schickt eine feste Nummer mit (`uID`: CPU = 1, GPU = 2). Windows erkennt ein Tray-Icon an .exe + Nummer;
+  pystray schickt die Nummer unter falschem Namen (`hID`), sie wäre also immer 0, und CPU und GPU wären für Windows
+  ein einziger Eintrag.
+→ https://learn.microsoft.com/de-de/windows/win32/api/shellapi/ns-shellapi-notifyicondataw
+
 #### Klasse `HardwareMonitorApp`
 
 `__init__`:
@@ -1355,7 +1369,7 @@ Farbstreifen (blau = CPU, grün = GPU). Zweistellig große Schrift, dreistellig 
 - `kinds` = die Icons, die es wirklich gibt: `icon_order` ohne `"gpu"`, wenn `gpu_hat_temperatur()` nichts findet
   (kein NVML und kein Temperatursensor an einer GPU – z. B. Intel-Onboard-Grafik). `kinds` bekommen auch
   `measure_icons`, `measure` (`collect(…, icons)`), das Detailfenster (Kopfzeile) und die Statusabfrage (`"icons"`).
-- Ein `pystray.Icon` pro Eintrag in `kinds`, alle mit demselben Menü.
+- Ein `TrayIcon` pro Eintrag in `kinds`, alle mit demselben Menü.
 - Threads vorbereiten: `sensor_thread` (`sensor_loop`), `ipc_thread` (`ipc_server`).
 
 **Rechtsklick-Menü** (`make_menu`, `rate_menu`): „Details anzeigen“ (`default=True` → auch Linksklick),
