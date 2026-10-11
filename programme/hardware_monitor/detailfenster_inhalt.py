@@ -123,6 +123,8 @@ FENSTER = [
                Wert("Composite Temperature"),
                Wert("Temperature"),
                Wert("Temperature #*"),
+               Wert("Warning Temperature"),
+               Wert("Critical Temperature"),
                Wert("Used Space"),
                Wert("Free Space"),
                Wert("Total Space"),
@@ -132,8 +134,10 @@ FENSTER = [
                Wert("Life"),
                Wert("Percentage Used"),
                Wert("Available Spare"),
+               Wert("Available Spare Threshold"),
                Wert("Data Read"),
                Wert("Data Written"),
+               Wert("Power On Count"),
                Wert("Power On Hours"))),
 
     Tab("Netzwerk",
@@ -206,6 +210,10 @@ ERKLAERUNGEN = [
                                            "(bei SSDs meist Controller bzw. Speicherchips)."),
     ("Temperature", r"Temperature( \d+)?", "Temperatur des Laufwerks (Controller oder Speicherchips)."),
     ("Temperature", r"Composite Temperature", "Zusammengefasste Temperatur der SSD, nach der sie sich ggf. drosselt."),
+    ("Temperature", r"Warning Temperature", "Grenzwert der SSD: Ab dieser Temperatur warnt sie und beginnt sich zu "
+                                            "drosseln – kein Messwert."),
+    ("Temperature", r"Critical Temperature", "Grenzwert der SSD: Ab dieser Temperatur drosselt sie sich stark, um "
+                                             "Schäden zu vermeiden – kein Messwert."),
     # --- Auslastung ---
     ("Load", r"CPU Total", "Gesamtauslastung aller CPU-Kerne."),
     ("Load", r"CPU Core Max", "Auslastung des gerade am stärksten belasteten Kerns."),
@@ -293,10 +301,15 @@ ERKLAERUNGEN = [
     ("Throughput", r"GPU PCIe Tx", "Daten, die die Grafikkarte gerade über PCIe sendet."),
     # --- Zustand ---
     ("Level", r"Available Spare", "Reserve-Speicherzellen der SSD für defekte Zellen; sinkt im Laufe der Zeit."),
-    ("Level", r"Remaining Life", "Geschätzte verbleibende Lebensdauer der SSD."),
+    ("Level", r"Available Spare Threshold", "Grenzwert: Fällt die Reserve (Available Spare) darunter, meldet die SSD "
+                                            "einen kritischen Zustand – kein Messwert."),
+    ("Level", r"Life", "Geschätzte verbleibende Lebensdauer der SSD."),
     ("Level", r"Percentage Used", "Verbrauchter Anteil der vom Hersteller angegebenen Lebensdauer der SSD."),
     ("Level", r"Charge Level", "Ladestand des Akkus."),
     ("Level", r"Degradation Level", "Wie stark der Akku gegenüber neu an Kapazität verloren hat."),
+    # --- Zähler ---
+    ("Factor", r"Power On Count", "Wie oft das Laufwerk insgesamt eingeschaltet wurde."),
+    ("Factor", r"Power On Hours", "Betriebsstunden des Laufwerks über seine ganze Lebensdauer."),
 ]
 
 TYP_ERKLAERUNGEN = {   # Rückfall, wenn kein genauerer Eintrag oben passt

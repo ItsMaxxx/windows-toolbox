@@ -80,10 +80,11 @@ ein zweiter Start beendet sich sofort.
   Umschalt+Klick (bis hierhin) oder Strg+A (alle) – und mit Strg+C kopieren, z. B. „Hersteller-ID: 10DE“ und
   „Produkt-ID: 2786“ untereinander. Überschriften kommen nur mit ihrem Namen mit, eingerückt wie in der Liste.
   Dasselbe steht im Rechtsklick-Menü der Liste; Esc oder ein Klick ins Leere hebt die Markierung auf.
-- **Buttons im Tab „Hardwaredaten“**: „⧉ Kopieren“ rechts in jeder Bereichszeile (Prozessor, Grafikkarte, …) kopiert
-  den ganzen Bereich als Text – alle Geräte darin mit ihren Feldern, z. B. zum Einfügen in ein Forum. Oben kopiert
-  „Alles kopieren“ alle Hardwaredaten (mit Computername und Datum), „Modellnamen kopieren“ nur die Modellnamen: je
-  Bereich eine Zeile, darunter jedes Gerät mit einem Tab davor (gleiche Geräte zusammengefasst, z. B. „2× G.Skill …“).
+- **Tab „Hardwaredaten“** hat zwei Unterreiter: „Übersicht“ zeigt nur die Modellnamen (gleiche Geräte zusammengefasst,
+  z. B. „2× G.Skill …“), „Details“ alle Felder (Hersteller, IDs, Seriennummern, Treiber …). Kopiert wird immer das,
+  was gerade zu sehen ist: „⧉ Kopieren“ rechts in jeder Bereichszeile (Prozessor, Grafikkarte, …) den Bereich,
+  „Alles kopieren“ oben alle Bereiche – in der Übersicht je Bereich eine Zeile, darunter jedes Gerät mit einem Tab
+  davor; in den Details als Text mit Computername und Datum, z. B. zum Einfügen in ein Forum.
 - **Rechtsklick aufs Icon**: Aktualisierungsrate der Icons (1–10 s) und des Fensters (0,5–5 s), Beenden.
 - **Zahlenfarbe**: grün, ab `warn_temp` gelb, ab `hot_temp` rot (Standard 60 / 80 °C).
 
@@ -136,11 +137,12 @@ für frisch eingesteckte USB-Geräte); bis dahin bleiben die alten Daten stehen.
 | Bereich | Felder |
 |---|---|
 | Prozessor | Hersteller, Kerne/Threads, Grundtakt, L3-Cache, Sockel, Prozessor-ID (CPUID) |
-| Grafikkarte | Hersteller-ID, Produkt-ID, Platinen-Hersteller, Subsystem-ID, Revision, Hardware-ID, Treiber |
+| Grafikkarte | Art (Integriert/Dediziert/Extern), Hersteller-ID, Produkt-ID, Platinen-Hersteller, Subsystem-ID, Revision, Hardware-ID, Treiber |
 | Mainboard | Hersteller, Modell, Version, Seriennummer, BIOS-Hersteller/-Version/-Datum |
-| Arbeitsspeicher | je Riegel: Hersteller, Teilenummer, Größe, Typ, Takt, Steckplatz, Seriennummer |
+| Arbeitsspeicher | je Riegel: Hersteller, Teilenummer, Größe, Typ, Bauform (DIMM/SO-DIMM), Takt, Steckplatz, Seriennummer. Verlöteter LPDDR-Speicher als ein Eintrag: Größe gesamt, Bauform „verlötet“, Kanäle |
 | Laufwerke | Art (SSD/HDD), Anschluss (NVMe/SATA/USB), Größe, Seriennummer, Firmware |
-| Netzwerk, Audio | Hersteller-/Produkt-ID, Platinen-Hersteller, Hardware-ID, MAC-Adresse |
+| Netzwerk | Art (LAN/WLAN/Mobilfunk), Hersteller-/Produkt-ID, Platinen-Hersteller, Hardware-ID, MAC-Adresse |
+| Audio | Hersteller-/Produkt-ID, Platinen-Hersteller, Hardware-ID |
 | USB-Geräte | Hersteller-ID (VID), Produkt-ID (PID), Seriennummer – ein Eintrag pro Gerät |
 
 - Herstellernamen hinter den IDs („10DE (Nvidia)“) kommen aus kleinen Tabellen in `hardwaredaten.py`

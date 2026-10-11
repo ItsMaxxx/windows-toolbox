@@ -107,6 +107,7 @@ UNITS = {   # Sensortyp -> (Nachkommastellen, Einheit)
     "Noise": (0, "dBA"), "Conductivity": (0, "µS/cm"), "Factor": (2, ""),
 }
 BAR_TYPES = {"Temperature", "Load", "Control", "Level", "Humidity"}      # Werte von 0–100 bekommen einen Balken
+OHNE_AMPEL = ("*Distance to TjMax", "Warning Temperature", "Critical Temperature")   # Grenzwerte, keine Messwerte
 
 
 def fmt_rate(bytes_per_s):
@@ -128,6 +129,8 @@ def fmt_value(sensor_type, value):
         return f"{num(value / 1000, 1)} Wh"
     if sensor_type == "SmallData" and value >= 1024:     # z. B. Grafikspeicher lieber in GB
         return f"{num(value / 1024, 1)} GB"
+    if sensor_type == "Factor" and value == int(value):  # Zähler wie Power On Hours ohne ",00"
+        return num(value, 0)
     decimals, unit = UNITS.get(sensor_type, (1, ""))
     return f"{num(value, decimals)} {unit}".strip()
 
@@ -197,11 +200,15 @@ def ist_hwdaten(tab):
     return any(isinstance(g, Hardwaredaten) for g in tab.gruppen)
 
 
-def hwdaten_zeilen(daten):
-    """Wie zeilen(), nur für den Tab Hardwaredaten: Bereich -> Gerät -> Felder. Felder stehen als "Info"-Sensor drin."""
+def hwdaten_zeilen(daten, uebersicht=False):
+    """Wie zeilen(), nur für den Tab Hardwaredaten: Bereich -> Gerät -> Felder. Felder stehen als "Info"-Sensor drin.
+    uebersicht=True: nur Bereich -> Modellnamen, gleiche Geräte zusammengefasst („2× …“)."""
     result = []
     for b, (bereich, geraete) in enumerate(daten):
         result.append((f"b{b}", "", bereich, None))
+        if uebersicht:
+            result += [(f"b{b}|{g}", f"b{b}", name, None) for g, name in enumerate(hardwaredaten.modellnamen(geraete))]
+            continue
         for g, (name, felder) in enumerate(geraete):
             head = f"b{b}|{g}"
             result.append((head, f"b{b}", name, None))
@@ -298,6 +305,7 @@ class Detailfenster:
         self.hwdaten_neu = None                          # Ergebnis des Lese-Threads, bis hwdaten_warten() es übernimmt
 
         win = self.win = tk.Toplevel(root)
+        self.hw_ansicht = tk.StringVar(win, "uebersicht")    # Unterreiter im Tab Hardwaredaten: uebersicht / details
         win.withdraw()
         win.title(str(PROGRAMM_DATEI))                   # Pfad wie beim Explorer – siehe PROGRAMM_DATEI
         win.configure(bg=BG)
@@ -368,6 +376,12 @@ class Detailfenster:
         style.map("Knopf.TButton", background=[("pressed", FG), ("active", AKZENT)],
                   foreground=[("active", BG)], lightcolor=[("active", AKZENT)], darkcolor=[("active", AKZENT)],
                   bordercolor=[("active", AKZENT)])
+        # Unterreiter im Tab Hardwaredaten: Radiobuttons ohne Punkt, gefärbt wie die Tabs darüber
+        style.configure("Unterreiter.Toolbutton", background=BG, foreground=SUB, bordercolor=BG, lightcolor=BG,
+                        darkcolor=BG, borderwidth=0, padding=(self.px(8), self.px(2)))
+        style.map("Unterreiter.Toolbutton", background=[("selected", BG_LIST), ("active", HOVER)],
+                  foreground=[("selected", AKZENT), ("active", FG)], lightcolor=[("selected", BG_LIST)],
+                  darkcolor=[("selected", BG_LIST)], bordercolor=[("selected", BG_LIST)])
         style.configure("Vertical.TScrollbar", background=HOVER, troughcolor=BG_LIST, bordercolor=BG_LIST,
                         arrowcolor=SUB, lightcolor=HOVER, darkcolor=HOVER, gripcount=0)
 
@@ -410,19 +424,25 @@ class Detailfenster:
         self.knoepfe = {}
         for tab in tabs:
             frame = ttk.Frame(self.notebook)
-            if ist_hwdaten(tab):                         # oben eine Leiste zum Kopieren von allem
+            if ist_hwdaten(tab):                         # oben: Unterreiter Übersicht / Details und „Alles kopieren“
                 leiste = ttk.Frame(frame)
                 leiste.pack(side="top", fill="x", pady=(self.px(6), self.px(4)))
-                for text, als_text, meldung, hilfe in (
-                        ("⧉  Modellnamen kopieren", hardwaredaten.modellnamen_als_text, "Modellnamen kopiert",
-                         "Kopiert nur die Modellnamen aller Komponenten, nach Bereichen sortiert."),
-                        ("⧉  Alles kopieren", hardwaredaten.alles_als_text, "Alle Hardwaredaten kopiert",
-                         "Kopiert alle Hardwaredaten als Text.")):
-                    knopf = ttk.Button(leiste, text=text, style="Knopf.TButton", cursor="hand2",
-                                       command=lambda f=als_text, m=meldung: self.alles_kopieren(f, m))
-                    knopf.pack(side="right", padx=(self.px(6), 0))
-                    knopf.bind("<Enter>", lambda e, h=hilfe: self.fusszeile(h))
-                    knopf.bind("<Leave>", lambda e: self.fusszeile(HINWEIS))
+                for text, wert, hilfe in (
+                        ("Übersicht", "uebersicht", "Nur die Modellnamen aller Komponenten, nach Bereichen sortiert."),
+                        ("Details", "details", "Alle Hardwaredaten: Hersteller, Modell, IDs, Seriennummern, Treiber.")):
+                    reiter = ttk.Radiobutton(leiste, text=text, value=wert, variable=self.hw_ansicht,
+                                             style="Unterreiter.Toolbutton", cursor="hand2",
+                                             command=self.aktualisieren)
+                    reiter.pack(side="left")
+                    reiter.bind("<Enter>", lambda e, h=hilfe: self.fusszeile(h))
+                    reiter.bind("<Leave>", lambda e: self.fusszeile(HINWEIS))
+                knopf = ttk.Button(leiste, text="⧉  Alles kopieren", style="Knopf.TButton", cursor="hand2",
+                                   command=self.alles_kopieren)
+                knopf.pack(side="right")
+                knopf.bind("<Enter>", lambda e: self.fusszeile(
+                    "Kopiert alle Modellnamen als Text." if self.uebersicht() else
+                    "Kopiert alle Hardwaredaten als Text (mit Computername und Datum)."))
+                knopf.bind("<Leave>", lambda e: self.fusszeile(HINWEIS))
             tree = ttk.Treeview(frame, columns=("wert", "balken"), show="tree", selectmode="extended")
             if ist_hwdaten(tab):                         # Feldname links, langer Wert (IDs) daneben
                 tree.column("#0", width=self.px(300), stretch=True)     # breit genug für lange Gerätenamen
@@ -554,7 +574,7 @@ class Detailfenster:
         info = ist_hwdaten(tab)
         if info:
             self.hwdaten_laden()
-            rows = hwdaten_zeilen(self.hwdaten or [])
+            rows = hwdaten_zeilen(self.hwdaten or [], self.uebersicht())
             leer = ("Keine Hardwaredaten gefunden (Details in daten\\logs\\hardware_monitor.log)." if self.hwdaten == []
                     else "Lese Hardwaredaten …")
             geladen = self.hwdaten_aktuell
@@ -588,6 +608,7 @@ class Detailfenster:
                 tree.insert("", "end", iid="leer", text=leer, tags=("hinweis",))
             self.signatur[tree] = signatur
             if info:
+                self.hw_spalten(tree)
                 self.knoepfe_bauen(tree, [(key, text) for key, parent, text, _ in rows if not parent])
 
         self.sensoren, self.kopierbar = {}, {}
@@ -601,7 +622,8 @@ class Detailfenster:
                 self.kopierbar[key] = ("#1", sensor["value"])
                 tree.item(key, values=(sensor["value"], ""))
                 continue
-            is_temp = sensor["type"] == "Temperature"
+            is_temp = (sensor["type"] == "Temperature"
+                       and not any(fnmatch.fnmatchcase(sensor["name"], m) for m in OHNE_AMPEL))
             wert = fmt_value(sensor["type"], sensor["value"])
             self.kopierbar[key] = ("#1", wert)           # Messwert, so wie er gerade dasteht
             tree.item(key, values=(wert, balken(sensor["value"]) if sensor["type"] in BAR_TYPES else ""),
@@ -765,7 +787,8 @@ class Detailfenster:
         for key, bereich in bereiche:
             knopf = ttk.Button(tree, text="⧉  Kopieren", style="Knopf.TButton", cursor="hand2",
                                command=lambda b=bereich: self.bereich_kopieren(b))
-            knopf.bind("<Enter>", lambda e, b=bereich: self.fusszeile(f"Kopiert alle Daten zu „{b}“ als Text."))
+            knopf.bind("<Enter>", lambda e, b=bereich: self.fusszeile(
+                f"Kopiert {'die Modellnamen' if self.uebersicht() else 'alle Daten'} zu „{b}“ als Text."))
             knopf.bind("<Leave>", lambda e: self.fusszeile(HINWEIS))
             self.knoepfe[tree][key] = knopf
         self.win.after_idle(self.knoepfe_platzieren, tree)
@@ -780,17 +803,40 @@ class Detailfenster:
             else:
                 knopf.place_forget()
 
+    def uebersicht(self):
+        """True, solange im Tab Hardwaredaten der Unterreiter „Übersicht“ (nur Modellnamen) gewählt ist."""
+        return self.hw_ansicht.get() == "uebersicht"
+
+    def hw_spalten(self, tree):
+        """Übersicht: nur Namen, die bekommen die ganze Breite (sonst werden lange CPU-Namen abgeschnitten).
+        Details: Feldname links, Wert daneben – Aufteilung wie in tabs_bauen (300 : 260)."""
+        breite = max(tree.winfo_width(), self.px(560))
+        if self.uebersicht():
+            tree.column("wert", width=0, stretch=False)
+            tree.column("#0", width=breite)
+        else:
+            tree.column("wert", width=breite * 260 // 560, stretch=True)
+            tree.column("#0", width=breite - breite * 260 // 560)
+
     def bereich_kopieren(self, bereich):
+        """„Kopieren“ in einer Bereichszeile: so, wie der Bereich gerade angezeigt wird."""
         geraete = dict(self.hwdaten or []).get(bereich)
-        if geraete:
+        if not geraete:
+            return
+        if self.uebersicht():
+            self.zwischenablage(hardwaredaten.modellnamen_als_text([(bereich, geraete)]),
+                                f"Modellnamen zu „{bereich}“ kopiert")
+        else:
             self.zwischenablage(hardwaredaten.als_text(bereich, geraete), f"Alle Daten zu „{bereich}“ kopiert")
 
-    def alles_kopieren(self, als_text, meldung):
-        """Die Buttons oben im Tab: alle Bereiche auf einmal (als_text aus hardwaredaten.py)."""
-        if self.hwdaten:
-            self.zwischenablage(als_text(self.hwdaten), meldung)
-        else:
+    def alles_kopieren(self):
+        """„Alles kopieren“ oben im Tab: alle Bereiche so, wie der gewählte Unterreiter sie zeigt."""
+        if not self.hwdaten:
             self.bestaetigen("Die Hardwaredaten werden noch gelesen – gleich noch einmal versuchen.", farbe=SUB)
+        elif self.uebersicht():
+            self.zwischenablage(hardwaredaten.modellnamen_als_text(self.hwdaten), "Alle Modellnamen kopiert")
+        else:
+            self.zwischenablage(hardwaredaten.alles_als_text(self.hwdaten), "Alle Hardwaredaten kopiert")
 
     def meldung_ende(self):
         self.meldung_job = None

@@ -168,7 +168,7 @@ Beispiel Hardware-Monitor:
 | `id` | `"hardware_monitor"` – eindeutiger Kurzname; daraus wird auch `daten\hardware_monitor.json` |
 | `name` | „Hardware-Monitor“ – Anzeige in der Seitenleiste, Dateibeschreibung der `.exe` |
 | `version` | „1.0“ – Version des Programms (auch in den Eigenschaften der Starter-`.exe`) |
-| `kategorie` | Tab in der Toolbox („Allgemein“, „Werkzeuge“, …) |
+| `kategorie` | Tab in der Toolbox („Allgemein“ oder „Games“) |
 | `beschreibung` | Untertitel auf der Programmseite |
 | `seite` | Datei mit der Programmseite (`SEITE`, optional `PROGRAMM`) – siehe 4.3 |
 | `skript` | das eigenständige Programm, das der Starter startet |
@@ -733,8 +733,19 @@ Nvidia-Karten direkt aus `nvml.dll` (über ctypes) – solange als Sensor „Aut
 Eine Art Datenbank, in der Windows Infos über Hardware und System bereitstellt. Abgefragt wird mit WQL, einer
 SQL-ähnlichen Sprache: `SELECT Name, ProcessorId FROM Win32_Processor`. Braucht keine Adminrechte.
 Benutzte Klassen: Win32_Processor, Win32_VideoController, Win32_BaseBoard, Win32_BIOS, Win32_PhysicalMemory,
-MSFT_PhysicalDisk (anderer „Namespace“: `root\Microsoft\Windows\Storage`), Win32_NetworkAdapter, Win32_SoundDevice,
-Win32_PnPEntity.
+MSFT_PhysicalDisk (anderer „Namespace“: `root\Microsoft\Windows\Storage`), Win32_NetworkAdapter,
+MSFT_NetAdapter (`root\StandardCimv2`, nur für die Art: LAN/WLAN – Win32_NetworkAdapter meldet WLAN als „Ethernet“),
+Win32_SoundDevice, Win32_PnPEntity.
+
+#### DXCore
+
+Windows-Schnittstelle zu den Grafikchips (Teil von DirectX). Der Hardware-Monitor fragt darüber nur ab, ob eine GPU
+integriert (im Prozessor) oder extern (eGPU) ist – das steht in WMI nicht, und am Namen sieht man es nicht sicher
+(„Intel Arc Graphics“ ist integriert, „Intel Arc A770“ eine Steckkarte). DXCore ist eine COM-Schnittstelle; ohne
+fertige Python-Anbindung ruft `gpu_arten()` die Methoden per `ctypes` direkt über ihre Nummer in der Methodentabelle
+(vtable) auf. Gibt es DXCore nicht (Windows 10 vor Version 2004), fehlt das Feld „Art“ einfach.
+→ https://learn.microsoft.com/de-de/windows/win32/dxcore/dxcore
+→ https://learn.microsoft.com/de-de/windows/win32/api/dxcore_interface/ne-dxcore_interface-dxcoreadapterproperty
 → https://learn.microsoft.com/de-de/windows/win32/wmisdk/about-wmi
 → https://learn.microsoft.com/de-de/windows/win32/wmisdk/wql-sql-for-wmi
 → https://learn.microsoft.com/de-de/windows/win32/cimwin32prov/win32-processor (Beispiel für eine Klasse)
@@ -974,7 +985,7 @@ Ablauf beim Start (von oben nach unten, wie Python die Datei ausführt):
 
 1. Importe, `sys.dont_write_bytecode = True`, `APP_DIR`/`ROOT`/`PROGRAMME_DIR` bestimmen, `APP_DIR` in `sys.path`.
 2. `import daten`, `import winutil`, `from base import ...`, `from platzhalter import ...`.
-3. Konstanten: `CATEGORIES` (Tabs oben: Allgemein, Werkzeuge, Medien, Netzwerk, Games), `PLACEHOLDERS` (die
+3. Konstanten: `CATEGORIES` (Tabs oben: Allgemein, Games), `PLACEHOLDERS` (die
    „XXX“-Einträge), `AUSWEIS` (`toolbox\programm.json`) und daraus `VERSION`, `SETTINGS_FILE` (`daten\toolbox.json`),
    `ICON_FILE`, `TOOLBOX_EXE` (`runtime\Toolbox.exe`), `EINRICHTEN` (`Einrichten.cmd`), `GUI_PORT = 47816`,
    `APPEARANCE`, `DEFAULT_SETTINGS`.
@@ -1442,7 +1453,9 @@ offenem Fenster alle 100 ms, sonst alle 250 ms (spart Aufwachen im Leerlauf).
   (`importlib.reload`). Hat die Datei einen Fehler, läuft das Fenster trotzdem (Rückfall: Tab „Alles“) und die
   Fußzeile zeigt den Fehler rot. → Du kannst die Datei bei laufendem Monitor bearbeiten; Fenster zu/auf genügt.
 - `tabs_bauen(tabs)`: Pro Tab ein Frame mit Treeview + Scrollbar; im Hardwaredaten-Tab zusätzlich die Leiste mit
-  „Modellnamen kopieren“ / „Alles kopieren“. Tags färben Zeilen (bereich, gruppe, typ, hinweis, Ampelfarben).
+  den Unterreitern „Übersicht“ / „Details“ (Radiobuttons auf `self.hw_ansicht`, `uebersicht()` fragt sie ab) und
+  „Alles kopieren“, das wie die Bereichs-Knöpfe kopiert, was die gewählte Ansicht zeigt. `hw_spalten()` gibt in der
+  Übersicht der Namensspalte die ganze Breite. Tags färben Zeilen (bereich, gruppe, typ, hinweis, Ampelfarben).
 - `zeigen()`/`verstecken()`/`umschalten()`; `platzieren()`: gespeicherte Position, wenn sie noch auf einem
   angeschlossenen Bildschirm liegt – sonst unten rechts auf dem Bildschirm, auf dem geklickt wurde, über der
   Taskleiste. `speichern()`: Geometrie → `app.fenster_geometrie` → `daten\hardware_monitor.json` (`"window"`).
@@ -1509,8 +1522,9 @@ runtime\python.exe programme\hardware_monitor\hardwaredaten.py
 |---|---|
 | `abfrage(wql, scope)` | führt eine WQL-Abfrage aus → Liste von dicts (alle Werte als Text). Fehler → leer + Log. |
 | Helfer | `wert()` (Platzhalter wie „To Be Filled By O.E.M.“ → `None`), `mit_namen()` („10DE“ → „10DE (Nvidia)“), `datum()` (WMI-Datum → TT.MM.JJJJ), `pci_felder()`/`usb_ids()`/`ids_felder()` (IDs aus Kennungen per Regex), `hardware_id()` (Kennung ohne den Steckplatz-Teil) |
-| Tabellen | `PCI_HERSTELLER`, `USB_HERSTELLER` (Auszüge – bei Bedarf ergänzen), `RAM_TEILENUMMER` (Hersteller aus dem Anfang der Teilenummer raten, weil Windows oft „Unknown“ meldet), `RAM_TYPEN`, `BUS_TYPEN`, `MEDIEN_TYPEN` |
-| Bereiche | `prozessoren`, `grafikkarten`, `mainboard` (+ BIOS), `arbeitsspeicher`, `laufwerke`, `netzwerk`, `audio`, `usb_geraete`. Jede Funktion liefert `[(Gerätename, [(Feld, Wert), …]), …]`. Virtuelle Geräte werden aussortiert. `audio` nimmt PCI-, HDAUDIO- und `INTELAUDIO\FUNC_`-Geräte (Codec hinter Intel Smart Sound bei Laptops). `usb_geraete` fasst Einträge mit gleicher VID/PID zusammen (ein Gerät meldet sich oft mehrfach an). |
+| Tabellen | `PCI_HERSTELLER`, `USB_HERSTELLER` (Auszüge – bei Bedarf ergänzen), `RAM_TEILENUMMER` (Hersteller aus dem Anfang der Teilenummer raten, weil Windows oft „Unknown“ meldet), `RAM_TYPEN`, `RAM_BAUFORMEN`, `NETZ_ARTEN`, `BUS_TYPEN`, `MEDIEN_TYPEN` |
+| `gpu_arten()` | fragt per DXCore ab, welche GPU integriert / extern / dediziert ist (siehe Begriff DXCore); `com_methode()` ruft eine COM-Methode über ihre Nummer auf |
+| Bereiche | `prozessoren`, `grafikkarten`, `mainboard` (+ BIOS), `arbeitsspeicher`, `laufwerke`, `netzwerk`, `audio`, `usb_geraete`. Jede Funktion liefert `[(Gerätename, [(Feld, Wert), …]), …]`. Virtuelle Geräte werden aussortiert. `grafikkarten` ordnet die Art aus `gpu_arten()` über Hersteller-/Produkt-ID zu, `netzwerk` die Art aus MSFT_NetAdapter über die Gerätekennung. `arbeitsspeicher` fasst verlöteten LPDDR-Speicher zu einem Eintrag zusammen – Windows meldet ihn je Speicherkanal, nicht je Riegel. `audio` nimmt PCI-, HDAUDIO- und `INTELAUDIO\FUNC_`-Geräte (Codec hinter Intel Smart Sound bei Laptops). `usb_geraete` fasst Einträge mit gleicher VID/PID zusammen (ein Gerät meldet sich oft mehrfach an). |
 | `BEREICHE` | Liste (Anzeigename, Funktion) – Reihenfolge im Tab |
 | `lesen()` | ruft alle Bereiche auf; ein kaputter Bereich verhindert die anderen nicht |
 | `als_text` / `alles_als_text` / `modellnamen_als_text` | Textform für die Kopieren-Buttons |
@@ -1583,7 +1597,7 @@ Kommentare, kurze Erklär-Kommentare über dem „Warum“). Nach Änderungen di
      "id": "mein_tool",
      "name": "Mein Tool",
      "version": "1.0",
-     "kategorie": "Werkzeuge",
+     "kategorie": "Allgemein",
      "beschreibung": "Kurze Beschreibung",
      "seite": "mein_tool_gui.py"
    }
@@ -1620,7 +1634,7 @@ Kommentare, kurze Erklär-Kommentare über dem „Warum“). Nach Änderungen di
    SEITE = MeinToolPage
    ```
 4. `programme\mein_tool\README.md` schreiben und in der Tabelle der Haupt-README verlinken.
-5. Toolbox neu starten – das Tool erscheint im Tab „Werkzeuge“. Den XXX-Platzhalter dieses Tabs kannst du dann in
+5. Toolbox neu starten – das Tool erscheint im Tab „Allgemein“. Den XXX-Platzhalter dieses Tabs kannst du dann in
    `toolbox.py` (`PLACEHOLDERS`) entfernen.
 
 **Braucht das Tool ein eigenes Hintergrundprogramm** (wie der Monitor), nimm `hardware_monitor.py` als Vorbild:

@@ -176,14 +176,14 @@ Wert hinzufügen = Zeile schreiben, Wert weglassen = Zeile löschen. Die genauen
      "id": "mein",
      "name": "Mein Programm",
      "version": "1.0",
-     "kategorie": "Werkzeuge",
+     "kategorie": "Allgemein",
      "beschreibung": "Kurze Beschreibung",
      "seite": "mein_gui.py",
      "skript": "mein.py",
      "starter": "MeinProgramm.exe"
    }
    ```
-   `kategorie` ist der Tab oben (Allgemein, Werkzeuge, Medien, Netzwerk oder Games – `CATEGORIES` in
+   `kategorie` ist der Tab oben (Allgemein oder Games – `CATEGORIES` in
    `toolbox.py`). `skript` und `starter` braucht es nur, wenn das Tool ein eigenes Programm hat – `Setup.exe` legt dann `MeinProgramm.exe` an – mit dem grünen ⚒ (`toolbox/programm.ico`), oder mit eigenem
    Symbol über `"symbol": "mein.ico"`. Braucht es etwas zum Herunterladen, kommt das als `downloads` dazu (Vorbild:
    `programme/hardware_monitor/programm.json`).

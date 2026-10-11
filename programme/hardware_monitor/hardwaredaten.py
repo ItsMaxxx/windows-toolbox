@@ -6,9 +6,11 @@ Fensters, nicht laufend. Braucht keine Adminrechte und kein LibreHardwareMonitor
 Zum Ausprobieren:  python hardwaredaten.py   -> gibt alles aus, was der Tab zeigen würde
 """
 
+import ctypes
 import logging
 import platform
 import re
+import uuid
 from collections import Counter
 from datetime import date
 
@@ -27,6 +29,8 @@ ERKLAERUNGEN = {
     "Teilenummer": "Bestellnummer des Herstellers – damit findet man genau diesen Riegel wieder.",
     "Takt": "Eingestellter Speichertakt in Megatransfers pro Sekunde.",
     "Takt laut Riegel": "Höchster Takt, den der Riegel ohne XMP/EXPO meldet.",
+    "Bauform": "Riegel lassen sich tauschen und aufrüsten; verlöteter Speicher sitzt fest auf dem Mainboard.",
+    "Kanäle": "Verlöteten Speicher meldet Windows je Speicherkanal statt je Riegel – so viele Einträge sind es.",
 }
 
 # PCI-Herstellerkennungen (Auszug: die bei Desktop-PCs häufigsten)
@@ -54,7 +58,9 @@ RAM_TEILENUMMER = (
     (r"F[345]-", "G.Skill"), (r"CM", "Corsair"), (r"KF|KHX|KVR|KCP", "Kingston"), (r"BL|CT", "Crucial"),
     (r"M[34]\d\d", "Samsung"), (r"HM", "SK Hynix"), (r"MTA", "Micron"), (r"A[XD][45]", "ADATA"),
 )
-RAM_TYPEN = {20: "DDR", 21: "DDR2", 24: "DDR3", 26: "DDR4", 30: "LPDDR4", 34: "DDR5", 35: "LPDDR5"}
+RAM_TYPEN = {20: "DDR", 21: "DDR2", 24: "DDR3", 26: "DDR4", 29: "LPDDR3", 30: "LPDDR4", 34: "DDR5", 35: "LPDDR5"}
+RAM_BAUFORMEN = {8: "Riegel (DIMM)", 12: "Riegel (SO-DIMM)"}     # Win32_PhysicalMemory.FormFactor
+NETZ_ARTEN = {14: "LAN (Kabel)", 9: "WLAN", 1: "WLAN", 8: "Mobilfunk", 10: "Bluetooth"}    # NdisPhysicalMedium
 BUS_TYPEN = {1: "SCSI", 3: "ATA", 7: "USB", 8: "RAID", 9: "iSCSI", 10: "SAS", 11: "SATA", 12: "SD-Karte",
              17: "NVMe"}
 MEDIEN_TYPEN = {3: "Festplatte (HDD)", 4: "SSD"}
@@ -75,6 +81,50 @@ def abfrage(wql, scope=r"root\cimv2"):
     except Exception:
         logging.exception("WMI-Abfrage fehlgeschlagen: %s", wql)
         return []
+
+
+# ---------- DXCore (Windows-Grafikschnittstelle): integrierte oder eigene GPU? ----------
+class GUID(ctypes.Structure):
+    _fields_ = [("bytes", ctypes.c_ubyte * 16)]
+
+    def __init__(self, text):
+        super().__init__()
+        ctypes.memmove(self.bytes, uuid.UUID(text).bytes_le, 16)
+
+
+def com_methode(obj, nr, ergebnis, *argtypes):
+    """Methode Nr. nr eines COM-Objekts, gezählt wie in dxcore_interface.h (0–2: QueryInterface, AddRef, Release)."""
+    vtable = ctypes.cast(obj, ctypes.POINTER(ctypes.POINTER(ctypes.c_void_p))).contents
+    return lambda *args: ctypes.WINFUNCTYPE(ergebnis, ctypes.c_void_p, *argtypes)(vtable[nr])(obj, *args)
+
+
+def gpu_arten():
+    """(Hersteller-ID, Produkt-ID, Subsystem) -> „Integriert (im Prozessor)“ / „Extern (eGPU)“ / „Dediziert“.
+    Am Namen lässt sich das nicht erkennen („Intel Arc Graphics“ ist integriert, „Intel Arc A770“ eine Karte)."""
+    from ctypes import POINTER, byref, c_bool, c_size_t, c_uint32, c_void_p
+    HRESULT = ctypes.HRESULT
+    factory, liste = c_void_p(), c_void_p()
+    ctypes.WinDLL("dxcore").DXCoreCreateAdapterFactory(byref(GUID("78ee5945-c36e-4b13-a669-005dd11c0f06")),
+                                                       byref(factory))
+    com_methode(factory, 3, HRESULT, c_uint32, POINTER(GUID), POINTER(GUID), POINTER(c_void_p))(   # CreateAdapterList
+        1, byref(GUID("248e2800-a793-4724-abaa-23a6de1be090")),         # alle GPUs, die rechnen können
+        byref(GUID("526c7776-40e9-459b-b711-f32ad76dfc28")), byref(liste))
+    arten = {}
+    for i in range(com_methode(liste, 4, c_uint32)()):                # GetAdapterCount
+        adapter = c_void_p()
+        com_methode(liste, 3, HRESULT, c_uint32, POINTER(GUID), POINTER(c_void_p))(               # GetAdapter
+            i, byref(GUID("f0db4c7f-fe5a-42a2-bd62-f2a6cf6fc83e")), byref(adapter))
+        eigenschaft = com_methode(adapter, 6, HRESULT, c_uint32, c_size_t, c_void_p)               # GetProperty
+        ids, integriert, extern = (c_uint32 * 4)(), c_bool(), c_bool()
+        eigenschaft(3, ctypes.sizeof(ids), ids)                         # HardwareID: Hersteller, Produkt, Subsystem
+        eigenschaft(12, 1, byref(integriert))                           # IsIntegrated
+        eigenschaft(13, 1, byref(extern))                               # IsDetachable
+        arten[(f"{ids[0]:04X}", f"{ids[1]:04X}", f"{ids[2]:08X}")] = (
+            "Integriert (im Prozessor)" if integriert.value else "Extern (eGPU)" if extern.value else "Dediziert")
+        com_methode(adapter, 2, c_uint32)()                             # Release
+    com_methode(liste, 2, c_uint32)()
+    com_methode(factory, 2, c_uint32)()
+    return arten
 
 
 # ---------- Helfer ----------
@@ -167,12 +217,20 @@ def prozessoren():
 
 
 def grafikkarten():
+    try:
+        arten = gpu_arten()
+    except Exception:                            # z. B. Windows 10 vor Version 2004 (ohne dxcore.dll): Feld fehlt
+        logging.exception("DXCore: Art der Grafikkarten nicht lesbar")
+        arten = {}
     geraete = []
     for g in abfrage("SELECT Name, PNPDeviceID, DriverVersion, DriverDate FROM Win32_VideoController"):
-        if not (g["PNPDeviceID"] or "").upper().startswith("PCI\\"):
+        pnp = (g["PNPDeviceID"] or "").upper()
+        if not pnp.startswith("PCI\\"):
             continue                             # virtuelle Anzeigen (Fernwartung, Streaming) weglassen
+        m = re.search(r"VEN_(\w{4})&DEV_(\w{4})(?:&SUBSYS_(\w{8}))?", pnp)
+        art = m and (arten.get(m.groups()) or next((a for ids, a in arten.items() if ids[:2] == m.groups()[:2]), None))
         geraete.append((wert(g["Name"]) or "Grafikkarte", felder_ohne_leere(
-            pci_felder(g["PNPDeviceID"])
+            [("Art", art)] + pci_felder(g["PNPDeviceID"])
             + [("Treiberversion", wert(g["DriverVersion"])), ("Treiberdatum", datum(g["DriverDate"]))])))
     return geraete
 
@@ -191,27 +249,40 @@ def mainboard():
 
 
 def arbeitsspeicher():
-    geraete = []
+    geraete, verloetet = [], {}
     for r in abfrage("SELECT Manufacturer, PartNumber, SerialNumber, BankLabel, DeviceLocator, Capacity, Speed, "
-                     "ConfiguredClockSpeed, SMBIOSMemoryType FROM Win32_PhysicalMemory"):
+                     "ConfiguredClockSpeed, SMBIOSMemoryType, FormFactor FROM Win32_PhysicalMemory"):
         teil = wert(r["PartNumber"])
         hersteller = wert(r["Manufacturer"])
         if not hersteller and teil:
             geraten = next((name for muster, name in RAM_TEILENUMMER if re.match(muster, teil)), None)
             hersteller = f"{geraten} (laut Teilenummer)" if geraten else None
-        groesse = zahl(r["Capacity"])
+        groesse = zahl(r["Capacity"]) or 0
+        typ = RAM_TYPEN.get(zahl(r["SMBIOSMemoryType"]))
         eingestellt, maximal = zahl(r["ConfiguredClockSpeed"]), zahl(r["Speed"])
         name = " ".join(filter(None, (hersteller.split(" (")[0] if hersteller else None, teil)))
+        if typ and typ.startswith("LP"):         # LPDDR ist immer verlötet und kommt je Speicherkanal -> zusammenfassen
+            gruppe = verloetet.setdefault(name or "Arbeitsspeicher", {
+                "Hersteller": hersteller, "Teilenummer": teil, "Größe": 0, "Typ": typ,
+                "Takt": f"{eingestellt} MT/s" if eingestellt else None, "Bauform": "verlötet", "Kanäle": 0})
+            gruppe["Größe"] += groesse
+            gruppe["Kanäle"] += 1
+            continue
         geraete.append((name or "Speicherriegel", felder_ohne_leere([
             ("Hersteller", hersteller),
             ("Teilenummer", teil),
             ("Größe", f"{groesse // 1024 ** 3} GB" if groesse else None),
-            ("Typ", RAM_TYPEN.get(zahl(r["SMBIOSMemoryType"]))),
+            ("Typ", typ),
+            ("Bauform", RAM_BAUFORMEN.get(zahl(r["FormFactor"]))),
             ("Takt", f"{eingestellt} MT/s" if eingestellt else None),
             ("Takt laut Riegel", f"{maximal} MT/s" if maximal and maximal != eingestellt else None),
             ("Steckplatz", " / ".join(filter(None, (wert(r["BankLabel"]), wert(r["DeviceLocator"]))))),
             ("Seriennummer", wert(r["SerialNumber"])),
         ])))
+    for name, gruppe in verloetet.items():
+        gruppe["Größe"] = f"{gruppe['Größe'] // 1024 ** 3} GB" if gruppe["Größe"] else None
+        gruppe["Kanäle"] = str(gruppe["Kanäle"])
+        geraete.insert(0, (name, felder_ohne_leere(list(gruppe.items()))))
     return geraete
 
 
@@ -234,12 +305,18 @@ def laufwerke():
 
 
 def netzwerk():
+    # Art (LAN, WLAN, …) steht nur in der neueren Klasse MSFT_NetAdapter – Win32_NetworkAdapter meldet auch WLAN
+    # als „Ethernet“. Zugeordnet wird über die Gerätekennung.
+    arten = {(a["PnPDeviceID"] or "").upper(): NETZ_ARTEN.get(zahl(a["NdisPhysicalMedium"]))
+             for a in abfrage("SELECT PnPDeviceID, NdisPhysicalMedium FROM MSFT_NetAdapter",
+                              scope=r"root\StandardCimv2")}
     geraete = []
     for n in abfrage("SELECT Name, PNPDeviceID, MACAddress FROM Win32_NetworkAdapter WHERE PhysicalAdapter = TRUE"):
-        if not re.match(r"(PCI|USB)\\", n["PNPDeviceID"] or "", re.I):
+        pnp = n["PNPDeviceID"] or ""
+        if not re.match(r"(PCI|USB)\\", pnp, re.I):
             continue                             # virtuelle Adapter (VPN, Hyper-V, …) weglassen
-        geraete.append((wert(n["Name"]) or "Netzwerkadapter",
-                        felder_ohne_leere(ids_felder(n["PNPDeviceID"]) + [("MAC-Adresse", wert(n["MACAddress"]))])))
+        geraete.append((wert(n["Name"]) or "Netzwerkadapter", felder_ohne_leere(
+            [("Art", arten.get(pnp.upper()))] + ids_felder(pnp) + [("MAC-Adresse", wert(n["MACAddress"]))])))
     return geraete
 
 
@@ -322,13 +399,17 @@ def alles_als_text(daten):
     return kopf + "\n\n" + "\n\n\n".join(als_text(b, g) for b, g in daten) + "\n"
 
 
+def modellnamen(geraete):
+    """Die Gerätenamen eines Bereichs – gleiche Geräte zusammengefasst („2× G.Skill …“)."""
+    namen = Counter(name for name, _ in geraete)
+    return [f"{n}× {name}" if n > 1 else name for name, n in namen.items()]
+
+
 def modellnamen_als_text(daten):
-    """Nur die Modellnamen: der Bereich, darunter je Gerät eine Zeile mit Tab davor – gleiche Geräte zusammengefasst
-    („2× G.Skill …“)."""
+    """Nur die Modellnamen: der Bereich, darunter je Gerät eine Zeile mit Tab davor."""
     zeilen = []
     for bereich, geraete in daten:
-        namen = Counter(name for name, _ in geraete)
-        zeilen += [bereich] + [f"\t{n}× {name}" if n > 1 else f"\t{name}" for name, n in namen.items()]
+        zeilen += [bereich] + [f"\t{name}" for name in modellnamen(geraete)]
     return "\n".join(zeilen) + "\n"
 
 

@@ -46,7 +46,7 @@ import winutil  # noqa: E402
 from base import (BAD, BAR, BORDER, GOOD, HOVER, MUTED, SELECTED, TEXT, Button, Buttons, Choice,  # noqa: E402
                   Section, Switch, Text, ToolInfo, ToolPage, Tooltip, apply_font, apply_theme)
 
-CATEGORIES = ["Allgemein", "Werkzeuge", "Medien", "Netzwerk", "Games"]     # Tabs oben, in dieser Reihenfolge
+CATEGORIES = ["Allgemein", "Games"]     # Tabs oben, in dieser Reihenfolge
 
 AUSWEIS = json.loads((APP_DIR / "programm.json").read_text(encoding="utf-8"))    # wie bei jedem Programm
 VERSION = AUSWEIS["version"]
