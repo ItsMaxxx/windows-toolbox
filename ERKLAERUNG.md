@@ -1235,9 +1235,9 @@ stehen).
 
 - `layout()`: Bereiche Status (Statuszeile + Starten/Beenden/Neu starten), Autostart (Schalter + Aufgabe einrichten),
   Aktualisierung (zwei Raten + Effizienzmodus mit „i“-Tooltip, Text in `EFFIZIENZ_INFO`), Anzeige (Reihenfolge,
-  Sensor-Combos, zwei Slider), Detailfenster (Hinweis + Ordner öffnen), Erweitert (Aufgabenname,
+  Sensor-Combos, je zwei Slider für CPU und GPU), Detailfenster (Hinweis + Ordner öffnen), Erweitert (Aufgabenname,
   Ordner/Log/Einstellungsdatei öffnen, Alles zurücksetzen).
-- `on_change`: hält „Gelb ab“ immer unter „Rot ab“ (zieht den anderen Regler mit); zeigt bei geänderter
+- `on_change`: hält „gelb ab“ immer unter „rot ab“ – je für CPU und GPU (zieht den anderen Regler mit); zeigt bei geänderter
   Icon-Reihenfolge den Hinweis „Wird nach Neu starten übernommen“.
 - `on_saved`: schickt `"reload"` an den Monitor → der übernimmt die Werte sofort.
 - `task_name` (property) / `on_task_name`: Aufgabenname aus bzw. in `self.data` – also in `daten\hardware_monitor.json`.
@@ -1286,7 +1286,7 @@ Was beim Start passiert (Reihenfolge im Code):
    |---|---|
    | `LHM_DIR` | wo `LibreHardwareMonitorLib.dll` liegt (`lhm\` neben dem Skript, sonst `runtime\lhm`, wo es kurzzeitig lag, sonst `C:\Tools\lhm`) |
    | `ICON_RATES` / `POPUP_RATES` | 1, 2, 5, 10 s / 0,5, 1, 2, 5 s |
-   | `DEFAULT_SETTINGS` | `icon_interval`, `popup_interval`, `icon_order`, `cpu_sensor`, `gpu_sensor`, `warn_temp`, `hot_temp`, `window`, `effizienzmodus` (`"auto"`/`"an"`/`"aus"`) |
+   | `DEFAULT_SETTINGS` | `icon_interval`, `popup_interval`, `icon_order`, `cpu_sensor`, `gpu_sensor`, `cpu_warn_temp`/`cpu_hot_temp`, `gpu_warn_temp`/`gpu_hot_temp`, `window`, `effizienzmodus` (`"auto"`/`"an"`/`"aus"`) |
    | `SETTINGS_FILE` | `daten\hardware_monitor.json` (über `daten.einstellungen`) |
    | `CPU_SENSORS` | `("Core (Tctl/Tdie)", "CPU Package", "Core Average")` – Reihenfolge für „Automatisch“ |
    | `GPU_SENSORS` | `("GPU Core", "GPU Hot Spot")` |
@@ -1438,6 +1438,7 @@ offenem Fenster alle 100 ms, sonst alle 250 ms (spart Aufwachen im Leerlauf).
 | `Tab(titel, *gruppen)` | ein Reiter |
 | `Gruppe(geraet, *werte, name="*", titel=None)` | Werte EINES Gerätetyps. Gibt es mehrere passende Geräte (drei Laufwerke), erscheint die Gruppe für jedes einmal. `name` filtert Geräte nach Namen. |
 | `Wert(sensor, typ=None, text=None, ohne=None)` | eine Zeile. `*` als Platzhalter. `typ` nur nötig, wenn derselbe Name mehrfach vorkommt („GPU Core“ ist Temperatur, Auslastung UND Takt). `typ` darf deutsch („Temperatur“) oder englisch („Temperature“) sein. `ohne` schließt Namen aus, die trotz Platzhalter nicht dazugehören (`"CPU Core #*"`, `ohne="*Distance*"`). |
+| `Abschnitt(titel, *werte, eine_zeile=False)` | einklappbarer Unterpunkt in einer Gruppe (z. B. „Lüfter“). `eine_zeile=True` zeigt gleichnamige Werte in einer Zeile: den ersten als Wert, den zweiten als Balken mit % (Fan #1: Drehzahl und Ansteuerung); „Control“ im Namen zählt dabei nicht mit. 0 RPM bei einem angesteuerten Lüfter erscheint grau als „steht“. |
 | `AlleSensoren()` | alles, was LHM findet (zum Nachschlagen) |
 | `Hardwaredaten()` | der Tab mit den festen Daten (`hardwaredaten.py`) |
 
@@ -1445,7 +1446,7 @@ offenem Fenster alle 100 ms, sonst alle 250 ms (spart Aufwachen im Leerlauf).
 
 `TYPE_LABELS` (englisch → deutsch), `UNITS` (Nachkommastellen, Einheit), `BAR_TYPES` (bekommen einen Text-Balken),
 `fmt_value` (Zahl schön formatieren, deutsches Komma, B/s→KB/s→MB/s, GB→TB …), `AMPEL` + `temp_stufe`/`temp_color`
-(grün/gelb/rot nach `warn_temp`/`hot_temp` – dieselben Farben auch in den Tray-Icons), `balken` (██████░░░░),
+(grün/gelb/rot nach `cpu_…`/`gpu_warn_temp` und `…_hot_temp` – GPU-Sensoren nach den GPU-Grenzen, alles andere nach den CPU-Grenzen; dieselben Farben auch in den Tray-Icons), `balken` (██████░░░░),
 `erklaere` (passenden Erklärtext aus `ERKLAERUNGEN` suchen). `ICON_DATEI` = `toolbox\toolbox.ico` (Fenstersymbol).
 
 #### Vom Inhalt zur Liste
@@ -1573,8 +1574,8 @@ pystray-Thread → `ui_queue.put("toggle")` → GUI-Thread (`poll_queue`, späte
 `<<NotebookTabChanged>>` → `melden()` → `fenster_braucht({"laufwerk"})` → `wake` → `collect({"laufwerk"})` (+ CPU,
 + GPU über NVML) → bis dahin „Lade Sensordaten …“.
 
-**D) Du schiebst in der Toolbox „Rot ab“ auf 85**
-Slider → `page.set("hot_temp", 85, later=True)` → `on_change` (gelb < rot sicherstellen) → `refresh` → 500 ms nach
+**D) Du schiebst in der Toolbox „CPU rot ab“ auf 85**
+Slider → `page.set("cpu_hot_temp", 85, later=True)` → `on_change` (gelb < rot sicherstellen) → `refresh` → 500 ms nach
 dem Loslassen `save()` → `daten\hardware_monitor.json` schreiben → „Gespeichert ✓“ → `on_saved()` →
 `run_async(ipc("reload"))` → Monitor-IPC-Thread → Queue → `reload_settings()` → Icons in neuer Farbe.
 

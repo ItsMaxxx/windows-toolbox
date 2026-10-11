@@ -33,8 +33,12 @@ DEFAULT_SETTINGS = {
     "icon_order": ["cpu", "gpu"],    # Reihenfolge in der Taskleiste (wirkt nach Neustart des Programms)
     "cpu_sensor": "auto",            # "auto" = erster vorhandener aus CPU_SENSORS, sonst ein Sensorname
     "gpu_sensor": "auto",
-    "warn_temp": 60,                 # ab hier gelb
-    "hot_temp": 80,                  # ab hier rot
+    # Ampelfarbe der Temperaturen: ab warn gelb, ab hot rot – getrennt, weil CPUs unter Last deutlich heißer werden
+    # dürfen (Ryzen und Intel drosseln sich erst bei etwa 90–100 °C, Grafikkarten meist schon ab etwa 83 °C).
+    "cpu_warn_temp": 75,
+    "cpu_hot_temp": 90,
+    "gpu_warn_temp": 70,
+    "gpu_hot_temp": 83,
     "window": "",                    # Größe und Position des Detailfensters, z. B. "480x640+1420+380" (merkt es sich selbst)
     "effizienzmodus": "auto",        # "auto" = nur bei geschlossenem Fenster, "an" = immer, "aus" = nie
 }
@@ -52,9 +56,12 @@ def load_settings():
         s["icon_order"] = list(start["icon_order"])
     for key in ("cpu_sensor", "gpu_sensor"):
         s[key] = s[key].strip() if isinstance(s[key], str) and s[key].strip() else start[key]
-    warn, hot = s["warn_temp"], s["hot_temp"]
-    if not (isinstance(warn, (int, float)) and isinstance(hot, (int, float)) and 20 <= warn < hot <= 120):
-        s["warn_temp"], s["hot_temp"] = start["warn_temp"], start["hot_temp"]
+    for kind in ("cpu", "gpu"):
+        warn, hot = s[f"{kind}_warn_temp"], s[f"{kind}_hot_temp"]
+        if not (isinstance(warn, (int, float)) and isinstance(hot, (int, float)) and 20 <= warn < hot <= 120):
+            s[f"{kind}_warn_temp"], s[f"{kind}_hot_temp"] = start[f"{kind}_warn_temp"], start[f"{kind}_hot_temp"]
+    s.pop("warn_temp", None)                     # früher eine Ampel für beide – ersetzt durch die Werte oben
+    s.pop("hot_temp", None)
     if not (isinstance(s["window"], str) and re.fullmatch(r"\d+x\d+\+-?\d+\+-?\d+", s["window"])):
         s["window"] = start["window"]
     if s["effizienzmodus"] not in EFFIZIENZ:

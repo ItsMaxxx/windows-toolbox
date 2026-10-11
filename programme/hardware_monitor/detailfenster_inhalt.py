@@ -14,6 +14,8 @@ Die genauen Sensornamen stehen in der Ausgabe von `python hardware_monitor.py --
   Wert("GPU Core", typ="Takt")     typ nur nötig, wenn es den Namen mehrfach gibt
   Wert("Package", text="CPU gesamt")   eigene Beschriftung
   Wert("CPU Core #*", ohne="*Distance*")   Platzhalter, aber ohne die Namen, die hierzu passen
+  Abschnitt("Lüfter", Wert(...), Wert(...))   einklappbarer Unterpunkt in einer Gruppe
+  Abschnitt(..., eine_zeile=True)  gleichnamige Werte in einer Zeile (Fan #1: Drehzahl, dahinter % als Balken)
   Hardwaredaten()                  statt Gruppen: feste Daten wie Hersteller- und Produkt-IDs
 
 Die Namen unterscheiden sich je nach Hardware (AMD: „Core (Tctl/Tdie)“, Intel: „CPU Package“). Was es auf einem PC
@@ -23,7 +25,20 @@ der PC gar nicht hat (z. B. Mainboard-Sensoren am Laptop, Akku am Desktop), werd
 Gespeichert? Fenster schließen und wieder öffnen – die Änderungen sind sofort da.
 """
 
-from detailfenster import AlleSensoren, Gruppe, Hardwaredaten, Tab, Wert  # noqa: F401 (AlleSensoren siehe unten)
+from detailfenster import Abschnitt, AlleSensoren, Gruppe, Hardwaredaten, Tab, Wert  # noqa: F401 (AlleSensoren siehe unten)
+
+# Die Lüfter – eine Zeile je Lüfter: Drehzahl, dahinter die Ansteuerung als Balken. Stehen jeweils in zwei Tabs.
+# Mainboards benennen ihre Anschlüsse unterschiedlich („Fan #1“, „CPU Fan“, „Chassis Fan #2“, „Pump“ …).
+LUEFTER = Abschnitt("Lüfter",
+                    Wert("*Fan*", typ="Lüfter"),
+                    Wert("*Pump*", typ="Lüfter"),
+                    Wert("*Fan*", typ="Lüftersteuerung"),
+                    Wert("*Pump*", typ="Lüftersteuerung"),
+                    eine_zeile=True)
+GPU_LUEFTER = Abschnitt("Lüfter",
+                        Wert("GPU Fan*", typ="Lüfter"),
+                        Wert("GPU Fan*", typ="Lüftersteuerung"),
+                        eine_zeile=True)
 
 FENSTER = [
     Tab("Temperaturen",
@@ -35,7 +50,10 @@ FENSTER = [
         Gruppe("gpu",
                Wert("GPU Core", typ="Temperatur"),
                Wert("GPU Hot Spot"),
-               Wert("GPU Memory Junction"))),
+               Wert("GPU Memory Junction"),
+               GPU_LUEFTER),
+        Gruppe("mainboard",
+               LUEFTER)),
 
     Tab("CPU",
         Gruppe("cpu",
@@ -74,10 +92,9 @@ FENSTER = [
                Wert("GPU Memory Used"),
                Wert("GPU Memory Free"),
                Wert("GPU Memory Total"),
-               Wert("GPU Fan *", typ="Lüfter"),
-               Wert("GPU Fan *", typ="Lüftersteuerung"),
                Wert("GPU PCIe Rx"),
-               Wert("GPU PCIe Tx")),
+               Wert("GPU PCIe Tx"),
+               GPU_LUEFTER),
         Gruppe("gpu",                                   # Intel-Grafik: liefert nur Leistung und Windows-Werte
                Wert("GPU Power", typ="Leistung"),
                Wert("D3D 3D"),
@@ -108,15 +125,14 @@ FENSTER = [
                Wert("Motherboard"),
                Wert("VRM"),
                Wert("Auxiliary*"),
-               Wert("Fan #*", typ="Lüfter"),
-               Wert("Fan #*", typ="Lüftersteuerung"),
                Wert("Vcore"),
                Wert("+12V"),
                Wert("+5V"),
                Wert("+3.3V"),
                Wert("+3V Standby"),
                Wert("+1.8V"),
-               Wert("Chipset 1.05V"))),
+               Wert("Chipset 1.05V"),
+               LUEFTER)),
 
     Tab("Laufwerke",
         Gruppe("laufwerk",                              # jedes Laufwerk einzeln

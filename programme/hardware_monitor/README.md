@@ -86,7 +86,8 @@ ein zweiter Start beendet sich sofort.
   „Alles kopieren“ oben alle Bereiche – in der Übersicht je Bereich eine Zeile, darunter jedes Gerät mit einem Tab
   davor; in den Details als Text mit Computername und Datum, z. B. zum Einfügen in ein Forum.
 - **Rechtsklick aufs Icon**: Aktualisierungsrate der Icons (1–10 s) und des Fensters (0,5–5 s), Beenden.
-- **Zahlenfarbe**: grün, ab `warn_temp` gelb, ab `hot_temp` rot (Standard 60 / 80 °C).
+- **Zahlenfarbe**: grün, ab `…_warn_temp` gelb, ab `…_hot_temp` rot – getrennt für CPU (Standard 75 / 90 °C) und
+  GPU (70 / 83 °C). Im Detailfenster richten sich Mainboard und Laufwerke nach den CPU-Grenzen.
 
 ## Einstellungen
 
@@ -99,7 +100,8 @@ laufende Programm übernimmt die Werte sofort. Fehlende oder ungültige Werte be
 | `popup_interval` | `1` | Sekunden zwischen Messungen bei offenem Fenster (0.5, 1, 2, 5) |
 | `icon_order` | `["cpu", "gpu"]` | Reihenfolge der Icons – wirkt erst nach Neustart des Programms |
 | `cpu_sensor` / `gpu_sensor` | `"auto"` | Sensor im Icon; `auto` nimmt den ersten vorhandenen aus `CPU_SENSORS` bzw. `GPU_SENSORS` |
-| `warn_temp` / `hot_temp` | `60` / `80` | ab hier gelb bzw. rot |
+| `cpu_warn_temp` / `cpu_hot_temp` | `75` / `90` | CPU: ab hier gelb bzw. rot (auch Mainboard, Laufwerke) |
+| `gpu_warn_temp` / `gpu_hot_temp` | `70` / `83` | GPU: ab hier gelb bzw. rot |
 | `effizienzmodus` | `"auto"` | Effizienzmodus von Windows 11: `auto` = nur bei geschlossenem Fenster, `an` = immer, `aus` = nie |
 | `window` | `""` | Größe und Position des Detailfensters (setzt das Fenster selbst) |
 
@@ -122,6 +124,10 @@ Tab("GPU",
   `netzwerk`, `akku`, `weitere`. `name=` beschränkt eine Gruppe auf Geräte mit passendem Namen (z. B. `"Intel*"`).
 - `typ=` ist nur nötig, wenn es denselben Namen mehrfach gibt; `text=` setzt eine eigene Beschriftung; `ohne=` schließt
   Namen aus, die trotz `*` nicht dazugehören (`Wert("CPU Core #*", ohne="*Distance*")`).
+- `Abschnitt("Lüfter", Wert(...), ...)` in einer Gruppe ist ein einklappbarer Unterpunkt; mit `eine_zeile=True` stehen
+  gleichnamige Werte in einer Zeile (Fan #1: Drehzahl, dahinter die Ansteuerung als Balken mit %; dreht sich ein
+  angesteuerter Lüfter nicht, steht dort grau „steht“). Zugeklappte Bereiche bleiben zu, bis das
+  Programm beendet wird.
 - Die Namen hängen von der Hardware ab (AMD: `Core (Tctl/Tdie)`, Intel: `CPU Package`). Was es auf dem PC nicht gibt,
   wird nicht angezeigt – daher stehen die Namen für beide nebeneinander in der Datei.
 - Die genauen Namen zeigt `--list`. Den früheren Tab „Alles“ (alle Sensoren) kann man in `detailfenster_inhalt.py`

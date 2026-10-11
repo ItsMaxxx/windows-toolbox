@@ -51,6 +51,7 @@ class Gruppe:
             Hat der PC keins davon (z. B. keinen Akku), wird der Tab ausgeblendet.
     name:   nur Geräte, deren Name hierzu passt (* als Platzhalter), z. B. name="Total Memory"
     titel:  eigene Überschrift statt des Gerätenamens
+    werte:  Wert(...)-Zeilen und Abschnitt(...)e (einklappbare Unterpunkte, z. B. alle Lüfter)
     """
 
     def __init__(self, geraet, *werte, name="*", titel=None):
@@ -76,6 +77,39 @@ class Wert:
         return ((self.typ is None or s["type"] == self.typ)
                 and fnmatch.fnmatchcase(name, self.sensor.lower())
                 and not (self.ohne and fnmatch.fnmatchcase(name, self.ohne.lower())))
+
+
+class Abschnitt:
+    """Ein einklappbarer Unterpunkt in einer Gruppe, z. B. alle Lüfter. Ohne passende Sensoren fehlt er.
+
+    titel:      Beschriftung des Unterpunkts
+    werte:      Wert(...)-Zeilen wie in einer Gruppe
+    eine_zeile: Werte mit demselben Namen in EINER Zeile: der erste als Wert, der zweite als Balken mit Prozent
+                dahinter – z. B. Fan #1 mit Drehzahl und Ansteuerung. „Control“ im Namen zählt dabei nicht mit,
+                „Fan Control #1“ gehört also zu „Fan #1“.
+    """
+
+    def __init__(self, titel, *werte, eine_zeile=False):
+        self.titel, self.werte, self.eine_zeile = titel, werte, eine_zeile
+
+    def zeilen(self, sensors):
+        """[(Text, Sensor)] in Anzeigereihenfolge. Bei eine_zeile hat der Sensor unter "balken" den zweiten Wert."""
+        rows, gesehen = [], set()
+        for wert in self.werte:
+            for s in sensors:
+                if wert.passt(s) and s["id"] not in gesehen:     # passt zu zwei Mustern (*Fan*, *Pump*) -> nur einmal
+                    gesehen.add(s["id"])
+                    rows.append((wert.text or s["name"], s))
+        if not self.eine_zeile:
+            return rows
+        zeilen = {}                                      # Name ohne „Control“ -> [Text, Sensor]; dict hält die Reihenfolge
+        for text, s in rows:
+            name = re.sub(r"\s*\bControl\b", "", s["name"])
+            if name not in zeilen:
+                zeilen[name] = [text, s]
+            elif "balken" not in zeilen[name][1]:
+                zeilen[name][1] = {**zeilen[name][1], "balken": s}      # Kopie: der Snapshot bleibt unverändert
+        return [tuple(zeile) for zeile in zeilen.values()]
 
 
 class AlleSensoren:
@@ -138,18 +172,19 @@ def fmt_value(sensor_type, value):
 AMPEL = {"grau": (143, 163, 184), "gruen": (61, 220, 151), "gelb": (245, 196, 81), "rot": (255, 100, 100)}
 
 
-def temp_stufe(value, settings):
-    """"gruen", "gelb" oder "rot" je nach den Grenzen aus den Einstellungen ("grau" ohne Wert)."""
+def temp_stufe(value, settings, kind):
+    """"gruen", "gelb" oder "rot" je nach den Grenzen aus den Einstellungen ("grau" ohne Wert).
+    kind: "cpu" oder "gpu" – beide haben eigene Grenzen."""
     if value is None:
         return "grau"
-    if value < settings["warn_temp"]:
+    if value < settings[f"{kind}_warn_temp"]:
         return "gruen"
-    return "gelb" if value < settings["hot_temp"] else "rot"
+    return "gelb" if value < settings[f"{kind}_hot_temp"] else "rot"
 
 
-def temp_color(value, settings):
+def temp_color(value, settings, kind):
     """Ampelfarbe (RGB) für eine Temperatur – dieselbe in Tray-Icons und Fenster."""
-    return AMPEL[temp_stufe(value, settings)]
+    return AMPEL[temp_stufe(value, settings, kind)]
 
 
 def hex_color(rgb):
@@ -200,6 +235,11 @@ def ist_hwdaten(tab):
     return any(isinstance(g, Hardwaredaten) for g in tab.gruppen)
 
 
+def mit_prozent(tab):
+    """True, wenn im Tab Zeilen mit zwei Werten stehen (Abschnitt mit eine_zeile) – Balken bekommen dann „97 %“."""
+    return any(isinstance(w, Abschnitt) and w.eine_zeile for g in tab.gruppen for w in getattr(g, "werte", ()))
+
+
 def hwdaten_zeilen(daten, uebersicht=False):
     """Wie zeilen(), nur für den Tab Hardwaredaten: Bereich -> Gerät -> Felder. Felder stehen als "Info"-Sensor drin.
     uebersicht=True: nur Bereich -> Modellnamen, gleiche Geräte zusammengefasst („2× …“)."""
@@ -234,10 +274,20 @@ def zeilen(tab, snap):
                 continue
             if hw["geraet"] != gruppe.geraet or not fnmatch.fnmatchcase(hw["name"].lower(), gruppe.name.lower()):
                 continue
-            rows = [(wert.text or s["name"], s) for wert in gruppe.werte for s in hw["sensors"] if wert.passt(s)]
+            rows = []
+            for i, wert in enumerate(gruppe.werte):
+                if isinstance(wert, Abschnitt):                  # Unterpunkt mit eigenen Zeilen darunter
+                    unter = wert.zeilen(hw["sensors"])
+                    if unter:
+                        key = f"{head}|{wert.titel}"
+                        rows.append((key, head, wert.titel, None))
+                        rows += [(f"{key}|{j}", key, text, s) for j, (text, s) in enumerate(unter)]
+                else:
+                    rows += [(f"{head}|{i}|{j}", head, wert.text or s["name"], s)
+                             for j, s in enumerate(s for s in hw["sensors"] if wert.passt(s))]
             if rows:
                 result.append((head, "", gruppe.titel or hw["name"], None))
-                result += [(f"{head}|{i}", head, text, s) for i, (text, s) in enumerate(rows)]
+                result += rows
     return result
 
 
@@ -293,6 +343,7 @@ class Detailfenster:
         self.tabs = []                                   # [(Tab, Treeview)]
         self.ausgeblendet_fuer = None                    # vorhandene Geräte, nach denen Tabs zuletzt ausgeblendet wurden
         self.signatur = {}                               # je Treeview: Aufbau beim letzten Zeichnen
+        self.zugeklappt = {}                             # je Treeview: Schlüssel der zugeklappten Bereiche
         self.sensoren = {}                               # Zeilen-Schlüssel -> Sensor (für die Erklärung)
         self.kopierbar = {}                              # Zeilen-Schlüssel -> (Spalte, Text), den ein Klick kopiert
         self.druck = None                                # gedrückte Maustaste in der Liste: Klick oder Ziehen?
@@ -418,7 +469,7 @@ class Detailfenster:
             self.notebook.forget(tab_frame)
         for _, tree in self.tabs:
             tree.master.destroy()
-        self.tabs, self.signatur = [], {}
+        self.tabs, self.signatur, self.zugeklappt = [], {}, {}
         self.ausgeblendet_fuer = None                    # neue Tabs sind alle sichtbar
 
         self.knoepfe = {}
@@ -451,7 +502,10 @@ class Detailfenster:
             else:
                 tree.column("#0", width=self.px(250), stretch=True)
                 tree.column("wert", width=self.px(100), stretch=False, anchor="e")
-                tree.column("balken", width=self.px(100), stretch=False, anchor="center")
+                if mit_prozent(tab):                     # Balken mit „97 %“ dahinter: breiter, alle Balken links
+                    tree.column("balken", width=self.px(140), stretch=False, anchor="w")
+                else:
+                    tree.column("balken", width=self.px(100), stretch=False, anchor="center")
             tree.tag_configure("bereich", foreground=SUB, font=("Segoe UI Semibold", 9))
             tree.tag_configure("gruppe", font=SCHRIFT_GRUPPE)
             tree.tag_configure("typ", foreground=SUB, font=("Segoe UI", 8))
@@ -568,7 +622,7 @@ class Detailfenster:
         for kind, label in self.kopf.items():
             value = self.app.current.get(kind)
             label.configure(text="–" if value is None else f"{value:.0f} °C",
-                            foreground=hex_color(temp_color(value, self.app.settings)))
+                            foreground=hex_color(temp_color(value, self.app.settings, kind)))
 
         tab, tree = self.aktiver_tab()
         info = ist_hwdaten(tab)
@@ -595,6 +649,10 @@ class Detailfenster:
 
         signatur = [(key, parent, text) for key, parent, text, _ in rows] or [leer]
         if signatur != self.signatur.get(tree):
+            zu = self.zugeklappt.setdefault(tree, set())  # zugeklappte Bereiche bleiben zu (z. B. nach einem Tabwechsel)
+            for key in sichtbare_zeilen(tree):
+                if tree.get_children(key):
+                    (zu.add if not tree.item(key, "open") else zu.discard)(key)
             tree.delete(*tree.get_children())
             for key, parent, text, sensor in rows:
                 if sensor:
@@ -603,7 +661,7 @@ class Detailfenster:
                     tag = ("bereich",) if info else ("gruppe",)
                 else:                                    # zweite Ebene: Sensortyp – bei Hardwaredaten das Gerät
                     tag = ("gruppe",) if info else ("typ",)
-                tree.insert(parent, "end", iid=key, text=text, open=True, tags=tag)
+                tree.insert(parent, "end", iid=key, text=text, open=key not in zu, tags=tag)
             if not rows:
                 tree.insert("", "end", iid="leer", text=leer, tags=("hinweis",))
             self.signatur[tree] = signatur
@@ -612,6 +670,7 @@ class Detailfenster:
                 self.knoepfe_bauen(tree, [(key, text) for key, parent, text, _ in rows if not parent])
 
         self.sensoren, self.kopierbar = {}, {}
+        geraet_von = {s["id"]: hw["geraet"] for hw in snap["hardware"] for s in hw["sensors"]}
         for key, _, text, sensor in rows:
             if sensor is None:
                 if "gruppe" in tree.item(key, "tags"):  # Gerätename -> Klick darauf kopiert ihn
@@ -625,9 +684,17 @@ class Detailfenster:
             is_temp = (sensor["type"] == "Temperature"
                        and not any(fnmatch.fnmatchcase(sensor["name"], m) for m in OHNE_AMPEL))
             wert = fmt_value(sensor["type"], sensor["value"])
+            leiste = balken(sensor["value"]) if sensor["type"] in BAR_TYPES else ""
+            # Grafikkarte nach den GPU-Grenzen, alles andere (CPU, Mainboard, Laufwerke …) nach den CPU-Grenzen
+            kind = "gpu" if geraet_von.get(sensor["id"]) == "gpu" else "cpu"
+            tags = (temp_stufe(sensor["value"], self.app.settings, kind),) if is_temp else ()
+            neben = sensor.get("balken")                 # zweiter Wert in derselben Zeile, z. B. Lüfter-Ansteuerung
+            if neben:
+                leiste = f"{balken(neben['value'])}  {fmt_value(neben['type'], neben['value'])}"
+                if sensor["type"] == "Fan" and sensor["value"] == 0:
+                    wert, tags = "steht", ("grau",)      # angesteuert, dreht sich aber nicht (oder nichts angeschlossen)
             self.kopierbar[key] = ("#1", wert)           # Messwert, so wie er gerade dasteht
-            tree.item(key, values=(wert, balken(sensor["value"]) if sensor["type"] in BAR_TYPES else ""),
-                      tags=(temp_stufe(sensor["value"], self.app.settings),) if is_temp else ())
+            tree.item(key, values=(wert, leiste), tags=tags)
 
     def erklaeren(self, tree, event):
         """Maus über der Liste (event None = verlassen): Hand-Cursor genau über kopierbaren Werten, in der Fußzeile
@@ -643,6 +710,11 @@ class Detailfenster:
                     f"{erklaerung + ' ' if erklaerung else ''}Klick auf den Wert kopiert ihn.")
         elif sensor:
             text = f"{sensor['name']}: {erklaere(sensor, self.inhalt)}"
+            if sensor.get("balken"):
+                text += f" Der Balken: {erklaere(sensor['balken'], self.inhalt)}"
+            if sensor.get("balken") and sensor["type"] == "Fan" and sensor["value"] == 0:
+                text += (" „steht“: Der Anschluss wird angesteuert, aber nichts dreht sich – meist ist dort kein "
+                         "Lüfter angeschlossen, oder er stoppt gerade im Leerlauf.")
         elif key in self.kopierbar:
             text = f"Klick auf den Namen kopiert „{self.kopierbar[key][1]}“."
         else:
@@ -725,6 +797,9 @@ class Detailfenster:
         """Eine Zeile zum Kopieren: „Feld: Wert“ – Überschriften (Gerät, Bereich, Sensortyp) nur mit ihrem Namen."""
         spalte, wert = self.kopierbar.get(key, (None, None))
         name = tree.item(key, "text")
+        neben = self.sensoren.get(key, {}).get("balken")
+        if neben:                                        # z. B. „Fan #2: 2523 RPM, 97 %“
+            wert = f"{wert}, {fmt_value(neben['type'], neben['value'])}"
         return f"{name}: {wert}" if spalte == "#1" else name
 
     def auswahl_kopieren(self):

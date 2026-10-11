@@ -145,8 +145,12 @@ class HardwareMonitorPage(ToolPage):
                     Combo("Sensor im GPU-Icon", "gpu_sensor", GPU_CHOICES, names=AUTO),
                     Text("Eigene Namen kannst du eintippen (siehe hardware_monitor.py --list). "
                          "Gibt es den Sensor nicht, wird automatisch gewählt."),
-                    Slider("Gelb ab {} °C", "warn_temp", 40, 100, color=WARN),
-                    Slider("Rot ab {} °C", "hot_temp", 41, 110, color=BAD)),
+                    Text("Farbe der Temperaturen – getrennt, weil CPUs unter Last deutlich heißer werden dürfen als "
+                         "Grafikkarten. Mainboard und Laufwerke im Detailfenster richten sich nach der CPU."),
+                    Slider("CPU gelb ab {} °C", "cpu_warn_temp", 40, 100, color=WARN),
+                    Slider("CPU rot ab {} °C", "cpu_hot_temp", 41, 110, color=BAD),
+                    Slider("GPU gelb ab {} °C", "gpu_warn_temp", 40, 100, color=WARN),
+                    Slider("GPU rot ab {} °C", "gpu_hot_temp", 41, 110, color=BAD)),
             Section("Detailfenster",
                     Text("Welche Werte im Detailfenster stehen, legst du in detailfenster_inhalt.py fest – "
                          "eine Zeile pro Wert. Änderungen erscheinen beim nächsten Öffnen des Fensters, "
@@ -164,12 +168,14 @@ class HardwareMonitorPage(ToolPage):
 
     def on_change(self, key, value):
         # gelb muss immer unter rot liegen – den anderen Regler notfalls mitziehen
-        if key == "warn_temp" and value >= self.data["hot_temp"]:
-            self.data["hot_temp"] = value + 1
-            self.refresh("hot_temp")
-        elif key == "hot_temp" and value <= self.data["warn_temp"]:
-            self.data["warn_temp"] = value - 1
-            self.refresh("warn_temp")
+        kind, _, art = key.partition("_")                # z. B. "cpu", "warn_temp"
+        warn, hot = f"{kind}_warn_temp", f"{kind}_hot_temp"
+        if art == "warn_temp" and value >= self.data[hot]:
+            self.data[hot] = value + 1
+            self.refresh(hot)
+        elif art == "hot_temp" and value <= self.data[warn]:
+            self.data[warn] = value - 1
+            self.refresh(warn)
         elif key == "icon_order":
             self.update_order_hint()
 

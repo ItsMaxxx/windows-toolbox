@@ -357,7 +357,7 @@ def make_icon(kind, value):
     d = ImageDraw.Draw(img)
     text = "--" if value is None else f"{value:.0f}"
     font = FONT_BIG if len(text) <= 2 else FONT_SMALL
-    d.text((32, 27), text, font=font, fill=temp_color(value, SETTINGS), anchor="mm")
+    d.text((32, 27), text, font=font, fill=temp_color(value, SETTINGS, kind), anchor="mm")
     d.rounded_rectangle([8, 55, 56, 63], radius=4, fill=STRIPE[kind])
     return img
 
