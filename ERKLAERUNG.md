@@ -856,7 +856,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File setup\setup.ps1 %*
 | (ohne) | Einrichten |
 | `-Entfernen` | Gegenstück |
 | `-OhneAdmin` | Einrichten ohne Schritt 5 und 6 |
-| `-Neustart` | lief der Hardware-Monitor, ihn in Schritt 6 auf jeden Fall neu starten (nach einem Update) |
+| `-Neustart` | lief der Hardware-Monitor, ihn in Schritt 6 auf jeden Fall neu starten – übergeben „Aktualisieren“ und „Neu einrichten“ in den Toolbox-Einstellungen |
 | `-Admin a,b` | INTERN: der Teil, der Adminrechte braucht. Das Skript startet sich dafür selbst noch einmal mit UAC-Abfrage (Funktion `Als-Admin`) und wartet auf dessen Ende/Exitcode. |
 
 Oben stehen Variablen für Pfade und Konstanten (`$Aufgabe = 'HardwareMonitor'`, `$IpcPort = 47815`,
@@ -1109,9 +1109,11 @@ Bereich „Aktualisieren“:
   | `git rev-list --count HEAD..@{upstream}` | wie viele davon sind neu? 0 → „Schon auf dem neuesten Stand“ |
   | `git pull --ff-only` | nur „vorspulen“ – eigene Commits oder Änderungen werden nie zusammengeführt oder überschrieben; passt es nicht, bricht git ab und die Meldung erscheint |
 
-  Gab es Neues, startet `os.startfile()` `Einrichten.cmd -Neustart` in einem eigenen Konsolenfenster (wie ein
-  Doppelklick). Das Setup beendet die Toolbox per „quit“, bringt `runtime\` auf den Stand von `requirements.txt`,
-  startet den Hardware-Monitor neu (`-Neustart`) und zum Schluss die Toolbox.
+  Gab es Neues, startet `os.startfile()` `Setup.exe -Neustart` in einem eigenen Konsolenfenster (wie ein
+  Doppelklick) – dasselbe macht der Knopf „Neu einrichten“, nur ohne git. Das Setup beendet die Toolbox per „quit“,
+  bringt `runtime\` auf den Stand von `requirements.txt`, stellt alles wie vorher (Schritt 6: Autostart, laufender
+  Hardware-Monitor neu gestartet) und startet zum Schluss die Toolbox. Hat alles geklappt, schließt sich das Fenster
+  nach 5 s von selbst; bei gelben Warnungen oder einem Fehler bleibt es offen, bis man eine Taste drückt.
 - `git()` führt git unsichtbar im Hauptordner aus (`git -C <Ordner> …` über `winutil.run_hidden`).
 
 → Ein neues Tool mit eigenem Programm muss für „Toolbox und alle Programme“ nichts an `toolbox.py` ändern – es gibt

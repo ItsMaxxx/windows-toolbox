@@ -227,7 +227,9 @@ class GuiSettingsPage(ToolPage):
             Section("Aktualisieren",
                     Text("●  Prüfe Stand …", name="stand"),
                     Buttons(Button("Aktualisieren", self.aktualisieren, name="update"),
-                            label="Neuester Stand von GitHub", info=UPDATE_INFO)),
+                            label="Neuester Stand von GitHub", info=UPDATE_INFO),
+                    Buttons(Button("Neu einrichten", self.neu_einrichten, name="setup", style="grau"),
+                            label="Ohne Update, z. B. zum Reparieren", info=NEU_EINRICHTEN_INFO)),
             Section("Info", Text(f"Toolbox {VERSION}\nEinstellungen und Logs: {daten.DATEN_DIR}")),
         ]
 
@@ -327,8 +329,7 @@ class GuiSettingsPage(ToolPage):
         self.app.run_async(git_stand, zeigen)
 
     def aktualisieren(self):
-        """git pull; gab es Neues, danach Setup.exe -Neustart in einem eigenen Fenster. Das beendet die Toolbox,
-        bringt runtime\\ auf den Stand von requirements.txt und startet Toolbox und Hardware-Monitor neu."""
+        """git pull; gab es Neues, danach Setup.exe (setup_starten)."""
         self.enable("update", False)
         self.w["stand"].configure(text="●  Suche nach Updates …", text_color=MUTED)
 
@@ -341,16 +342,24 @@ class GuiSettingsPage(ToolPage):
                 self.app.toast("Schon auf dem neuesten Stand ✓")
                 self.stand_pruefen()
             else:
-                self.w["stand"].configure(text=f"●  {neu} neue Änderung(en) geholt – Setup.exe läuft …",
-                                          text_color=GOOD)
-                try:
-                    os.startfile(str(SETUP_EXE), arguments="-Neustart", cwd=str(SETUP_EXE.parent))
-                except OSError:
-                    logging.exception("Setup.exe konnte nicht gestartet werden")
-                    self.w["stand"].configure(text="●  Code ist aktuell, aber Setup.exe startete nicht – "
-                                                   "bitte selbst ausführen.", text_color=BAD)
+                self.setup_starten(f"●  {neu} neue Änderung(en) geholt – Setup.exe läuft …")
 
         self.app.run_async(git_holen, done)
+
+    def neu_einrichten(self):
+        """Wie nach einem Update, nur ohne git pull (siehe NEU_EINRICHTEN_INFO)."""
+        self.setup_starten("●  Setup.exe läuft …")
+
+    def setup_starten(self, text):
+        """Setup.exe -Neustart in einem eigenen Fenster. Das beendet die Toolbox, bringt runtime\\ auf den Stand von
+        requirements.txt, stellt alles wie vorher (Autostart, Einstellungen) und startet neu, was lief."""
+        self.w["stand"].configure(text=text, text_color=GOOD)
+        try:
+            os.startfile(str(SETUP_EXE), arguments="-Neustart", cwd=str(SETUP_EXE.parent))
+        except OSError:
+            logging.exception("Setup.exe konnte nicht gestartet werden")
+            self.w["stand"].configure(text="●  Setup.exe startete nicht – bitte Setup.exe im Hauptordner "
+                                           "doppelklicken.", text_color=BAD)
 
 
 UPDATE_INFO = (
@@ -361,6 +370,12 @@ UPDATE_INFO = (
     "Alles, was du eingestellt hast, ist danach wie vorher: Einstellungen in daten\\, Autostart an oder aus, "
     "gestoppte Programme bleiben gestoppt. Eigene Änderungen am Code bleiben unangetastet: Passen sie nicht zum "
     "neuen Stand, bricht das Update mit einer Meldung ab."
+)
+NEU_EINRICHTEN_INFO = (
+    "Führt Setup.exe aus wie nach einem Update, nur ohne etwas von GitHub zu holen – z. B. wenn etwas nicht mehr "
+    "startet oder nach dem Verschieben des Ordners.\n\n"
+    "Die Toolbox schließt sich kurz und kommt von selbst wieder. Alles, was du eingestellt hast, ist danach wie "
+    "vorher: Einstellungen, Autostart an oder aus, laufende Programme laufen wieder, gestoppte bleiben gestoppt."
 )
 NUR_TOOLBOX_INFO = (
     "•  Neu starten: schließt die Toolbox und öffnet sie gleich wieder – z. B. nach einem Update.\n"

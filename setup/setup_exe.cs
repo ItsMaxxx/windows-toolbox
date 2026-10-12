@@ -9,7 +9,8 @@
 //   - Konsole auf UTF-8, damit Umlaute richtig erscheinen (früher chcp 65001)
 //   - PSModulePath leeren: Aus einem PowerShell-7-Terminal gestartet, würde powershell.exe (5.1) sonst dessen Module
 //     erben und z. B. Get-FileHash nicht finden
-//   - am Ende auf eine Taste warten – aber nur, wenn das Fenster extra für uns aufging (Doppelklick), nicht im Terminal
+//   - am Ende, wenn das Fenster extra für uns aufging (Doppelklick, Toolbox), nicht im Terminal: hat alles geklappt,
+//     schließt es sich nach 5 s von selbst – bei Warnungen oder Fehlern wartet es auf eine Taste
 // Läuft ohne Adminrechte (asInvoker); setup.ps1 holt sie selbst per UAC, nur für die Schritte, die sie brauchen.
 
 using System;
@@ -18,6 +19,7 @@ using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 
 #if ENTFERNEN
 [assembly: AssemblyTitle("Toolbox entfernen")]
@@ -68,12 +70,25 @@ static class SetupExe
         }
 
         // Nur wir (und evtl. powershell, schon beendet) hängen an der Konsole -> sie ging für uns auf und schlösse
-        // sich sofort wieder. Dann warten, damit man das Ergebnis lesen kann.
+        // sich sofort wieder. Hat alles geklappt (Code 0), noch kurz stehen lassen und dann von selbst schließen;
+        // sonst (Warnungen: 2, Abbruch: 1) auf eine Taste warten, damit man lesen kann, was los war.
         if (GetConsoleProcessList(new uint[8], 8) <= 1)
         {
             Console.WriteLine();
-            Console.Write("Taste drücken zum Schließen …");
-            Console.ReadKey(true);
+            if (code == 0)
+            {
+                for (int s = 5; s > 0 && !Console.KeyAvailable; s--)
+                {
+                    Console.Write("\rDas Fenster schließt sich in " + s + " s (Taste drücken: sofort) ");
+                    for (int i = 0; i < 10 && !Console.KeyAvailable; i++)
+                        Thread.Sleep(100);
+                }
+            }
+            else
+            {
+                Console.Write("Taste drücken zum Schließen …");
+                Console.ReadKey(true);
+            }
         }
         return code;
     }

@@ -38,7 +38,7 @@ entfernt.) Danach alles, was nach dem Klonen fehlt:
   -OhneAdmin        nur Schritte 1–4, ohne UAC-Abfrage
   -Neustart         ohne Fenster, die eingerichteten Programme wie bisher; lief der Hardware-Monitor, ihn in
                     Schritt 6 auf jeden Fall neu starten, damit er neuen Code lädt (nach einem Update –
-                    „Aktualisieren“ in den Toolbox-Einstellungen übergibt das)
+                    „Aktualisieren“ und „Neu einrichten“ in den Toolbox-Einstellungen übergeben das)
 
 -Entfernen – das Gegenstück: Toolbox und Hardware-Monitor beenden, Aufgabe löschen, auf Wunsch alles Erzeugte und
   Heruntergeladene löschen (runtime\, Starter, Downloads). daten\ bleibt.
@@ -135,7 +135,8 @@ $GuiPort   = $Toolbox.port                       # Fernsteuerung der Toolbox
 function Schritt($text) { Write-Host ""; Write-Host "== $text" -ForegroundColor Cyan }
 function Ok($text)      { Write-Host "   [OK] $text" -ForegroundColor Green }
 function Info($text)    { Write-Host "   $text" }
-function Warnung($text) { Write-Host "   [!] $text" -ForegroundColor Yellow }
+$Warnungen = 0                                   # gezählt: mit Warnungen bleibt das Fenster am Ende offen
+function Warnung($text) { $script:Warnungen++; Write-Host "   [!] $text" -ForegroundColor Yellow }
 
 function Monitor-Befehl($befehl) {
     <# Schickt einen Befehl an den laufenden Hardware-Monitor (wie ipc() in hardware_monitor_gui.py) – $null, wenn er
@@ -191,8 +192,12 @@ function Als-Admin($schritte) {
     <# Startet dieses Skript mit -Admin nach einer UAC-Abfrage noch einmal. $true, wenn dort alles geklappt hat. #>
     Info 'Windows fragt jetzt nach Adminrechten …'
     try {
-        $p = Start-Process powershell.exe -Verb RunAs -Wait -PassThru -ArgumentList '-NoProfile',
+        # Ohne -Wait: Das wartet in Windows PowerShell auch auf alles, was der Admin-Durchlauf startet – nach
+        # monitor-starten also auf den Hardware-Monitor, d. h. ewig. WaitForExit wartet nur auf das Fenster selbst.
+        $p = Start-Process powershell.exe -Verb RunAs -PassThru -ArgumentList '-NoProfile',
             '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"", '-Admin', ($schritte -join ',')
+        $null = $p.Handle                         # Handle gleich holen, sonst fehlt am Ende der ExitCode
+        $p.WaitForExit()
         return $p.ExitCode -eq 0
     } catch {
         Warnung 'Adminrechte abgelehnt.'
@@ -519,7 +524,9 @@ function Einrichten {
     }
 
     Write-Host ""
-    if ($toolboxLief) {
+    if ($script:Warnungen) {
+        Write-Host "Fertig, aber nicht alles hat geklappt – siehe die gelben [!]-Zeilen oben." -ForegroundColor Yellow
+    } elseif ($toolboxLief) {
         Write-Host "Fertig. Die Toolbox wurde wieder gestartet." -ForegroundColor Green
     } else {
         Write-Host "Fertig. Die Toolbox startest du mit Toolbox.exe." -ForegroundColor Green
@@ -785,3 +792,6 @@ if ($Admin) { exit $(if (Admin-Schritte ($Admin -split ',')) { 0 } else { 1 }) }
 elseif ($Entfernen -and $Programme) { Programme-Entfernen }
 elseif ($Entfernen) { Entfernen }
 else { Einrichten }
+# Exit-Code für Setup.exe/Uninstall.exe: 0 = alles geklappt -> Fenster schließt sich von selbst; 2 = fertig, aber mit
+# Warnungen -> bleibt offen, damit man sie lesen kann (1 = abgebrochen, das macht PowerShell bei einem Fehler selbst)
+exit $(if ($Warnungen) { 2 } else { 0 })
