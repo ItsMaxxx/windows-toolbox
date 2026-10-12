@@ -27,6 +27,8 @@ import socket
 import subprocess
 import sys
 import threading
+import time
+import tkinter as tk
 import webbrowser
 from pathlib import Path
 from tkinter import messagebox
@@ -43,7 +45,7 @@ sys.path.insert(0, str(APP_DIR))           # damit base, winutil usw. gefunden w
 
 import daten  # noqa: E402
 import winutil  # noqa: E402
-from base import (BAD, BAR, BORDER, GOOD, HOVER, MUTED, SELECTED, TEXT, Button, Buttons, Choice,  # noqa: E402
+from base import (BAD, BAR, BORDER, CARD, GOOD, HOVER, MUTED, SELECTED, TEXT, Button, Buttons, Choice,  # noqa: E402
                   Section, Switch, Text, ToolInfo, ToolPage, Tooltip, apply_font, apply_theme)
 
 CATEGORIES = ["Allgemein", "Games"]     # Tabs oben, in dieser Reihenfolge
@@ -63,9 +65,11 @@ INSTALLIERT_FILE = daten.einstellungen("installiert")
 GUI_PORT = AUSWEIS["port"]       # ein zweiter Start holt nur das laufende Fenster nach vorne; setup.ps1 sagt "quit"
 
 APPEARANCE = {"Hell": "light", "Dunkel": "dark", "System": "system"}
+ZOOM_STUFEN = [0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0]    # Strg + Mausrad, Stufen wie im Browser
 DEFAULT_SETTINGS = {
     "appearance": "Dunkel",
     "close_to_tray": True,
+    "zoom": 1.0,
 }
 
 logging.basicConfig(filename=daten.log("toolbox"), level=logging.INFO,
@@ -125,6 +129,8 @@ def load_settings():
         settings["appearance"] = DEFAULT_SETTINGS["appearance"]
     if not isinstance(settings["close_to_tray"], bool):
         settings["close_to_tray"] = DEFAULT_SETTINGS["close_to_tray"]
+    if settings["zoom"] not in ZOOM_STUFEN:
+        settings["zoom"] = DEFAULT_SETTINGS["zoom"]
     return settings
 
 
@@ -197,7 +203,11 @@ class GuiSettingsPage(ToolPage):
 
     def layout(self):
         return [
-            Section("Darstellung", Choice("Design", "appearance", list(APPEARANCE))),
+            Section("Darstellung",
+                    Choice("Design", "appearance", list(APPEARANCE)),
+                    Text("Größer oder kleiner: Strg + Mausrad. Mausrad-Klick scrollt wie im Browser – Maus hoch oder "
+                         "runter bewegen, nochmal klicken beendet. Oder die Seite mit der linken Maustaste "
+                         "anfassen und ziehen.")),
             Section("Fenster",
                     Switch("Beim Schließen in den Infobereich minimieren", key="close_to_tray"),
                     Text("Die Toolbox läuft dann unten rechts als Symbol weiter. Doppelklick bzw. Klick öffnet sie "
@@ -363,11 +373,219 @@ ALLE_INFO = (
 )
 
 
+# ---------- Seite mit der Maus scrollen (zusätzlich zum Mausrad) ----------
+class Scrollen:
+    """Zwei Arten, die sichtbare Seite mit der Maus zu scrollen:
+
+    Mausrad-Klick wie im Browser: Ein Symbol markiert die Stelle; je weiter die Maus darüber bzw. darunter steht,
+    desto schneller scrollt die Seite.
+      kurz klicken                scrollt weiter bis zum nächsten Klick (oder Esc bzw. Mausrad)
+      gedrückt halten + ziehen    scrollt nur, bis die Taste losgelassen wird
+    Solange es läuft, gehen alle Mausklicks an das Symbol (grab) – der Klick zum Beenden löst also nichts aus.
+
+    Linksklick + ziehen wie am Handy: Die Seite folgt der Maus; mit Schwung losgelassen gleitet sie noch etwas weiter.
+    Nur auf freien Flächen und Texten – Knöpfe, Schalter, Regler, Eingabefelder usw. funktionieren wie gewohnt."""
+    TOTZONE = 12            # px um die Startstelle, in denen nichts scrollt bzw. ein Klick noch kein Ziehen ist
+    TEMPO = 0.12            # Mausrad-Klick: px pro Schritt je px Abstand außerhalb der Totzone
+    TAKT = 16               # ms je Schritt (~60 pro Sekunde)
+    ANLAUF = 0.3            # s – so lange darf der Fokus nach dem Klick noch fehlen (Fenster wird gerade aktiv)
+    REIBUNG = 0.94          # Schwung: so viel Tempo bleibt pro Schritt übrig
+    MIN_SCHWUNG = 300       # px/s – langsamer losgelassen bleibt die Seite einfach stehen
+    DURCHSICHTIG = "#010203"    # Hintergrund des Symbols, wird unsichtbar – so bleibt nur der Kreis
+    # Darauf startet Linksklick + ziehen nicht – die brauchen die Maus selbst
+    BEDIENELEMENTE = (ctk.CTkButton, ctk.CTkSegmentedButton, ctk.CTkSwitch, ctk.CTkSlider, ctk.CTkEntry,
+                      ctk.CTkComboBox, ctk.CTkOptionMenu, ctk.CTkCheckBox, ctk.CTkRadioButton, ctk.CTkTextbox,
+                      tk.Entry, tk.Text, tk.Button, tk.Scale)
+
+    def __init__(self, app):
+        self.app = app
+        self.symbol = None                       # Symbol des Mausrad-Klicks, solange der läuft
+        self.job = None                          # nächster Schritt (Mausrad-Klick oder Schwung)
+        self.gefasst = False                     # Linksklick auf der Seite, Taste noch unten
+        self.zieht = False                       # … und schon weiter als die Totzone gezogen
+        app.bind_all("<ButtonPress-2>", self.mitte_druecken, add="+")
+        app.bind_all("<ButtonRelease-2>", self.mitte_loslassen, add="+")
+        app.bind_all("<ButtonPress-1>", self.links_druecken, add="+")
+        app.bind_all("<B1-Motion>", self.links_ziehen, add="+")
+        app.bind_all("<ButtonRelease-1>", self.links_loslassen, add="+")
+        app.bind_all("<ButtonPress>", lambda e: self.stop(), add="+")         # z. B. Rechtsklick beendet
+        app.bind_all("<MouseWheel>", lambda e: self.stop(), add="+")
+        app.bind_all("<Escape>", lambda e: self.stop(), add="+")
+
+    # --- gemeinsam ---
+    def canvas_unter(self, widget):
+        """Canvas der sichtbaren Seite, wenn widget darauf liegt und es etwas zu scrollen gibt – sonst None.
+        Darin verschiebt CTkScrollableFrame den Inhalt der Seite."""
+        seite = self.app.current_page
+        if not isinstance(seite, ToolPage) or isinstance(widget, str):      # str: Tk-internes Fenster
+            return None
+        canvas = seite._parent_canvas
+        w = widget
+        while w is not None and w is not canvas:
+            w = w.master
+        if w is None or canvas.yview() == (0.0, 1.0):     # nicht auf der Seite bzw. passt ganz ins Fenster
+            return None
+        return canvas
+
+    def beginnen(self, canvas, event):
+        self.canvas = canvas
+        self.skalierung = ctk.ScalingTracker.get_widget_scaling(self.app)
+        self.start_x, self.start_y = event.x_root, event.y_root
+        self.start_zeit = time.monotonic()
+        self.position = canvas.yview()[0]        # als Kommazahl mitführen – sonst bleibt langsames Scrollen hängen
+
+    def verschieben(self, px):
+        """Seite um px weiter nach unten scrollen (negativ: nach oben). False, wenn sie dabei am Ende anstößt."""
+        oben, unten = self.canvas.yview()
+        sichtbar = unten - oben                  # Anteil der Seite im Fenster – daraus: px → Anteil
+        self.position += px * sichtbar / max(self.canvas.winfo_height(), 1)
+        ziel = min(max(self.position, 0.0), 1.0 - sichtbar)
+        frei = ziel == self.position
+        self.position = ziel
+        self.canvas.yview_moveto(ziel)
+        return frei
+
+    def stop(self):
+        """Mausrad-Klick-Scrollen bzw. Schwung beenden."""
+        if self.job:
+            self.app.after_cancel(self.job)
+            self.job = None
+        if self.symbol:
+            self.symbol.grab_release()
+            self.symbol.destroy()
+            self.symbol = None
+            self.app.configure(cursor="")
+
+    # --- Mausrad-Klick ---
+    def mitte_druecken(self, event):
+        if self.symbol:
+            self.stop()
+            return
+        self.stop()
+        canvas = self.canvas_unter(event.widget)
+        if canvas is None:
+            return
+        self.beginnen(canvas, event)
+        self.bewegt = False
+        self.symbol_zeigen()
+        self.job = self.app.after(self.TAKT, self.schritt)
+
+    def mitte_loslassen(self, event):
+        if self.symbol and self.bewegt:          # gedrückt gehalten und gezogen – beim Loslassen ist Schluss
+            self.stop()
+
+    def symbol_zeigen(self):
+        """Kreis mit Pfeilen hoch/runter an der Startstelle – schlichtes tk wie beim Tooltip."""
+        dunkel = ctk.get_appearance_mode() == "Dark"
+        farbe = lambda paar: paar[1] if dunkel else paar[0]         # noqa: E731
+        g = round(30 * self.skalierung)
+        self.symbol = symbol = tk.Toplevel(self.app)
+        symbol.withdraw()
+        symbol.overrideredirect(True)
+        symbol.attributes("-topmost", True)
+        symbol.attributes("-transparentcolor", self.DURCHSICHTIG)
+        bild = tk.Canvas(symbol, width=g, height=g, bg=self.DURCHSICHTIG, highlightthickness=0,
+                         cursor="sb_v_double_arrow")
+        bild.pack()
+        bild.create_oval(1, 1, g - 2, g - 2, fill=farbe(CARD), outline=farbe(MUTED),
+                         width=max(1, round(self.skalierung)))
+        m, b = g / 2, g * 0.16                   # Mitte, halbe Pfeilbreite
+        bild.create_polygon(m, g * 0.14, m - b, g * 0.36, m + b, g * 0.36, fill=farbe(TEXT))
+        bild.create_polygon(m, g * 0.86, m - b, g * 0.64, m + b, g * 0.64, fill=farbe(TEXT))
+        symbol.geometry(f"+{self.start_x - g // 2}+{self.start_y - g // 2}")
+        symbol.deiconify()
+        self.app.configure(cursor="sb_v_double_arrow")
+        self.festhalten()
+
+    def festhalten(self):
+        """Alle Mausklicks ans Symbol – klappt erst, wenn Windows es angezeigt hat, sonst gleich noch mal."""
+        if not self.symbol:
+            return
+        try:
+            self.symbol.grab_set()
+        except tk.TclError:
+            self.symbol.after(20, self.festhalten)
+
+    def schritt(self):
+        if not self.app.tk.call("focus") and time.monotonic() - self.start_zeit > self.ANLAUF:
+            self.job = None
+            self.stop()                          # anderes Programm im Vordergrund (z. B. Alt+Tab ins Spiel)
+            return
+        x, y = self.app.winfo_pointerxy()
+        totzone = self.TOTZONE * self.skalierung
+        if abs(x - self.start_x) > totzone or abs(y - self.start_y) > totzone:
+            self.bewegt = True
+        abstand = y - self.start_y
+        tempo = max(abs(abstand) - totzone, 0) * self.TEMPO
+        if tempo:
+            self.verschieben(tempo if abstand > 0 else -tempo)
+        self.job = self.app.after(self.TAKT, self.schritt)
+
+    # --- Linksklick + ziehen ---
+    def links_druecken(self, event):
+        if self.symbol:                          # Mausrad-Klick-Scrollen läuft – dieser Klick beendet es nur
+            self.stop()
+            return
+        self.stop()                              # gleitet die Seite noch, hält ein Klick sie an
+        canvas = self.canvas_unter(event.widget)
+        if canvas is None or self.ist_bedienelement(event.widget, canvas):
+            return
+        self.beginnen(canvas, event)
+        self.gefasst, self.zieht = True, False
+        self.letztes_y = event.y_root
+        self.verlauf = [(self.start_zeit, event.y_root)]     # letzte Mauspositionen – daraus das Tempo beim Loslassen
+
+    def ist_bedienelement(self, widget, canvas):
+        while widget is not None and widget is not canvas:
+            if isinstance(widget, self.BEDIENELEMENTE):
+                return True
+            widget = widget.master
+        return False
+
+    def links_ziehen(self, event):
+        if not self.gefasst:
+            return
+        if not self.zieht:
+            if abs(event.y_root - self.start_y) <= self.TOTZONE * self.skalierung:
+                return                           # noch ein Klick, kein Ziehen
+            self.zieht = True
+            self.app.configure(cursor="fleur")
+        self.verschieben(self.letztes_y - event.y_root)      # Maus runter = Inhalt runter = nach oben scrollen
+        self.letztes_y = event.y_root
+        jetzt = time.monotonic()
+        self.verlauf = [(t, y) for t, y in self.verlauf if jetzt - t < 0.1] + [(jetzt, event.y_root)]
+
+    def links_loslassen(self, event):
+        if not self.gefasst:
+            return
+        self.gefasst = False
+        if not self.zieht:
+            return
+        self.zieht = False
+        self.app.configure(cursor="")
+        # Schwung: Tempo der letzten 0,1 s – aber nur, wenn die Maus beim Loslassen noch in Bewegung war
+        jetzt = time.monotonic()
+        verlauf = [(t, y) for t, y in self.verlauf if jetzt - t < 0.1]
+        if len(verlauf) >= 2 and jetzt - verlauf[-1][0] < 0.05:
+            (t0, y0), (t1, y1) = verlauf[0], verlauf[-1]
+            self.schwung = (y0 - y1) / max(t1 - t0, 0.001)           # px/s, positiv = nach unten scrollen
+            if abs(self.schwung) >= self.MIN_SCHWUNG:
+                self.job = self.app.after(self.TAKT, self.gleiten)
+
+    def gleiten(self):
+        self.schwung *= self.REIBUNG
+        if abs(self.schwung) < 50 or not self.verschieben(self.schwung * self.TAKT / 1000):
+            self.job = None                      # ausgerollt bzw. am Ende angestoßen
+            return
+        self.job = self.app.after(self.TAKT, self.gleiten)
+
+
 # ---------- Hauptfenster ----------
 class ToolboxApp(ctk.CTk):
     def __init__(self):
         self.settings = load_settings()
         ctk.set_appearance_mode(APPEARANCE[self.settings["appearance"]])
+        ctk.set_widget_scaling(self.settings["zoom"])
         apply_theme()
         super().__init__()
         apply_font(self)
@@ -387,6 +605,9 @@ class ToolboxApp(ctk.CTk):
         self.tab_buttons = {}
         self.tray = None
         self.toast_job = None
+        self.zoom_job = None
+        self.zoom_rest = 0                      # angefangene Rasten (Touchpads liefern Bruchteile davon)
+        self.scrollen = Scrollen(self)
 
         self.columnconfigure(2, weight=1)
         self.rowconfigure(2, weight=1)
@@ -399,6 +620,8 @@ class ToolboxApp(ctk.CTk):
 
         self.show_category(CATEGORIES[0])
         self.protocol("WM_DELETE_WINDOW", self.on_close)
+        # Strg + Mausrad ist genauer als das <MouseWheel> der Seiten – die scrollen dabei also nicht mit
+        self.bind_all("<Control-MouseWheel>", self.zoom_mausrad)
         threading.Thread(target=self.instance_server, daemon=True).start()
         self.after(100, self.poll_queue)
 
@@ -501,6 +724,7 @@ class ToolboxApp(ctk.CTk):
     def show_page(self, page):
         if self.current_page is page:
             return
+        self.scrollen.stop()
         if self.current_page is not None:
             self.current_page.on_hide()
             self.current_page.grid_forget()
@@ -508,6 +732,28 @@ class ToolboxApp(ctk.CTk):
         if page is not None:
             page.grid(row=0, column=0, sticky="nsew")
             page.on_show()
+
+    # --- Zoom ---
+    def zoom_mausrad(self, event):
+        """Strg + Mausrad: alles größer bzw. kleiner wie im Browser, wird gemerkt. Die Anzeige oben rechts kommt
+        sofort, das Umrechnen erst kurz nach der letzten Raste – alles neu zu skalieren dauert einen Moment."""
+        self.zoom_rest += event.delta
+        rasten = int(self.zoom_rest / 120)        # 120 = eine Raste
+        if rasten:
+            self.zoom_rest -= rasten * 120
+            stufe = min(max(ZOOM_STUFEN.index(self.settings["zoom"]) + rasten, 0), len(ZOOM_STUFEN) - 1)
+            self.settings["zoom"] = ZOOM_STUFEN[stufe]
+            self.toast(f"Zoom {round(ZOOM_STUFEN[stufe] * 100)} %")
+            if self.zoom_job:
+                self.after_cancel(self.zoom_job)
+            self.zoom_job = self.after(150, self.zoom_anwenden)
+        return "break"
+
+    def zoom_anwenden(self):
+        self.zoom_job = None
+        ctk.set_widget_scaling(self.settings["zoom"])
+        if not save_settings(self.settings):
+            self.toast("Zoom konnte nicht gespeichert werden", error=True)
 
     # --- Hilfen für Programmseiten ---
     def save(self):
@@ -558,6 +804,7 @@ class ToolboxApp(ctk.CTk):
             self.quit_app()
 
     def hide_to_tray(self):
+        self.scrollen.stop()
         if self.current_page is not None:
             self.current_page.on_hide()          # z. B. keine Status-Abfragen, solange das Fenster weg ist
         self.withdraw()
