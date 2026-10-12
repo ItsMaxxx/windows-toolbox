@@ -31,6 +31,8 @@ entfernt.) Danach alles, was nach dem Klonen fehlt:
   7. alles wie vorher: Was Einrichten anfassen könnte, wird ganz am Anfang gemerkt und am Ende wiederhergestellt –
      auch wenn unterwegs etwas abbricht (Zustand-Merken / Zustand-Abgleichen): Autostart an/aus, ob der
      Hardware-Monitor lief (dann läuft er danach wieder, mit dem neuen Code), die Einstellungsdateien in daten\.
+     Programme ohne Adminrechte (z. B. Discord Plus) werden vorher beendet und laufen danach wieder, wenn sie
+     liefen; ihr Autostart-Eintrag (HKCU\...\Run) zeigt nach dem Verschieben des Ordners wieder hierher.
      Ein Update ändert so nie etwas, das man selbst eingestellt hat.
   Jeder Schritt prüft vorher, ob er schon erledigt ist – Einrichten lässt sich also jederzeit erneut ausführen,
   z. B. nach dem Verschieben des Ordners (dann wird nur die Aufgabe neu eingerichtet) oder nach einem git pull.
@@ -44,10 +46,11 @@ entfernt.) Danach alles, was nach dem Klonen fehlt:
                     Schritt 7 auf jeden Fall neu starten, damit er neuen Code lädt (nach einem Update –
                     „Aktualisieren“ und „Neu einrichten“ in den Toolbox-Einstellungen übergeben das)
 
--Entfernen – das Gegenstück: Toolbox und Hardware-Monitor beenden, Aufgabe und Verknüpfungen löschen, auf Wunsch
+-Entfernen – das Gegenstück: Toolbox und alle Programme beenden, Aufgabe, Autostart-Einträge und Verknüpfungen
+  löschen, auf Wunsch
   alles Erzeugte und Heruntergeladene löschen (runtime\, Starter, Downloads). daten\ bleibt.
   PawnIO bleibt installiert, weil es auch andere Programme nutzen (entfernen: winget uninstall namazso.PawnIO).
-  Mit -Programme <ids> nur diese Programme: beenden, Aufgabe löschen, Starter und Downloads löschen, aus
+  Mit -Programme <ids> nur diese Programme: beenden, Aufgabe bzw. Autostart löschen, Starter und Downloads löschen, aus
   daten\installiert.json streichen – ohne Rückfrage („Entfernen“ in der Toolbox fragt vorher selbst).
 
 -Admin <Schritte> – intern: der Teil mit Adminrechten. Das Skript startet sich dafür selbst nach einer UAC-Abfrage
@@ -180,6 +183,26 @@ function Programm-Beenden($p) {
     for ($i = 0; $i -lt 50 -and (Befehl-Senden $p.port 'status'); $i++) { Start-Sleep -Milliseconds 100 }
 }
 
+function Weitere-Programme {
+    <# Programme, die ohne Adminrechte eigenständig laufen (z. B. Discord Plus): alle mit Port außer Toolbox und
+       Hardware-Monitor – die beiden behandelt das Skript gesondert. #>
+    @($Alle | Where-Object { $_.port -and $_.id -ne 'toolbox' -and $_.id -ne $Monitor.id })
+}
+
+# Autostart der Programme ohne Adminrechte: Wert "autostart" aus programm.json unter HKCU\...\Run – so setzt ihn auch
+# winutil.autostart_setzen (Schalter in der Toolbox)
+$RunKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+
+function Autostart-Ziel($p) {
+    <# Was der Autostart-Eintrag startet, z. B. "E:\...\DiscordPlus.exe" (mit Anführungszeichen) – $null = keiner. #>
+    (Get-ItemProperty $RunKey -Name $p.autostart -ErrorAction SilentlyContinue).($p.autostart)
+}
+
+function Autostart-Loeschen($p) {
+    if (Autostart-Ziel $p) { Remove-ItemProperty $RunKey -Name $p.autostart; Ok 'Autostart-Eintrag gelöscht' }
+    else { Ok 'kein Autostart-Eintrag' }
+}
+
 function Toolbox-Beenden {
     <# $true, wenn die Toolbox lief (und jetzt beendet ist). #>
     if (-not (Toolbox-Befehl 'status')) { return $false }
@@ -226,7 +249,7 @@ function Starter-Bauen($p) {
        Byte-Vergleich ginge nicht). #>
     $ordner = Split-Path -Parent $p.StarterPfad
     $werte = [ordered]@{
-        '%NAME%' = $p.name; '%VERSION%' = $p.version; '%HOST%' = (Split-Path -Leaf $p.HostPfad)
+        '%NAME%' = $p.name; '%VERSION%' = $p.version; '%HOST%' = (Split-Path -Leaf $p.HostPfad); '%FIRMA%' = 'Windows Toolbox'
         '%RUNTIME%' = (Relativ $ordner $Runtime); '%SKRIPT%' = (Relativ $ordner $p.SkriptPfad)
     }
     $quelle = (Get-Content -Raw -Encoding UTF8 (Join-Path $PSScriptRoot 'starter.cs')) + "`r`n" +
@@ -450,12 +473,15 @@ function Zustand-Merken {
        Zustand-Abgleichen stellt es am Ende wieder her:
        - Autostart: die Aufgabe liegt in Windows, nicht in daten\ – und Windows legt sie beim Neu-Einrichten aktiv an
        - ob der Hardware-Monitor lief (ob die Toolbox lief, merkt sich Einrichten selbst: $toolboxLief)
+       - welche weiteren Programme liefen (Weitere-Programme) – Einrichten beendet sie, danach laufen sie wieder
        - die Einstellungsdateien in daten\ (Einrichten selbst schreibt dort nur installiert.json – die Auswahl) #>
     $dateien = @{}
     foreach ($f in Get-ChildItem (Join-Path $Root 'daten\*.json') -ErrorAction SilentlyContinue) {
         if ($f.Name -ne (Split-Path -Leaf $InstalliertDatei)) { $dateien[$f.Name] = [IO.File]::ReadAllText($f.FullName) }
     }
-    [pscustomobject]@{ Autostart = Autostart; MonitorLief = [bool](Monitor-Befehl 'status'); Dateien = $dateien }
+    $laufend = @(Weitere-Programme | Where-Object { Befehl-Senden $_.port 'status' } | ForEach-Object id)
+    [pscustomobject]@{ Autostart = Autostart; MonitorLief = [bool](Monitor-Befehl 'status'); Laufend = $laufend
+                       Dateien = $dateien }
 }
 
 function Json-Lesbar($pfad) {
@@ -463,10 +489,11 @@ function Json-Lesbar($pfad) {
     catch { $false }
 }
 
-function Zustand-Abgleichen($vor, $monitorDa, $neuStarten) {
+function Zustand-Abgleichen($vor, $monitorDa, $neuStarten, $ids) {
     <# Stellt her, was Zustand-Merken festgehalten hat. Läuft auch, wenn das Einrichten unterwegs abbricht.
        $monitorDa: Hardware-Monitor ist (noch) eingerichtet. $neuStarten: läuft er, mit dem neuen Code neu starten
-       (-Neustart nach einem Update, in Schritt 3 für die neue .exe beendet, Aufgabe zeigt jetzt woandershin). #>
+       (-Neustart nach einem Update, in Schritt 3 für die neue .exe beendet, Aufgabe zeigt jetzt woandershin).
+       $ids: die eingerichteten Programme (weitere Programme starten nur wieder, wenn sie noch dazugehören). #>
     Schritt 'Alles wie vorher? (Autostart, laufende Programme, Einstellungen)'
     $admin = @()                                  # was nur mit Adminrechten geht – zusammen in EINER UAC-Abfrage
 
@@ -499,6 +526,17 @@ function Zustand-Abgleichen($vor, $monitorDa, $neuStarten) {
             Ok $(if ($laeuft) { 'Hardware-Monitor neu gestartet – lief vorher' } else { 'Hardware-Monitor wieder gestartet – lief vorher' })
         } else {
             $admin += 'monitor-starten'           # Autostart aus -> braucht für die CPU-Werte Adminrechte
+        }
+    }
+
+    # Weitere Programme (ohne Adminrechte): Einrichten hat sie beendet – lief eins vorher, jetzt wieder starten
+    foreach ($p in Weitere-Programme | Where-Object { $vor.Laufend -contains $_.id }) {
+        if (Befehl-Senden $p.port 'status') { Ok "$($p.name) läuft – wie vorher" }
+        elseif ($ids -notcontains $p.id) { Ok "$($p.name): entfernt, läuft nicht mehr" }
+        elseif (-not (Test-Path $p.StarterPfad)) { Warnung "$($p.name) lief vorher, aber $(Split-Path -Leaf $p.StarterPfad) fehlt (siehe oben)." }
+        else {
+            try { Start-Process $p.StarterPfad -WorkingDirectory $p.Ordner; Ok "$($p.name) wieder gestartet – lief vorher" }
+            catch { Warnung "$($p.name) startete nicht: $_" }
         }
     }
 
@@ -611,13 +649,19 @@ function Einrichten {
     # Eine laufende Toolbox hält Dateien in runtime\ fest (Pakete, Toolbox.exe) -> vorher beenden, am Ende neu starten
     $toolboxLief = Toolbox-Beenden
     if ($toolboxLief) { Info 'Toolbox für die Einrichtung beendet – wird am Ende wieder gestartet.' }
+    # Dasselbe für weitere Programme (halten ihre .exe in runtime\ fest; danach starten sie mit dem neuen Code)
+    foreach ($p in Weitere-Programme | Where-Object { $vorZustand.Laufend -contains $_.id }) {
+        Programm-Beenden $p
+        Start-Sleep -Milliseconds 500             # Prozess räumt nach dem Schließen des Ports noch kurz auf
+        Info "$($p.name) für die Einrichtung beendet – wird am Ende wieder gestartet."
+    }
 
     # Die Schritte selbst; Abgleichen und Toolbox-Start kommen auch dann, wenn unterwegs etwas abbricht
     $lauf = @{ NeuStarten = [bool]$Neustart }     # Monitor neu starten (-Neustart: nach einem Update) – setzen die Schritte
     try {
         Einrichten-Schritte $vorher $ids $Auswahl $mitMonitor $lauf $verknuepfungen | Out-Host
     } finally {
-        try { Zustand-Abgleichen $vorZustand ($ids -contains $Monitor.id) $lauf.NeuStarten }
+        try { Zustand-Abgleichen $vorZustand ($ids -contains $Monitor.id) $lauf.NeuStarten $ids }
         catch { Warnung "Abgleichen fehlgeschlagen: $_" }
         if ($toolboxLief) { Toolbox-Starten }
     }
@@ -725,6 +769,17 @@ function Einrichten-Schritte($vorher, $ids, $Auswahl, $mitMonitor, $lauf, $verkn
 
         try { Ok (Starter-Bauen $p) }
         catch { Warnung "Starter nicht angelegt: $_" }
+
+        # Autostart ohne Adminrechte: ein vorhandener Eintrag zeigt nach dem Verschieben noch auf den alten Ort
+        if ($p.autostart) {
+            $ziel = Autostart-Ziel $p
+            if (-not $ziel) { Ok 'Autostart: aus (einschalten in der Toolbox)' }
+            elseif ($ziel -eq "`"$($p.StarterPfad)`"") { Ok 'Autostart: an' }
+            else {
+                Set-ItemProperty $RunKey -Name $p.autostart -Value "`"$($p.StarterPfad)`""
+                Ok "Autostart zeigt jetzt hierher (vorher: $ziel)"
+            }
+        }
     }
 
     # 4. Je Programm: Downloads aus programm.json
@@ -813,6 +868,7 @@ function Programm-Entfernen($p) {
     if ($p.id -eq $Monitor.id -and (Get-ScheduledTask -TaskName $Aufgabe -ErrorAction SilentlyContinue)) {
         Aufgabe-Loeschen; $etwas = $true
     }
+    if ($p.autostart -and (Autostart-Ziel $p)) { Autostart-Loeschen $p; $etwas = $true }
     $pfade = @($p.StarterPfad, $p.HostPfad, (Join-Path $Runtime "starter\$($p.id).cs")) +
              @(@($p.downloads | Where-Object { $_ }) | ForEach-Object { Join-Path $p.Ordner $_.ordner }) |
              Where-Object { $_ -and (Test-Path $_) }
@@ -858,8 +914,18 @@ function Entfernen {
     Schritt 'Hardware-Monitor beenden'
     if (Monitor-Befehl 'status') { Monitor-Beenden; Ok 'beendet' } else { Ok 'lief nicht' }
 
+    foreach ($p in Weitere-Programme) {
+        Schritt "$($p.name) beenden"
+        if (Befehl-Senden $p.port 'status') { Programm-Beenden $p; Ok 'beendet' } else { Ok 'lief nicht' }
+    }
+
     Schritt "Aufgabe $Aufgabe löschen"
     Aufgabe-Loeschen
+
+    foreach ($p in $Alle | Where-Object autostart) {
+        Schritt "Autostart von $($p.name) löschen"
+        Autostart-Loeschen $p
+    }
 
     Schritt 'Verknüpfungen löschen (Desktop, Startmenü)'
     Verknuepfungen-Loeschen

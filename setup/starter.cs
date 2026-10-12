@@ -17,6 +17,7 @@ using System.Windows.Forms;
 
 [assembly: AssemblyTitle("%NAME%")]            // Dateibeschreibung (Explorer, Task-Manager)
 [assembly: AssemblyProduct("Toolbox")]
+[assembly: AssemblyCompany("%FIRMA%")]             // Herausgeber (Task-Manager → Autostart)
 [assembly: AssemblyFileVersion("%VERSION%")]
 
 static class Starter

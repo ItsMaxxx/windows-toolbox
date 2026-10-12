@@ -1067,7 +1067,9 @@ der Aufgabenname des Hardware-Monitors steht in `daten\hardware_monitor.json`.
 - Zustände: `ui_queue`, `pages` (Cache gebauter Seiten), `current_page`, `selected` (letztes Programm je Tab) …
 - Raster: Zeile 0 = Kopfleiste, Zeile 1 = 1-px-Linie, Zeile 2 = Inhalt; Spalte 0 = Seitenleiste,
   Spalte 1 = 1-px-Linie, Spalte 2 = Hauptbereich (wächst mit: `columnconfigure(2, weight=1)`).
-- `build_topbar()`, `build_sidebar()`, Hauptbereich `self.main`.
+- `build_topbar()`, `build_sidebar()`, Hauptbereich `self.main`, `build_linkzeile()`: Kästchen unten links wie im
+  Browser, das beim Drüberfahren über einen Knopf mit `ziel` zeigt, was er öffnet (`link_zeigen`/`link_verstecken`,
+  liegt per `place` über allem; `show_page` und `hide_to_tray` blenden es aus).
 - ersten Tab zeigen, ✕ abfangen (`on_close`), Instanz-Server-Thread starten, Queue-Abfrage starten.
 
 Navigation:
@@ -1170,7 +1172,7 @@ Seitenklasse), `programm` (optional). Die Toolbox baut es aus `programm.json` + 
 | `Section(titel, *bausteine)` | eine Karte mit Überschrift; darin die Bausteine untereinander |
 | `Element` | Basisklasse: Beschriftung links (`label`), Bedienelement rechts. Mit `info="…"` steht hinter der Beschriftung ein rundes „i“ (`info_symbol`), das den Text beim Drüberfahren als Tooltip zeigt. Wichtige Methoden: `place(page, card, row)` baut ein und gibt die Zahl belegter Zeilen zurück, `create(page, card)` erzeugt das eigentliche Widget, `refresh(page)` zeigt den aktuellen Wert aus `page.data` an. |
 | `Text(text, name, color, size, hidden)` | Text über die ganze Breite (`hidden` → später `page.show(name)`) |
-| `Buttons(Button(...), …, label, info)` | Knopfreihe, optional mit Beschriftung links (und „i“). `Button(text, command, name, width, style)` mit style `"normal"` (grün), `"grau"`, `"rahmen"`, `"gefahr"` (roter Text). `page.enable(name, an)` graut einen Knopf aus und gibt ihm beim Einschalten wieder die Farbe seines Stils. |
+| `Buttons(Button(...), …, label, info)` | Knopfreihe, optional mit Beschriftung links (und „i“). `Button(text, command, name, width, style, ziel)` mit style `"normal"` (grün), `"grau"`, `"rahmen"`, `"gefahr"` (roter Text). `ziel` = was der Knopf außerhalb der Toolbox öffnet (Adresse, Pfad, Programm mit Argumenten oder eine Funktion, die das liefert) – steht beim Drüberfahren unten links im Fenster wie im Browser (`ziel_anzeigen()` → `app.link_zeigen()`); bei jedem solchen Knopf angeben. `page.enable(name, an)` graut einen Knopf aus und gibt ihm beim Einschalten wieder die Farbe seines Stils. |
 | `Programm(laeuft, beenden, starten)` | kein Baustein, sondern `PROGRAMM = Programm(…)` in der Seiten-Datei: wie die Toolbox das eigenständige Programm eines Tools abfragt, beendet und startet (für „Toolbox und alle Programme“). Alle drei bekommen `app`, laufen im Hintergrund. |
 | `Choice(label, key, optionen, info)` | Auswahlknöpfe (CTkSegmentedButton). `optionen` = `{"Anzeige": Wert}` oder Liste |
 | `Tooltip(widget, text)` | kleines Hinweisfenster bei `<Enter>`, weg bei `<Leave>`. Bewusst schlichtes tk (`tk.Toplevel` ohne Titelleiste + `tk.Label`): CTkToplevel setzt verzögert Symbol und Titelleiste, und CTk-Widgets in einem `tk.Toplevel` verträgt die DPI-Überwachung von CustomTkinter nicht. Schrift und Abstände werden deshalb selbst mit `ScalingTracker.get_widget_scaling()` an die Windows-Skalierung angepasst; die Farben (hell/dunkel) nach `ctk.get_appearance_mode()`. |
@@ -1686,7 +1688,8 @@ Kommentare, kurze Erklär-Kommentare über dem „Warum“). Nach Änderungen di
                        Choice("Rate", "rate", {"1 s": 1, "2 s": 2, "5 s": 5})),
                Section("Aktionen",
                        Buttons(Button("Los", self.los), Button("Ordner öffnen",
-                               lambda: self.open(Path(__file__).parent), style="grau"))),
+                               lambda: self.open(Path(__file__).parent), style="grau",
+                               ziel=Path(__file__).parent))),          # steht beim Drüberfahren unten links
            ]
 
        def los(self):

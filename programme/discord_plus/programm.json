@@ -1,0 +1,13 @@
+{
+  "id": "discord_plus",
+  "name": "Discord Plus",
+  "version": "1.0",
+  "kategorie": "Allgemein",
+  "beschreibung": "Erweiterungen für Discord. Call-Status: zeigt „Im Call“ an, sobald du telefonierst oder in einem Voice-Chat bist – auch für Freunde, die den Server oder Anruf nicht sehen können (discord_plus).",
+  "seite": "discord_plus_gui.py",
+  "skript": "discord_plus.py",
+  "starter": "DiscordPlus.exe",
+  "symbol": "discord_plus.ico",
+  "port": 47817,
+  "autostart": "WindowsToolbox DiscordPlus"
+}

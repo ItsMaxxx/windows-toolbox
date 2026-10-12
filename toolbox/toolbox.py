@@ -46,7 +46,7 @@ sys.path.insert(0, str(APP_DIR))           # damit base, winutil usw. gefunden w
 import daten  # noqa: E402
 import winutil  # noqa: E402
 from base import (BAD, BAR, BORDER, CARD, GOOD, HOVER, MUTED, SELECTED, TEXT, Button, Buttons, Choice,  # noqa: E402
-                  Section, Switch, Text, ToolInfo, ToolPage, Tooltip, apply_font, apply_theme)
+                  Section, Switch, Text, ToolInfo, ToolPage, Tooltip, apply_font, apply_theme, ziel_anzeigen)
 
 CATEGORIES = ["Allgemein", "Games"]     # Tabs oben, in dieser Reihenfolge
 
@@ -228,10 +228,12 @@ class GuiSettingsPage(ToolPage):
                     Text("●  Prüfe Stand …", name="stand"),
                     Buttons(Button("Aktualisieren", self.aktualisieren, name="update"),
                             label="Neuester Stand von GitHub", info=UPDATE_INFO),
-                    Buttons(Button("Neu einrichten", self.neu_einrichten, name="setup", style="grau"),
+                    Buttons(Button("Neu einrichten", self.neu_einrichten, name="setup", style="grau",
+                                   ziel=f"{SETUP_EXE} -Neustart"),
                             label="Ohne Update, z. B. zum Reparieren", info=NEU_EINRICHTEN_INFO)),
             Section("Deinstallieren",
-                    Buttons(Button("Deinstallieren", self.deinstallieren, name="deinstallieren", style="gefahr"),
+                    Buttons(Button("Deinstallieren", self.deinstallieren, name="deinstallieren", style="gefahr",
+                                   ziel=UNINSTALL_EXE),
                             label="Toolbox und alle Programme", info=DEINSTALLIEREN_INFO)),
             Section("Info", Text(f"Toolbox {VERSION}\nEinstellungen und Logs: {daten.DATEN_DIR}")),
         ]
@@ -247,9 +249,11 @@ class GuiSettingsPage(ToolPage):
         """Eine Zeile je Programm: Name und Version, die Beschreibung im „i“, daneben Installieren bzw. Entfernen."""
         knopf = f"programm_{ausweis['id']}"
         if ausweis["id"] in INSTALLIERT:
-            button = Button("Entfernen", lambda: self.einrichten(ausweis, False), name=knopf, style="gefahr")
+            button = Button("Entfernen", lambda: self.einrichten(ausweis, False), name=knopf, style="gefahr",
+                            ziel=f"{UNINSTALL_EXE} -Programme {ausweis['id']}")
         else:
-            button = Button("Installieren", lambda: self.einrichten(ausweis, True), name=knopf)
+            button = Button("Installieren", lambda: self.einrichten(ausweis, True), name=knopf,
+                            ziel=f"{SETUP_EXE} -Programme {ausweis['id']}")
         return Buttons(button, label=f"{ausweis['name']} {ausweis.get('version', '')}".strip(),
                        info=ausweis.get("beschreibung") or None)
 
@@ -664,6 +668,7 @@ class ToolboxApp(ctk.CTk):
         self.main.grid(row=2, column=2, sticky="nsew")
         self.main.columnconfigure(0, weight=1)
         self.main.rowconfigure(0, weight=1)
+        self.build_linkzeile()
 
         self.show_category(CATEGORIES[0])
         self.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -690,7 +695,8 @@ class ToolboxApp(ctk.CTk):
                              hover_color=HOVER, text_color=TEXT, font=ctk.CTkFont(size=17, weight="bold"),
                              cursor="hand2", command=lambda: webbrowser.open(GITHUB_URL))
         name.grid(row=0, column=0, padx=(12, 20), pady=12)
-        Tooltip(name, f"Auf GitHub öffnen\n{GITHUB_URL}")
+        Tooltip(name, "Auf GitHub öffnen")
+        ziel_anzeigen(name, self, GITHUB_URL)
 
         tabs = ctk.CTkFrame(bar, fg_color="transparent")
         tabs.grid(row=0, column=1, sticky="w")
@@ -713,6 +719,22 @@ class ToolboxApp(ctk.CTk):
         self.sidebar.grid_propagate(False)       # feste Breite, auch bei kurzen Namen
         self.sidebar.columnconfigure(0, weight=1)
         ctk.CTkFrame(self, width=1, corner_radius=0, fg_color=BORDER).grid(row=2, column=1, sticky="ns")
+
+    def build_linkzeile(self):
+        """Kästchen unten links wie im Browser: zeigt, was ein Knopf öffnet, solange die Maus darüber ist (siehe
+        base.ziel_anzeigen). Es liegt über Seitenleiste und Seite und ist nur dann zu sehen."""
+        self.linkzeile = ctk.CTkFrame(self, corner_radius=0, fg_color=BAR, border_width=1, border_color=BORDER)
+        self.link_label = ctk.CTkLabel(self.linkzeile, text="", text_color=MUTED, height=22,
+                                       font=ctk.CTkFont(size=12))
+        self.link_label.pack(padx=(9, 10), pady=2)
+
+    def link_zeigen(self, text):
+        self.link_label.configure(text=text)
+        self.linkzeile.place(relx=0, rely=1, anchor="sw")
+        self.linkzeile.lift()
+
+    def link_verstecken(self):
+        self.linkzeile.place_forget()
 
     def mark(self, button, active):
         """Gewählten Tab/Eintrag hervorheben wie die aktiven Links der Website (grün getönt, heller Text)."""
@@ -780,6 +802,7 @@ class ToolboxApp(ctk.CTk):
         if self.current_page is page:
             return
         self.scrollen.stop()
+        self.link_verstecken()                   # der Knopf darunter ist gleich weg – sein <Leave> kommt nicht mehr
         if self.current_page is not None:
             self.current_page.on_hide()
             self.current_page.grid_forget()
@@ -863,6 +886,7 @@ class ToolboxApp(ctk.CTk):
 
     def hide_to_tray(self):
         self.scrollen.stop()
+        self.link_verstecken()
         if self.current_page is not None:
             self.current_page.on_hide()          # z. B. keine Status-Abfragen, solange das Fenster weg ist
         self.withdraw()

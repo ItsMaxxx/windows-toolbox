@@ -27,6 +27,7 @@ from pathlib import Path
 RT_ICON, RT_GROUP_ICON, RT_VERSION = 3, 14, 16
 SPRACHE = 1033                                   # Sprache der Ressourcen in pythonw.exe (Englisch, USA)
 PRODUKT = "Toolbox"
+FIRMA = "Windows Toolbox"                        # Herausgeber (Task-Manager → Autostart, Eigenschaften)
 
 k32 = ctypes.WinDLL("kernel32", use_last_error=True)
 k32.BeginUpdateResourceW.restype = wintypes.HANDLE
@@ -82,6 +83,7 @@ def versionsinfo(beschreibung, dateiname):
     texte = {
         "FileDescription": beschreibung,
         "ProductName": PRODUKT,
+        "CompanyName": FIRMA,
         "FileVersion": version,
         "ProductVersion": version,
         "InternalName": Path(dateiname).stem,

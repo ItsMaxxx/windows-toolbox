@@ -1,6 +1,8 @@
 """
 Baukasten für Programmseiten in der Toolbox. Eine Seite wird – ähnlich wie HTML – nur beschrieben:
 
+    ORDNER = Path(__file__).parent
+
     class MeineSeite(ToolPage):
         defaults = {"rate": 2, "farbe": "blau"}
 
@@ -10,7 +12,7 @@ Baukasten für Programmseiten in der Toolbox. Eine Seite wird – ähnlich wie H
                         Text("Wie oft gemessen wird."),
                         Choice("Rate", "rate", {"1 s": 1, "2 s": 2, "5 s": 5})),
                 Section("Erweitert",
-                        Buttons(Button("Ordner öffnen", lambda: self.open(Path(__file__).parent)))),
+                        Buttons(Button("Ordner öffnen", lambda: self.open(ORDNER), ziel=ORDNER))),
             ]
 
     SEITE = MeineSeite
@@ -23,6 +25,8 @@ bzw. neu starten“ in den Einstellungen der Toolbox automatisch auch dafür.
 Bausteine mit key zeigen den Wert self.data[key] an und speichern Änderungen sofort in settings_file – ohne Angabe
 ist das daten\\<programm>.json (eine Datei pro Programm, siehe daten.py).
 Bausteine mit name sind danach als self.w[name] erreichbar, z. B. um eine Statuszeile zu ändern.
+Knöpfe, die etwas außerhalb der Toolbox öffnen (Website, Datei, Ordner, Programm), bekommen ziel=… – das steht dann
+beim Drüberfahren unten links im Fenster, wie im Browser.
 Die Toolbox findet jedes Programm über programme/<programm>/programm.json; dessen "seite" ist die Datei mit SEITE.
 """
 
@@ -230,8 +234,16 @@ class Button:
         "gefahr": {"fg_color": "transparent", "hover_color": BUTTON, "border_width": 1, "text_color": BAD},
     }
 
-    def __init__(self, text, command, name=None, width=110, style="normal"):
+    def __init__(self, text, command, name=None, width=110, style="normal", ziel=None):
         self.text, self.command, self.name, self.width, self.style = text, command, name, width, style
+        self.ziel = ziel        # was der Knopf öffnet (Website, Datei, Ordner, Programm) – siehe ziel_anzeigen()
+
+
+def ziel_anzeigen(widget, app, ziel):
+    """Wie im Browser: Solange die Maus über widget ist, steht unten links im Fenster, was es öffnet. ziel ist eine
+    Adresse, ein Pfad oder eine Funktion, die eins davon liefert (wird erst beim Drüberfahren gefragt)."""
+    widget.bind("<Enter>", lambda e: app.link_zeigen(str(ziel() if callable(ziel) else ziel)), add="+")
+    widget.bind("<Leave>", lambda e: app.link_verstecken(), add="+")
 
 
 class Buttons(Element):
@@ -247,6 +259,8 @@ class Buttons(Element):
             button = ctk.CTkButton(row, text=b.text, width=b.width, command=b.command, **Button.STYLES[b.style])
             button.farbe = Button.STYLES[b.style].get("fg_color")      # für page.enable(): wieder diese Farbe
             button.pack(side="left", padx=(0, 8))
+            if b.ziel:
+                ziel_anzeigen(button, page.app, b.ziel)
             if b.name:
                 page.w[b.name] = button
         return row
@@ -295,14 +309,15 @@ class Combo(Element):
 
 
 class Entry(Element):
-    """Eingabefeld. Mit key wird der Wert gespeichert, sonst bekommt command(text) ihn beim Verlassen/Enter."""
+    """Eingabefeld. Mit key wird der Wert gespeichert, sonst bekommt command(text) ihn beim Verlassen/Enter.
+    geheim=True zeigt Punkte statt des Texts (z. B. für ein Passwort oder Client-Secret)."""
 
-    def __init__(self, label, key=None, value="", command=None, name=None, width=240):
-        super().__init__(label, key, name)
-        self.value, self.command, self.width = value, command, width
+    def __init__(self, label, key=None, value="", command=None, name=None, width=240, geheim=False, info=None):
+        super().__init__(label, key, name, info)
+        self.value, self.command, self.width, self.geheim = value, command, width, geheim
 
     def create(self, page, card):
-        entry = ctk.CTkEntry(card, width=self.width)
+        entry = ctk.CTkEntry(card, width=self.width, show="•" if self.geheim else "")
         entry.insert(0, self.value)
         entry.bind("<Return>", lambda e: self.apply(page))
         entry.bind("<FocusOut>", lambda e: self.apply(page))

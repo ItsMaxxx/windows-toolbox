@@ -20,7 +20,6 @@ daten/
 
 # --- Eigenes Python, Starter-.exe und Downloads der Programme (legt Setup.exe an) ---
 runtime/
-/Toolbox.exe
 programme/*/*.exe
 programme/*/lhm/
 

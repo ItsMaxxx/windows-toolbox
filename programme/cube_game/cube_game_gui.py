@@ -26,13 +26,21 @@ class CubeGamePage(ToolPage):
         return [
             Section("Spielen",
                     Text("W A S D bewegen", color=MUTED),
-                    Buttons(Button("Spielen", self.spielen))),
+                    Buttons(Button("Spielen", self.spielen, ziel=self.spiel_ziel))),
             Section("Erweitert",
-                    Buttons(Button("Ordner öffnen", lambda: self.open(FOLDER), width=150, style="grau"))),
+                    Buttons(Button("Ordner öffnen", lambda: self.open(FOLDER), width=150, style="grau",
+                                   ziel=FOLDER))),
         ]
 
+    def befehl(self):
+        return [str(STARTER)] if STARTER.exists() else [winutil.pythonw_exe(), str(SKRIPT)]
+
+    def spiel_ziel(self):
+        """Was „Spielen“ startet – steht beim Drüberfahren unten links."""
+        return " ".join(self.befehl())
+
     def spielen(self):
-        befehl = [str(STARTER)] if STARTER.exists() else [winutil.pythonw_exe(), str(SKRIPT)]
+        befehl = self.befehl()
         try:
             subprocess.Popen(befehl, cwd=str(FOLDER))
         except OSError:

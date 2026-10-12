@@ -155,10 +155,12 @@ class HardwareMonitorPage(ToolPage):
                     Text("Welche Werte im Detailfenster stehen, legst du in detailfenster_inhalt.py fest – "
                          "eine Zeile pro Wert. Änderungen erscheinen beim nächsten Öffnen des Fensters, "
                          "alle Sensornamen zeigt „hardware_monitor.py --list“."),
-                    Buttons(Button("Ordner öffnen", lambda: self.open(FOLDER), width=150, style="grau"))),
+                    Buttons(Button("Ordner öffnen", lambda: self.open(FOLDER), width=150, style="grau",
+                                   ziel=FOLDER))),
             Section("Erweitert",
-                    Buttons(Button("Log öffnen", lambda: self.open(hm.LOG_FILE), **grey),
-                            Button("Einstellungsdatei öffnen", lambda: self.open(self.settings_file), **grey),
+                    Buttons(Button("Log öffnen", lambda: self.open(hm.LOG_FILE), ziel=hm.LOG_FILE, **grey),
+                            Button("Einstellungsdatei öffnen", lambda: self.open(self.settings_file), 
+                                   ziel=self.settings_file, **grey),
                             Button("Alles zurücksetzen", self.reset, width=150, style="gefahr"))),
         ]
 

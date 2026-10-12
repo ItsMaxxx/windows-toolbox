@@ -6,6 +6,7 @@ Sammlung kleiner, selbst geschriebener Windows-Tools mit einer gemeinsamen Oberf
 |---|---|---|
 | **Toolbox** (GUI) | `toolbox/` | Oberfläche für alle Tools: Tabs oben, Programmliste links, Einstellungen rechts, Zahnrad für die GUI selbst |
 | **Hardware-Monitor** | `programme/hardware_monitor/` | CPU- und GPU-Temperatur als Zahlen in der Taskleiste; Klick öffnet ein Fenster mit Hardware-Werten in Tabs und allen Hardwaredaten (Hersteller-/Produkt-IDs, Seriennummern) ([README](programme/hardware_monitor/README.md)) |
+| **Discord Plus** | `programme/discord_plus/` | Erweiterungen für Discord – bisher der Call-Status: zeigt „Im Call“ an, sobald du telefonierst oder in einem Voice-Chat bist – auch für Freunde ohne Zugriff auf Server oder Anruf; Einrichtung mit Anleitung auf der Toolbox-Seite ([README](programme/discord_plus/README.md)) |
 | **Cube Game** | `programme/cube_game/` | Kleines Spiel: weißer Würfel (WASD) weicht roten Würfeln aus, die vom Rand kommen; Rekord wird gespeichert ([README](programme/cube_game/README.md)) |
 
 Jedes Tool hat in seinem Ordner eine eigene `README.md` mit Einrichtung, Bedienung und Technik.
@@ -37,6 +38,7 @@ windows-toolbox/
 │  └─ programm.ico        Standardsymbol der Programme (⚒ auf Grün), z. B. für den Hardware-Monitor
 └─ programme/
    ├─ cube_game/                   Spiel (pygame-ce) – Aufbau siehe programme/cube_game/README.md
+   ├─ discord_plus/                Erweiterungen für Discord (Call-Status) – Aufbau siehe programme/discord_plus/README.md
    └─ hardware_monitor/            ein Programm = ein Ordner, alles darin
       ├─ programm.json             Ausweis: Name, Tab, Beschreibung, Version, Skript, Starter, Port, Aufgabe, Downloads
       ├─ HardwareMonitor.exe       Starter (legt Setup.exe an)

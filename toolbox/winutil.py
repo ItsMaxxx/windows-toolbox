@@ -176,3 +176,92 @@ def run_task(name):
     """Startet eine geplante Aufgabe (läuft mit den dort eingestellten Rechten, ohne UAC-Abfrage)."""
     result = run_hidden(["schtasks.exe", "/run", "/tn", name])
     return result is not None and result.returncode == 0
+
+
+# ---------- Autostart ohne Adminrechte ----------
+# Für Programme, die keine Adminrechte brauchen (z. B. Discord Plus), reicht ein Eintrag unter HKCU\...\Run – den
+# darf jeder Benutzer selbst setzen, ganz ohne UAC-Abfrage. Der Hardware-Monitor braucht Adminrechte und startet
+# deshalb über die Aufgabenplanung (siehe oben).
+RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+# Hier merkt sich Windows, wenn man den Eintrag im Task-Manager unter „Autostart“ deaktiviert hat
+RUN_ERLAUBT_KEY = r"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run"
+
+
+def autostart_info(name):
+    """{"ziel": gestarteter Befehl, "an": bool} – oder None, wenn es den Eintrag name nicht gibt.
+    "an" ist False, wenn der Eintrag im Task-Manager unter „Autostart“ deaktiviert wurde."""
+    import winreg
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as k:
+            ziel = winreg.QueryValueEx(k, name)[0]
+    except OSError:
+        return None
+    an = True
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_ERLAUBT_KEY) as k:
+            wert = winreg.QueryValueEx(k, name)[0]
+            an = not (isinstance(wert, bytes) and wert and wert[0] & 1)    # 02 = erlaubt, 03 = deaktiviert
+    except OSError:
+        pass
+    return {"ziel": ziel, "an": an}
+
+
+def autostart_setzen(name, exe=None):
+    """Beim Anmelden exe starten – oder mit exe=None den Eintrag löschen. True, wenn es geklappt hat.
+    Ein im Task-Manager deaktivierter Eintrag wird dabei wieder erlaubt."""
+    import winreg
+    try:
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as k:
+            if exe:
+                winreg.SetValueEx(k, name, 0, winreg.REG_SZ, f'"{exe}"')
+            else:
+                try:
+                    winreg.DeleteValue(k, name)
+                except FileNotFoundError:
+                    pass
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_ERLAUBT_KEY, 0, winreg.KEY_SET_VALUE) as k:
+                winreg.DeleteValue(k, name)
+        except FileNotFoundError:
+            pass
+        return True
+    except OSError:
+        return False
+
+
+# ---------- Toolbox auf der Seite eines Programms öffnen ----------
+ROOT = Path(__file__).resolve().parents[1]
+TOOLBOX_PORT = json.loads((ROOT / "toolbox" / "programm.json").read_text(encoding="utf-8"))["port"]
+
+
+def toolbox_befehl(befehl):
+    """Schickt der laufenden Toolbox einen Befehl (siehe instance_server in toolbox.py). True, wenn sie „ok“ sagt."""
+    import socket
+    try:
+        with socket.create_connection(("127.0.0.1", TOOLBOX_PORT), timeout=0.5) as conn:
+            conn.sendall(f"{befehl}\n".encode())
+            return conn.recv(16).startswith(b"ok")
+    except OSError:
+        return False
+
+
+def toolbox_oeffnen(programm_id):
+    """Die Seite eines Programms in der Toolbox zeigen – blockiert bis zu 15 s, also im Hintergrund aufrufen.
+    Läuft die Toolbox, genügt „show <programm_id>“; sonst wird sie gestartet und bekommt den Befehl, sobald sie
+    antwortet. True, wenn die Toolbox die Seite zeigt. (Wie toolbox_oeffnen in detailfenster.py.)"""
+    import time
+    ctypes.windll.user32.AllowSetForegroundWindow(-1)  # ASFW_ANY: die Toolbox darf ihr Fenster nach vorne holen
+    befehl = f"show {programm_id}"
+    if toolbox_befehl(befehl):
+        return True
+    starter = ROOT / "Toolbox.exe"
+    try:
+        # über explorer.exe: startet sie als normales Programm, auch wenn der Aufrufer Adminrechte hat
+        subprocess.Popen(["explorer.exe", str(starter)])
+    except OSError:
+        return False
+    for _ in range(60):
+        time.sleep(0.25)
+        if toolbox_befehl(befehl):
+            return True
+    return False
