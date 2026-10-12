@@ -114,8 +114,10 @@ das Repo dagegen als ZIP herunter, kann Windows SmartScreen beim ersten Start wa
 Windows geschützt“, weil die `.exe` nicht signiert ist) – dann *Weitere Informationen → Trotzdem ausführen*.
 
 **Toolbox starten**: Doppelklick auf `Toolbox.exe` – oder eine Verknüpfung darauf (Desktop, Startmenü, Taskleiste).
-Den Hardware-Monitor startet die Aufgabe beim Anmelden; von Hand geht es über die Toolbox oder
-`programme\hardware_monitor\HardwareMonitor.exe` (dann ohne Adminrechte, also ohne CPU-Werte).
+Den Hardware-Monitor startest du über die Toolbox (Windows fragt dabei nach Adminrechten) oder
+`programme\hardware_monitor\HardwareMonitor.exe` (dann ohne Adminrechte, also ohne CPU-Werte). Autostart beim
+Anmelden ist nach dem Einrichten aus – einschalten in der Toolbox auf der Seite Hardware-Monitor; dann startet ihn
+auch „Starten“ ohne Nachfrage.
 
 **Portabel**: Nach dem Einrichten steckt alles im Ordner. Verschieben oder auf einen anderen PC kopieren, dort
 `Setup.exe` erneut ausführen – fertig. Außerhalb des Ordners liegen nur PawnIO (ein Treiber muss in Windows

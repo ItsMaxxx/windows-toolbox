@@ -24,7 +24,10 @@ entfernt.) Danach alles, was nach dem Klonen fehlt:
      programme\hardware_monitor\lhm\
   5. nur mit Hardware-Monitor, mit einer UAC-Abfrage: PawnIO installieren und die geplante Aufgabe HardwareMonitor
      einrichten
-  6. nur mit Hardware-Monitor: (neu) starten
+  6. alles wie vorher: Was Einrichten anfassen könnte, wird ganz am Anfang gemerkt und am Ende wiederhergestellt –
+     auch wenn unterwegs etwas abbricht (Zustand-Merken / Zustand-Abgleichen): Autostart an/aus, ob der
+     Hardware-Monitor lief (dann läuft er danach wieder, mit dem neuen Code), die Einstellungsdateien in daten\.
+     Ein Update ändert so nie etwas, das man selbst eingestellt hat.
   Jeder Schritt prüft vorher, ob er schon erledigt ist – Einrichten lässt sich also jederzeit erneut ausführen,
   z. B. nach dem Verschieben des Ordners (dann wird nur die Aufgabe neu eingerichtet) oder nach einem git pull.
   Eine laufende Toolbox wird dafür beendet und am Ende wieder gestartet – mit der neuen Auswahl.
@@ -33,9 +36,9 @@ entfernt.) Danach alles, was nach dem Klonen fehlt:
                     -Programme hardware_monitor – so ruft „Installieren“ in der Toolbox das Skript auf).
                     Schritte 3–6 dann nur für diese; 1–2 (Python, runtime\) brauchen alle, die laufen immer.
   -OhneAdmin        nur Schritte 1–4, ohne UAC-Abfrage
-  -Neustart         ohne Fenster, die eingerichteten Programme wie bisher; Hardware-Monitor in Schritt 6 auf jeden
-                    Fall neu starten, damit er neuen Code lädt (nach einem Update – „Aktualisieren“ in den
-                    Toolbox-Einstellungen übergibt das)
+  -Neustart         ohne Fenster, die eingerichteten Programme wie bisher; lief der Hardware-Monitor, ihn in
+                    Schritt 6 auf jeden Fall neu starten, damit er neuen Code lädt (nach einem Update –
+                    „Aktualisieren“ in den Toolbox-Einstellungen übergibt das)
 
 -Entfernen – das Gegenstück: Toolbox und Hardware-Monitor beenden, Aufgabe löschen, auf Wunsch alles Erzeugte und
   Heruntergeladene löschen (runtime\, Starter, Downloads). daten\ bleibt.
@@ -44,7 +47,8 @@ entfernt.) Danach alles, was nach dem Klonen fehlt:
   daten\installiert.json streichen – ohne Rückfrage („Entfernen“ in der Toolbox fragt vorher selbst).
 
 -Admin <Schritte> – intern: der Teil mit Adminrechten. Das Skript startet sich dafür selbst nach einer UAC-Abfrage
-  noch einmal (Schritte, mit Komma getrennt: pawnio, aufgabe, aufgabe-loeschen).
+  noch einmal (Schritte, mit Komma getrennt: pawnio, aufgabe, autostart-an, autostart-aus, monitor-starten,
+  aufgabe-loeschen).
 
 Aufteilung des Ordners: Code = Repo (toolbox\, programme\, setup\), runtime\ = wegwerfbar (Python und Pakete –
 lässt sich jederzeit neu einrichten), daten\ = Einstellungen (eine .json je Programm) und Logs.
@@ -333,6 +337,96 @@ function Auswahl-Fenster($vorher) {
 }
 
 
+# ---------- Zustand vor dem Einrichten – ist danach genauso (auch nach einem Update) ----------
+function Autostart {
+    <# 'an' oder 'aus' (Schalter „Autostart“ in der Toolbox) – $null, wenn es die Aufgabe nicht gibt. #>
+    $task = Get-ScheduledTask -TaskName $Aufgabe -ErrorAction SilentlyContinue
+    if (-not $task) { $null } elseif ($task.State -eq 'Disabled') { 'aus' } else { 'an' }
+}
+
+function Zustand-Merken {
+    <# Hält ganz am Anfang fest, was der Nutzer eingestellt hat und das Einrichten anfassen könnte –
+       Zustand-Abgleichen stellt es am Ende wieder her:
+       - Autostart: die Aufgabe liegt in Windows, nicht in daten\ – und Windows legt sie beim Neu-Einrichten aktiv an
+       - ob der Hardware-Monitor lief (ob die Toolbox lief, merkt sich Einrichten selbst: $toolboxLief)
+       - die Einstellungsdateien in daten\ (Einrichten selbst schreibt dort nur installiert.json – die Auswahl) #>
+    $dateien = @{}
+    foreach ($f in Get-ChildItem (Join-Path $Root 'daten\*.json') -ErrorAction SilentlyContinue) {
+        if ($f.Name -ne (Split-Path -Leaf $InstalliertDatei)) { $dateien[$f.Name] = [IO.File]::ReadAllText($f.FullName) }
+    }
+    [pscustomobject]@{ Autostart = Autostart; MonitorLief = [bool](Monitor-Befehl 'status'); Dateien = $dateien }
+}
+
+function Json-Lesbar($pfad) {
+    try { $text = [IO.File]::ReadAllText($pfad); if (-not $text.Trim()) { return $false }; $null = $text | ConvertFrom-Json; $true }
+    catch { $false }
+}
+
+function Zustand-Abgleichen($vor, $monitorDa, $neuStarten) {
+    <# Stellt her, was Zustand-Merken festgehalten hat. Läuft auch, wenn das Einrichten unterwegs abbricht.
+       $monitorDa: Hardware-Monitor ist (noch) eingerichtet. $neuStarten: läuft er, mit dem neuen Code neu starten
+       (-Neustart nach einem Update, in Schritt 3 für die neue .exe beendet, Aufgabe zeigt jetzt woandershin). #>
+    Schritt 'Alles wie vorher? (Autostart, laufende Programme, Einstellungen)'
+    $admin = @()                                  # was nur mit Adminrechten geht – zusammen in EINER UAC-Abfrage
+
+    # Autostart: genau wie vorher. Gab es die Aufgabe noch nicht, ist er aus (so legt task_command sie an).
+    $soll = if ($vor.Autostart) { $vor.Autostart } else { 'aus' }
+    $ist = Autostart
+    if (-not $ist) {
+        if ($monitorDa -and $vor.Autostart) { Warnung "Aufgabe $Aufgabe fehlt – Setup.exe erneut ausführen." }
+    } elseif ($ist -eq $soll) {
+        Ok $(if ($vor.Autostart) { "Autostart: $ist – wie vorher" } else { 'Autostart: aus (einschalten in der Toolbox)' })
+    } else {
+        Info "Autostart ist $ist, war $soll – wird zurückgestellt"
+        $admin += "autostart-$soll"               # die Aufgabe läuft mit Adminrechten -> ändern nur mit Adminrechten
+    }
+
+    # Hardware-Monitor: lief er vorher, läuft er danach wieder (mit dem neuen Code); lief er nicht, bleibt er aus
+    $laeuft = [bool](Monitor-Befehl 'status')
+    if (-not $monitorDa) {
+        # abgewählt oder nie eingerichtet – nichts zu tun
+    } elseif (-not $vor.MonitorLief) {
+        Ok $(if ($laeuft) { 'Hardware-Monitor läuft' } else { 'Hardware-Monitor: nicht gestartet – wie vorher (Start über die Toolbox)' })
+    } elseif ($laeuft -and -not $neuStarten) {
+        Ok 'Hardware-Monitor läuft – wie vorher'
+    } elseif (-not (Test-Path $Monitor.StarterPfad)) {
+        Warnung "Hardware-Monitor lief vorher, aber $(Split-Path -Leaf $Monitor.StarterPfad) fehlt (siehe oben) – Setup.exe erneut ausführen."
+    } else {
+        if ($laeuft) { Monitor-Beenden }          # läuft noch mit dem alten Code
+        if ($ist -eq 'an') {                      # über die Aufgabe: ohne UAC-Abfrage
+            Start-ScheduledTask -TaskName $Aufgabe
+            Ok $(if ($laeuft) { 'Hardware-Monitor neu gestartet – lief vorher' } else { 'Hardware-Monitor wieder gestartet – lief vorher' })
+        } else {
+            $admin += 'monitor-starten'           # Autostart aus -> braucht für die CPU-Werte Adminrechte
+        }
+    }
+
+    if ($admin.Count -gt 0) {
+        $meldungen = @{ 'autostart-an' = 'Autostart: an – wie vorher'; 'autostart-aus' = 'Autostart: aus – wie vorher'
+                        'monitor-starten' = 'Hardware-Monitor wieder gestartet – lief vorher' }
+        if ($OhneAdmin) { Warnung "übersprungen (-OhneAdmin): $($admin -join ', ') – in der Toolbox nachholen." }
+        elseif (Als-Admin $admin) { foreach ($s in $admin) { Ok $meldungen[$s] } }
+        else { Warnung 'Nicht alles ließ sich wiederherstellen – in der Toolbox nachholen (Seite Hardware-Monitor).' }
+    }
+
+    # Einstellungen in daten\: fehlt eine Datei oder ist sie kaputt, kommt die von vorher zurück
+    $gleich = 0
+    foreach ($name in $vor.Dateien.Keys) {
+        $pfad = Join-Path $Root "daten\$name"
+        if (-not (Json-Lesbar $pfad)) {
+            [IO.File]::WriteAllText($pfad, $vor.Dateien[$name], (New-Object Text.UTF8Encoding $false))
+            Ok "daten\$name war weg oder kaputt – wiederhergestellt"
+        } elseif ([IO.File]::ReadAllText($pfad) -eq $vor.Dateien[$name]) {
+            $gleich++
+        } else {                                  # z. B. Fensterposition, die der Monitor beim Beenden speichert
+            Info "daten\${name}: vom Programm selbst gespeichert (z. B. beim Beenden)"
+        }
+    }
+    if ($vor.Dateien.Count -eq 0) { Ok 'Einstellungen: noch keine gespeichert' }
+    elseif ($gleich -eq $vor.Dateien.Count) { Ok "Einstellungen in daten\: alle $gleich Dateien unverändert" }
+}
+
+
 # ---------- Der Teil mit Adminrechten (läuft im eigenen Fenster) ----------
 function Admin-Schritte($schritte) {
     $ok = $true
@@ -343,17 +437,24 @@ function Admin-Schritte($schritte) {
     }
     if ($schritte -contains 'aufgabe') {
         Schritt "Aufgabe $Aufgabe einrichten"
-        $vorher = Get-ScheduledTask -TaskName $Aufgabe -ErrorAction SilentlyContinue
         & $RuntimePy -B -c $PyAufgabe (Join-Path $Root 'toolbox') $Aufgabe $Monitor.StarterPfad | Out-Host
-        if ($LASTEXITCODE -ne 0) {
-            Warnung 'fehlgeschlagen'; $ok = $false
-        } else {
-            if ($vorher -and $vorher.State -eq 'Disabled') {      # Autostart war bewusst aus -> so lassen
-                Disable-ScheduledTask -TaskName $Aufgabe | Out-Null
-                Info 'Autostart bleibt ausgeschaltet, wie vorher'
-            }
-            Ok 'eingerichtet'
-        }
+        if ($LASTEXITCODE -ne 0) { Warnung 'fehlgeschlagen'; $ok = $false } else { Ok 'eingerichtet' }
+    }
+    # Zurückstellen, wie es vor dem Einrichten war (Zustand-Abgleichen)
+    if ($schritte -contains 'autostart-an') {
+        Schritt 'Autostart wieder einschalten'
+        try { Enable-ScheduledTask -TaskName $Aufgabe | Out-Null; Ok 'an, wie vorher' }
+        catch { Warnung $_; $ok = $false }
+    }
+    if ($schritte -contains 'autostart-aus') {
+        Schritt 'Autostart wieder ausschalten'
+        try { Disable-ScheduledTask -TaskName $Aufgabe | Out-Null; Ok 'aus, wie vorher' }
+        catch { Warnung $_; $ok = $false }
+    }
+    if ($schritte -contains 'monitor-starten') {        # mit Adminrechten gestartet -> der Monitor hat sie auch
+        Schritt 'Hardware-Monitor wieder starten'
+        try { Start-Process $Monitor.StarterPfad -WorkingDirectory $Monitor.Ordner; Ok 'gestartet' }
+        catch { Warnung $_; $ok = $false }
     }
     if ($schritte -contains 'aufgabe-loeschen') {
         Schritt "Aufgabe $Aufgabe löschen"
@@ -383,6 +484,9 @@ function Runtime-Version {
 }
 
 function Einrichten {
+    # Merken, was eingestellt ist, bevor irgendetwas passiert – am Ende ist es wieder genauso (Zustand-Abgleichen)
+    $vorZustand = Zustand-Merken
+
     # 0. Welche Programme: aus -Programme, wie bisher (-Neustart) oder aus dem Fenster
     $vorher = Installierte
     if ($Programme) { $ids = @($vorher) + @(Programm-Ids $Programme) | Select-Object -Unique }
@@ -404,6 +508,25 @@ function Einrichten {
     $toolboxLief = Toolbox-Beenden
     if ($toolboxLief) { Info 'Toolbox für die Einrichtung beendet – wird am Ende wieder gestartet.' }
 
+    # Die Schritte selbst; Abgleichen und Toolbox-Start kommen auch dann, wenn unterwegs etwas abbricht
+    $lauf = @{ NeuStarten = [bool]$Neustart }     # Monitor neu starten (-Neustart: nach einem Update) – setzen die Schritte
+    try {
+        Einrichten-Schritte $vorher $ids $Auswahl $mitMonitor $lauf | Out-Host
+    } finally {
+        try { Zustand-Abgleichen $vorZustand ($ids -contains $Monitor.id) $lauf.NeuStarten }
+        catch { Warnung "Abgleichen fehlgeschlagen: $_" }
+        if ($toolboxLief) { Toolbox-Starten }
+    }
+
+    Write-Host ""
+    if ($toolboxLief) {
+        Write-Host "Fertig. Die Toolbox wurde wieder gestartet." -ForegroundColor Green
+    } else {
+        Write-Host "Fertig. Die Toolbox startest du mit Toolbox.exe." -ForegroundColor Green
+    }
+}
+
+function Einrichten-Schritte($vorher, $ids, $Auswahl, $mitMonitor, $lauf) {
     foreach ($p in $Alle | Where-Object { $vorher -contains $_.id -and $ids -notcontains $_.id }) {
         Programm-Entfernen $p                     # im Fenster abgewählt
     }
@@ -473,7 +596,6 @@ function Einrichten {
     Ok 'Pakete vollständig'
 
     # 3. Je Programm: pythonw.exe-Kopie mit eigenem Namen und Symbol + Starter
-    $neuStarten = [bool]$Neustart                 # Monitor in Schritt 6 neu starten (-Neustart: nach einem Update)
     foreach ($p in $Auswahl | Where-Object StarterPfad) {
         Schritt "$($p.name): $(Split-Path -Leaf $p.StarterPfad)"
         $meldung = & $RuntimePy -B (Join-Path $PSScriptRoot 'exe_anlegen.py') $p.HostPfad $p.name $p.SymbolPfad
@@ -482,7 +604,7 @@ function Einrichten {
         if ($LASTEXITCODE -eq 2 -and $p -eq $Monitor -and (Monitor-Befehl 'status')) {
             Info 'Hardware-Monitor läuft noch mit der alten Datei – wird kurz beendet …'
             Monitor-Beenden
-            $neuStarten = $true
+            $lauf.NeuStarten = $true
             # Der Prozess räumt nach dem letzten IPC-Lebenszeichen noch kurz auf (LHM schließen) – so lange ist die
             # Datei noch gesperrt. Bis zu 10 s erneut versuchen.
             for ($i = 0; $i -lt 20; $i++) {
@@ -525,18 +647,11 @@ function Einrichten {
         }
     }
 
-    if ($mitMonitor) { Monitor-Einrichten $neuStarten }
-
-    Write-Host ""
-    if ($toolboxLief) {
-        Toolbox-Starten
-        Write-Host "Fertig. Die Toolbox wurde wieder gestartet." -ForegroundColor Green
-    } else {
-        Write-Host "Fertig. Die Toolbox startest du mit Toolbox.exe." -ForegroundColor Green
-    }
+    if ($mitMonitor) { Monitor-Einrichten $lauf }
+    # 6. (Neu) starten, was vorher lief, Autostart wie vorher: Zustand-Abgleichen (in Einrichten)
 }
 
-function Monitor-Einrichten($neuStarten) {
+function Monitor-Einrichten($lauf) {
     # 5. Adminrechte: PawnIO und Aufgabe
     Schritt 'PawnIO und Autostart-Aufgabe'
     $schritte = @()
@@ -550,6 +665,8 @@ function Monitor-Einrichten($neuStarten) {
     elseif (-not (Test-Path $Monitor.StarterPfad)) { Warnung "$($Monitor.StarterPfad) fehlt (siehe oben) – Aufgabe bleibt, wie sie ist" }
     elseif ($task) { Info "Aufgabe $Aufgabe zeigt noch auf: $($task.Actions[0].Execute) $($task.Actions[0].Arguments)"; $schritte += 'aufgabe' }
     else { Info "Aufgabe $Aufgabe fehlt"; $schritte += 'aufgabe' }
+    # Autostart bleibt dabei, wie er war: task_command schaltet die neu angelegte Aufgabe gleich wieder aus, wenn sie
+    # vorher aus war oder fehlte; Zustand-Abgleichen prüft es am Ende noch einmal
 
     if ($schritte.Count -eq 0) {
         # nichts zu tun
@@ -557,23 +674,10 @@ function Monitor-Einrichten($neuStarten) {
         Warnung 'übersprungen (-OhneAdmin)'
     } elseif (Als-Admin $schritte) {
         Ok 'erledigt'
-        $neuStarten = $neuStarten -or ($schritte -contains 'aufgabe')
+        # Ein laufender Monitor kam noch von der alten Aufgabe (anderer Ordner) -> neu starten
+        if ($schritte -contains 'aufgabe') { $lauf.NeuStarten = $true }
     } else {
         Warnung 'Nicht alles hat geklappt – Setup.exe erneut ausführen.'
-    }
-
-    # 6. Hardware-Monitor starten
-    Schritt 'Hardware-Monitor'
-    $task = Get-ScheduledTask -TaskName $Aufgabe -ErrorAction SilentlyContinue
-    $laeuft = [bool](Monitor-Befehl 'status')
-    if (-not $task -or $task.State -eq 'Disabled') {
-        Info $(if ($laeuft) { 'läuft' } else { 'nicht gestartet (Aufgabe fehlt oder Autostart ist aus) – Start über die Toolbox' })
-    } elseif ($laeuft -and -not $neuStarten) {
-        Ok 'läuft'
-    } else {
-        if ($laeuft) { Monitor-Beenden }          # läuft noch mit dem alten Programm -> beenden und neu starten
-        Start-ScheduledTask -TaskName $Aufgabe
-        Ok $(if ($laeuft) { 'neu gestartet' } else { 'gestartet' })
     }
 }
 

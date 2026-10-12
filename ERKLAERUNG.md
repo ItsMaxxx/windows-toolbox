@@ -856,7 +856,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File setup\setup.ps1 %*
 | (ohne) | Einrichten |
 | `-Entfernen` | Gegenstück |
 | `-OhneAdmin` | Einrichten ohne Schritt 5 und 6 |
-| `-Neustart` | Hardware-Monitor in Schritt 6 auf jeden Fall neu starten (nach einem Update) |
+| `-Neustart` | lief der Hardware-Monitor, ihn in Schritt 6 auf jeden Fall neu starten (nach einem Update) |
 | `-Admin a,b` | INTERN: der Teil, der Adminrechte braucht. Das Skript startet sich dafür selbst noch einmal mit UAC-Abfrage (Funktion `Als-Admin`) und wartet auf dessen Ende/Exitcode. |
 
 Oben stehen Variablen für Pfade und Konstanten (`$Aufgabe = 'HardwareMonitor'`, `$IpcPort = 47815`,
@@ -935,17 +935,38 @@ es EINE UAC-Abfrage (`Als-Admin`). Im Admin-Durchlauf (`Admin-Schritte`):
 - **pawnio**: `winget install namazso.PawnIO`
 - **aufgabe**: ruft `runtime\python.exe` mit einem Python-Einzeiler (`$PyAufgabe`) auf, der
   `winutil.task_command()` benutzt – GENAU denselben Befehl wie der Knopf „Aufgabe einrichten“ in der Toolbox. So
-  gibt es die Aufgaben-Definition nur an einer Stelle. War die Aufgabe vorher deaktiviert (Autostart bewusst aus),
-  wird sie wieder deaktiviert.
+  gibt es die Aufgaben-Definition nur an einer Stelle. Windows legt eine Aufgabe immer aktiv an – deshalb schaltet
+  `task_command()` sie gleich wieder aus, wenn es sie vorher nicht gab (Autostart ist nach dem ersten Einrichten
+  aus) oder sie deaktiviert war (Autostart bewusst aus). Nur eine Aufgabe, die schon an war, bleibt an.
+- **autostart-an / autostart-aus / monitor-starten**: gehören zu Schritt 6 (zurückstellen, wie es vorher war).
 
 Nach dem Verschieben des Ordners zeigt die Aufgabe auf den alten Ort → nur dieser Schritt wird wiederholt.
 
-#### Schritt 6 – Monitor starten
+#### Schritt 6 – Alles wie vorher
 
-Fragt per Socket „status“ (Funktion `Monitor-Befehl`, das PowerShell-Gegenstück zu `ipc()` in Python). Läuft er
-noch mit der alten Aufgabe, wird er per „quit“ beendet (`Monitor-Beenden` wartet bis zu 5 s) und über
-`Start-ScheduledTask` neu gestartet. Mit `-Neustart` (so ruft „Aktualisieren“ in der Toolbox das Skript auf) wird er
-auf jeden Fall neu gestartet – sonst liefe nach einem `git pull` noch der alte Code weiter.
+Ganz am Anfang von `Einrichten`, bevor irgendetwas passiert, hält `Zustand-Merken` fest, was der Nutzer eingestellt
+hat und das Einrichten anfassen könnte:
+
+- **Autostart** an oder aus (`Autostart` liest die Aufgabe) – die liegt in Windows, nicht in `daten\`.
+- **ob der Hardware-Monitor lief** (per Socket „status“, Funktion `Monitor-Befehl` – das PowerShell-Gegenstück zu
+  `ipc()` in Python). Ob die Toolbox lief, merkt sich `Einrichten` selbst (`$toolboxLief`).
+- **die Einstellungsdateien in `daten\`** (Text jeder `.json`, außer `installiert.json` – die schreibt Einrichten ja
+  selbst).
+
+Die Schritte 1–5 laufen in `Einrichten-Schritte`, und zwar in `try { … } finally { … }`: `Zustand-Abgleichen` und
+der Neustart der Toolbox kommen also auch dann, wenn unterwegs etwas abbricht. `Zustand-Abgleichen`:
+
+- **Autostart** wie vorher (gab es die Aufgabe nicht: aus). Weicht er ab, kommt `autostart-an`/`autostart-aus` in
+  den Admin-Durchlauf – die Aufgabe läuft mit Adminrechten, ohne die lässt sie sich nicht ändern.
+- **Hardware-Monitor**: Lief er vorher, läuft er danach wieder. Musste er neu starten (`-Neustart` nach einem Update,
+  in Schritt 3 für die neue `.exe` beendet, Aufgabe auf einen neuen Ordner umgestellt), wird er per „quit“ beendet
+  (`Monitor-Beenden` wartet bis zu 5 s) und neu gestartet – sonst liefe nach einem `git pull` noch der alte Code
+  weiter. Gestartet wird über die Aufgabe (ohne Nachfrage), wenn Autostart an ist, sonst per `monitor-starten` im
+  Admin-Durchlauf (eine UAC-Abfrage – ohne Adminrechte fehlten die CPU-Werte). Lief er vorher nicht, bleibt er aus.
+- **`daten\`**: Fehlt eine Datei oder ist sie kein gültiges JSON mehr, wird die gemerkte zurückgeschrieben. Hat ein
+  Programm sie selbst geändert (der Monitor speichert beim Beenden z. B. die Fensterposition), bleibt das so.
+
+Was nur mit Adminrechten geht, sammelt `Zustand-Abgleichen` und erledigt es in EINER UAC-Abfrage.
 
 Ganz unten entscheidet die letzte Zeile, welche Funktion läuft: `-Admin` → `Admin-Schritte`, `-Entfernen` →
 `Entfernen`, sonst `Einrichten`.

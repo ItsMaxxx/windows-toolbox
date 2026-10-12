@@ -128,10 +128,13 @@ def task_command(name, exe, cwd=None):
     "Mit höchsten Privilegien", auch im Akkubetrieb, ohne die 3-Tage-Zeitbegrenzung.
     exe: das gestartete Programm, z. B. der Starter HardwareMonitor.exe (braucht keine Argumente).
     cwd: Arbeitsordner (Standard: Ordner von exe).
+    Autostart: Gab es die Aufgabe noch nicht (erstes Einrichten) oder war sie ausgeschaltet, wird sie gleich wieder
+    ausgeschaltet – Windows legt sie sonst immer aktiv an. Nur eine Aufgabe, die schon an war, bleibt an.
     Braucht Adminrechte – register_task() holt sie per UAC; setup\\setup.ps1 ruft es schon mit Adminrechten auf.
     """
     lines = [
         "$ErrorActionPreference = 'Stop'",
+        f"$alt = Get-ScheduledTask -TaskName {ps_quote(name)} -ErrorAction SilentlyContinue",
         '$user = "$env:USERDOMAIN\\$env:USERNAME"',
         f"$action = New-ScheduledTaskAction -Execute {ps_quote(str(exe))} "
         f"-WorkingDirectory {ps_quote(str(cwd or Path(exe).parent))}",
@@ -141,6 +144,7 @@ def task_command(name, exe, cwd=None):
         "-ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew",
         f"Register-ScheduledTask -TaskName {ps_quote(name)} -Action $action -Trigger $trigger "
         "-Principal $principal -Settings $settings -Force | Out-Null",
+        f"if (-not $alt -or $alt.State -eq 'Disabled') {{ Disable-ScheduledTask -TaskName {ps_quote(name)} | Out-Null }}",
     ]
     return "\n".join(lines)
 

@@ -44,8 +44,10 @@ und die geplante Aufgabe `HardwareMonitor`. Von Hand ginge es so:
    diesem Ordner entpacken.
 4. **Autostart**: in der Toolbox auf *Aufgabe einrichten* klicken. Das legt die geplante Aufgabe `HardwareMonitor`
    (Name aus `"aufgabe"` in `programm.json`) an,
-   die das Programm beim Anmelden mit Adminrechten startet – ohne UAC-Abfrage. Ohne Aufgabe startet *Starten* in der
-   Toolbox das Programm direkt, dann fragt Windows jedes Mal nach.
+   die das Programm beim Anmelden mit Adminrechten startet – ohne UAC-Abfrage. Sie wird ausgeschaltet angelegt
+   (Setup.exe macht das genauso); der Schalter *Beim Anmelden automatisch starten* schaltet sie ein. Ist sie aus oder
+   fehlt sie, startet *Starten* in der Toolbox das Programm direkt, dann fragt Windows jedes Mal nach.
+   Neu einrichten (Knopf, Setup.exe, Update) lässt den Schalter, wie er war.
 
 **Womit es läuft:** Aufgabe und *Starten* rufen den Starter `HardwareMonitor.exe` in diesem Ordner auf (ohne
 Argumente). Der startet `runtime\HardwareMonitor.exe` (`pythonw.exe` des Projekt-Pythons mit eigener

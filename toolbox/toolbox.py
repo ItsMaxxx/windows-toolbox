@@ -356,10 +356,11 @@ class GuiSettingsPage(ToolPage):
 UPDATE_INFO = (
     "Holt den neuesten Stand von GitHub (git pull) und führt danach Setup.exe aus:\n\n"
     "•  Die Toolbox schließt sich kurz, Pakete in runtime\\ werden auf die Versionen aus requirements.txt gebracht.\n"
-    "•  Danach starten die Toolbox und die eingerichteten Programme (z. B. der Hardware-Monitor) mit dem neuen "
+    "•  Danach starten die Toolbox und die Programme, die liefen (z. B. der Hardware-Monitor), mit dem neuen "
     "Code. Neue Programme richtest du selbst ein: unter „Programme“ → Installieren.\n\n"
-    "Eigene Änderungen am Code bleiben unangetastet: Passen sie nicht zum neuen Stand, bricht das Update mit einer "
-    "Meldung ab. Einstellungen in daten\\ bleiben sowieso erhalten."
+    "Alles, was du eingestellt hast, ist danach wie vorher: Einstellungen in daten\\, Autostart an oder aus, "
+    "gestoppte Programme bleiben gestoppt. Eigene Änderungen am Code bleiben unangetastet: Passen sie nicht zum "
+    "neuen Stand, bricht das Update mit einer Meldung ab."
 )
 NUR_TOOLBOX_INFO = (
     "•  Neu starten: schließt die Toolbox und öffnet sie gleich wieder – z. B. nach einem Update.\n"
