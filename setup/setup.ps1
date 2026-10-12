@@ -22,9 +22,13 @@ entfernt.) Danach alles, was nach dem Klonen fehlt:
          (setup\starter.cs, übersetzt mit csc.exe aus dem .NET Framework von Windows)
   4. je Programm die Downloads aus programm.json (feste Version, Prüfsumme), z. B. LibreHardwareMonitor nach
      programme\hardware_monitor\lhm\
-  5. nur mit Hardware-Monitor, mit einer UAC-Abfrage: PawnIO installieren und die geplante Aufgabe HardwareMonitor
+  5. Verknüpfungen „$VerknuepfungName“ auf Toolbox.exe – auf dem Desktop und im Startmenü, je nach Kästchen im
+     Fenster (Häkchen weg: gelöscht). Ohne Fenster („Neu einrichten“, „Aktualisieren“) bleiben sie, wie sie sind;
+     nur eine, die nach dem Verschieben des Ordners ins Leere zeigt, zeigt danach wieder hierher. Eine, die man selbst
+     gelöscht oder woandershin verschoben hat, kommt nicht wieder (zurückholen: Kästchen im Fenster).
+  6. nur mit Hardware-Monitor, mit einer UAC-Abfrage: PawnIO installieren und die geplante Aufgabe HardwareMonitor
      einrichten
-  6. alles wie vorher: Was Einrichten anfassen könnte, wird ganz am Anfang gemerkt und am Ende wiederhergestellt –
+  7. alles wie vorher: Was Einrichten anfassen könnte, wird ganz am Anfang gemerkt und am Ende wiederhergestellt –
      auch wenn unterwegs etwas abbricht (Zustand-Merken / Zustand-Abgleichen): Autostart an/aus, ob der
      Hardware-Monitor lief (dann läuft er danach wieder, mit dem neuen Code), die Einstellungsdateien in daten\.
      Ein Update ändert so nie etwas, das man selbst eingestellt hat.
@@ -34,14 +38,14 @@ entfernt.) Danach alles, was nach dem Klonen fehlt:
 
   -Programme <ids>  diese Programme zusätzlich einrichten, ohne Fenster (mit Komma getrennt, z. B.
                     -Programme hardware_monitor – so ruft „Installieren“ in der Toolbox das Skript auf).
-                    Schritte 3–6 dann nur für diese; 1–2 (Python, runtime\) brauchen alle, die laufen immer.
-  -OhneAdmin        nur Schritte 1–4, ohne UAC-Abfrage
+                    Schritte 3–7 dann nur für diese; 1–2 (Python, runtime\) brauchen alle, die laufen immer.
+  -OhneAdmin        nur Schritte 1–5, ohne UAC-Abfrage
   -Neustart         ohne Fenster, die eingerichteten Programme wie bisher; lief der Hardware-Monitor, ihn in
-                    Schritt 6 auf jeden Fall neu starten, damit er neuen Code lädt (nach einem Update –
+                    Schritt 7 auf jeden Fall neu starten, damit er neuen Code lädt (nach einem Update –
                     „Aktualisieren“ und „Neu einrichten“ in den Toolbox-Einstellungen übergeben das)
 
--Entfernen – das Gegenstück: Toolbox und Hardware-Monitor beenden, Aufgabe löschen, auf Wunsch alles Erzeugte und
-  Heruntergeladene löschen (runtime\, Starter, Downloads). daten\ bleibt.
+-Entfernen – das Gegenstück: Toolbox und Hardware-Monitor beenden, Aufgabe und Verknüpfungen löschen, auf Wunsch
+  alles Erzeugte und Heruntergeladene löschen (runtime\, Starter, Downloads). daten\ bleibt.
   PawnIO bleibt installiert, weil es auch andere Programme nutzen (entfernen: winget uninstall namazso.PawnIO).
   Mit -Programme <ids> nur diese Programme: beenden, Aufgabe löschen, Starter und Downloads löschen, aus
   daten\installiert.json streichen – ohne Rückfrage („Entfernen“ in der Toolbox fragt vorher selbst).
@@ -64,6 +68,9 @@ $RuntimePy  = Join-Path $Runtime 'python.exe'
 $Symbol     = Join-Path $Root 'toolbox\programm.ico'   # Standardsymbol der Programme (⚒ auf Grün); die Toolbox hat
                                                      # ihr eigenes ("symbol" in toolbox\programm.json)
 $Csc        = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+
+# Name der Verknüpfungen auf Toolbox.exe (Desktop, Startmenü – Schritt 5)
+$VerknuepfungName = 'Windows Toolbox'
 
 # Python: genau diese Version (Major.Minor) – mit ihr sind die festen Paketversionen in requirements.txt geprüft.
 # Zum Wechseln: hier ändern, runtime\ löschen, Setup.exe ausführen, testen, requirements.txt anpassen.
@@ -244,10 +251,84 @@ function Starter-Bauen($p) {
 }
 
 
+# ---------- Verknüpfungen auf Toolbox.exe ----------
+# Schlüssel: Ordnername für [Environment]::GetFolderPath (findet auch einen Desktop, den OneDrive verschoben hat;
+# 'Programs' = Startmenü des Benutzers, ohne Adminrechte); Wert: so heißt der Ort im Fenster und in den Meldungen
+$Orte = [ordered]@{ Desktop = 'Desktop'; Programs = 'Startmenü' }
+
+function Ort-Ordner($ort) { [Environment]::GetFolderPath($ort) }
+
+function Verknuepfung-Pfad($ort) { Join-Path (Ort-Ordner $ort) "$VerknuepfungName.lnk" }
+
+function Verknuepfung-Ziel($ort) {
+    <# Wohin die Verknüpfung zeigt – $null, wenn es sie nicht gibt. #>
+    $pfad = Verknuepfung-Pfad $ort
+    if (-not (Test-Path -LiteralPath $pfad)) { return $null }
+    (New-Object -ComObject WScript.Shell).CreateShortcut($pfad).TargetPath
+}
+
+function Verknuepfung-Unsere($ort) {
+    <# Gibt es sie, und gehört sie zu diesem Ordner? Zeigt sie ins Leere (Ordner verschoben), zählt sie auch. Zeigt sie
+       auf eine andere Toolbox, die es noch gibt (zweiter Klon), nicht – die wird nur ersetzt, wenn man es im Fenster
+       ausdrücklich ankreuzt, und nie gelöscht. #>
+    $ziel = Verknuepfung-Ziel $ort
+    if ($null -eq $ziel) { return $false }
+    -not $ziel -or $ziel -eq $Toolbox.StarterPfad -or -not (Test-Path -LiteralPath $ziel)
+}
+
+function Verknuepfungen-Einrichten($wunsch) {
+    <# 5. $wunsch aus dem Fenster: je Ort $true/$false. Ohne Fenster ($null) bleibt jede, wie sie ist – nur eine, die
+       ins Leere zeigt, zeigt danach wieder auf diesen Ordner. #>
+    Schritt "Verknüpfungen „$VerknuepfungName“"
+    foreach ($ort in $Orte.Keys) {
+        $wo = $Orte[$ort]
+        $unsere = Verknuepfung-Unsere $ort
+        $soll = if ($wunsch) { $wunsch[$ort] } else { $unsere }
+        if ($soll) {
+            if ((Verknuepfung-Ziel $ort) -eq $Toolbox.StarterPfad) { Ok "${wo}: schon da"; continue }
+            if (-not (Test-Path $Toolbox.StarterPfad)) { Warnung "${wo}: nicht angelegt – Toolbox.exe fehlt (siehe oben)"; continue }
+            $lnk = (New-Object -ComObject WScript.Shell).CreateShortcut((Verknuepfung-Pfad $ort))
+            $lnk.TargetPath = $Toolbox.StarterPfad
+            $lnk.WorkingDirectory = $Root
+            $lnk.IconLocation = "$($Toolbox.StarterPfad),0"    # das Symbol steckt in Toolbox.exe
+            $lnk.Save()
+            Ok "${wo}: angelegt"
+        } elseif ($unsere) {
+            Remove-Item -LiteralPath (Verknuepfung-Pfad $ort) -Force
+            Ok "${wo}: gelöscht"
+        } elseif (Verknuepfung-Ziel $ort) {
+            Ok "${wo}: zeigt auf eine andere Toolbox – bleibt"
+        } else {
+            Ok "${wo}: keine"
+        }
+    }
+}
+
+function Verknuepfungen-Loeschen {
+    <# Für Uninstall – immer, nicht erst auf Nachfrage: Nach dem Entfernen zeigten sie ins Leere. Gelöscht wird jede
+       Verknüpfung auf diese Toolbox.exe auf dem Desktop und im Startmenü (dort auch in Unterordnern) – auch eine
+       umbenannte oder verschobene –, dazu „$VerknuepfungName“, wenn sie ins Leere zeigt (Verknuepfung-Unsere).
+       Verknüpfungen auf eine andere Toolbox bleiben. #>
+    $shell = New-Object -ComObject WScript.Shell
+    $pfade = @(foreach ($ort in $Orte.Keys) {
+        Get-ChildItem -LiteralPath (Ort-Ordner $ort) -Filter *.lnk -File -Recurse:($ort -eq 'Programs') -ErrorAction SilentlyContinue |
+            Where-Object { $shell.CreateShortcut($_.FullName).TargetPath -eq $Toolbox.StarterPfad } | ForEach-Object FullName
+        if (Verknuepfung-Unsere $ort) { Verknuepfung-Pfad $ort }
+    }) | Select-Object -Unique
+    if (-not $pfade) { Ok 'keine'; return }
+    foreach ($pfad in $pfade) {
+        try { Remove-Item -LiteralPath $pfad -Force; Ok "gelöscht: $pfad" }
+        catch { Warnung "ließ sich nicht löschen: $pfad" }
+    }
+}
+
+
 # ---------- Auswahlfenster ----------
 function Auswahl-Fenster($vorher) {
     <# Fragt in einem kleinen Fenster, welche Programme eingerichtet sein sollen ($vorher ist vorausgewählt).
-       Rückgabe: die gewählten IDs (ohne Toolbox, evtl. leer) – oder $null bei Abbrechen.
+       Dazu zwei Kästchen für die Verknüpfungen (Schritt 5).
+       Rückgabe: Ids = die gewählten IDs (ohne Toolbox, evtl. leer), Verknuepfungen = je Ort $true/$false – oder $null
+       bei Abbrechen.
        WinForms gehört zum .NET Framework von Windows – Python und damit tkinter gibt es an dieser Stelle ja noch nicht. #>
     Add-Type -AssemblyName System.Windows.Forms, System.Drawing
     # Selbst skalieren statt von Windows unscharf hochzeichnen lassen (bei Anzeige-Skalierung über 100 %)
@@ -316,6 +397,19 @@ function Auswahl-Fenster($vorher) {
     $hinweis.MaximumSize = New-Object Drawing.Size ([int](380 * $s)), 0
     Zeile $hinweis 8
 
+    $titel = New-Object Windows.Forms.Label
+    $titel.Text = 'Verknüpfungen'
+    $titel.Font = New-Object Drawing.Font($form.Font, [Drawing.FontStyle]::Bold)
+    Zeile $titel 16
+    $ortKaestchen = @{}                                   # Ort -> Kästchen
+    foreach ($ort in $Orte.Keys) {
+        $box = New-Object Windows.Forms.CheckBox
+        $box.Text = if ($ort -eq 'Desktop') { 'Verknüpfung auf dem Desktop' } else { 'Verknüpfung im Startmenü' }
+        $box.Checked = Verknuepfung-Unsere $ort            # beim ersten Einrichten aus; Häkchen weg löscht sie
+        Zeile $box 6
+        $ortKaestchen[$ort] = $box
+    }
+
     $knoepfe = New-Object Windows.Forms.FlowLayoutPanel
     $knoepfe.FlowDirection = 'RightToLeft'
     $abbrechen = New-Object Windows.Forms.Button
@@ -336,9 +430,11 @@ function Auswahl-Fenster($vorher) {
 
     $ergebnis = $form.ShowDialog()
     $ids = @($kaestchen | Where-Object { $_.Checked -and $_.Tag -ne 'toolbox' } | ForEach-Object { $_.Tag })
+    $verknuepfungen = @{}
+    foreach ($ort in $Orte.Keys) { $verknuepfungen[$ort] = $ortKaestchen[$ort].Checked }
     $form.Dispose()
     if ($ergebnis -ne 'OK') { return $null }
-    , $ids                                                # Komma: eine leere Liste bleibt eine Liste (nicht $null)
+    [pscustomobject]@{ Ids = $ids; Verknuepfungen = $verknuepfungen }
 }
 
 
@@ -494,15 +590,18 @@ function Einrichten {
 
     # 0. Welche Programme: aus -Programme, wie bisher (-Neustart) oder aus dem Fenster
     $vorher = Installierte
+    $verknuepfungen = $null                       # nur das Fenster fragt danach – sonst bleiben sie, wie sie sind
     if ($Programme) { $ids = @($vorher) + @(Programm-Ids $Programme) | Select-Object -Unique }
     elseif ($Neustart) { $ids = $vorher }
     else {
-        $ids = Auswahl-Fenster $vorher
-        if ($null -eq $ids) { Write-Host 'Abgebrochen – nichts geändert.'; return }
+        $wahl = Auswahl-Fenster $vorher
+        if ($null -eq $wahl) { Write-Host 'Abgebrochen – nichts geändert.'; return }
+        $ids = $wahl.Ids
+        $verknuepfungen = $wahl.Verknuepfungen
     }
     $ids = @($ids)
     Installierte-Speichern $ids                   # gleich speichern: Bricht unten etwas ab, gilt die Wahl trotzdem
-    # Schritte 3–6 für alle gewählten Programme – mit -Programme nur für die genannten (die übrigen sind ja schon
+    # Schritte 3–7 für alle gewählten Programme – mit -Programme nur für die genannten (die übrigen sind ja schon
     # eingerichtet). Python und runtime\ (1–2) brauchen alle, die werden immer geprüft.
     $Auswahl = @($Alle | Where-Object {
         if ($Programme) { (Programm-Ids $Programme) -contains $_.id } else { $_.id -eq 'toolbox' -or $ids -contains $_.id }
@@ -516,7 +615,7 @@ function Einrichten {
     # Die Schritte selbst; Abgleichen und Toolbox-Start kommen auch dann, wenn unterwegs etwas abbricht
     $lauf = @{ NeuStarten = [bool]$Neustart }     # Monitor neu starten (-Neustart: nach einem Update) – setzen die Schritte
     try {
-        Einrichten-Schritte $vorher $ids $Auswahl $mitMonitor $lauf | Out-Host
+        Einrichten-Schritte $vorher $ids $Auswahl $mitMonitor $lauf $verknuepfungen | Out-Host
     } finally {
         try { Zustand-Abgleichen $vorZustand ($ids -contains $Monitor.id) $lauf.NeuStarten }
         catch { Warnung "Abgleichen fehlgeschlagen: $_" }
@@ -533,7 +632,7 @@ function Einrichten {
     }
 }
 
-function Einrichten-Schritte($vorher, $ids, $Auswahl, $mitMonitor, $lauf) {
+function Einrichten-Schritte($vorher, $ids, $Auswahl, $mitMonitor, $lauf, $verknuepfungen) {
     foreach ($p in $Alle | Where-Object { $vorher -contains $_.id -and $ids -notcontains $_.id }) {
         Programm-Entfernen $p                     # im Fenster abgewählt
     }
@@ -606,7 +705,7 @@ function Einrichten-Schritte($vorher, $ids, $Auswahl, $mitMonitor, $lauf) {
     foreach ($p in $Auswahl | Where-Object StarterPfad) {
         Schritt "$($p.name): $(Split-Path -Leaf $p.StarterPfad)"
         $meldung = & $RuntimePy -B (Join-Path $PSScriptRoot 'exe_anlegen.py') $p.HostPfad $p.name $p.SymbolPfad
-        # 2 = Datei gesperrt, weil das Programm läuft. Den Monitor dürfen wir kurz beenden (Schritt 6 startet ihn neu),
+        # 2 = Datei gesperrt, weil das Programm läuft. Den Monitor dürfen wir kurz beenden (Schritt 7 startet ihn neu),
         # die Toolbox nicht – da bleibt die alte Datei bis zum nächsten Einrichten.
         if ($LASTEXITCODE -eq 2 -and $p -eq $Monitor -and (Monitor-Befehl 'status')) {
             Info 'Hardware-Monitor läuft noch mit der alten Datei – wird kurz beendet …'
@@ -654,12 +753,14 @@ function Einrichten-Schritte($vorher, $ids, $Auswahl, $mitMonitor, $lauf) {
         }
     }
 
+    Verknuepfungen-Einrichten $verknuepfungen
+
     if ($mitMonitor) { Monitor-Einrichten $lauf }
-    # 6. (Neu) starten, was vorher lief, Autostart wie vorher: Zustand-Abgleichen (in Einrichten)
+    # 7. (Neu) starten, was vorher lief, Autostart wie vorher: Zustand-Abgleichen (in Einrichten)
 }
 
 function Monitor-Einrichten($lauf) {
-    # 5. Adminrechte: PawnIO und Aufgabe
+    # 6. Adminrechte: PawnIO und Aufgabe
     Schritt 'PawnIO und Autostart-Aufgabe'
     $schritte = @()
     if (Get-Service PawnIO -ErrorAction SilentlyContinue) { Ok 'PawnIO ist installiert' }
@@ -760,19 +861,22 @@ function Entfernen {
     Schritt "Aufgabe $Aufgabe löschen"
     Aufgabe-Loeschen
 
+    Schritt 'Verknüpfungen löschen (Desktop, Startmenü)'
+    Verknuepfungen-Loeschen
+
     Schritt 'Erzeugte und heruntergeladene Dateien'
     $pfade = @($Runtime) + @($Alle | ForEach-Object {
         $p = $_
         $p.StarterPfad
         @($p.downloads | Where-Object { $_ }) | ForEach-Object { Join-Path $p.Ordner $_.ordner }
-    }) | Where-Object { $_ -and (Test-Path $_) }
+    }) | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
     if (-not $pfade) {
         Ok 'nichts da'
     } else {
         $pfade | ForEach-Object { Info $_ }
         if ((Read-Host '   Das alles löschen? (j/n)') -match '^[jJyY]') {
             try {
-                $pfade | ForEach-Object { Remove-Item $_ -Recurse -Force }
+                $pfade | ForEach-Object { Remove-Item -LiteralPath $_ -Recurse -Force }
                 Ok 'gelöscht'
             } catch {
                 Warnung 'Nicht alles ließ sich löschen – läuft die Toolbox noch? Dann schließen und erneut versuchen.'

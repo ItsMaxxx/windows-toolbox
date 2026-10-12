@@ -71,11 +71,13 @@ git clone https://github.com/ItsMaxxx/windows-toolbox.git
 ```
 Danach **Doppelklick auf `Setup.exe`** – sonst ist nichts nötig, nicht einmal ein installiertes Python. `Setup.exe`
 öffnet ein Konsolenfenster und führt darin `setup\setup.ps1` aus (eine `.ps1` direkt doppelzuklicken würde sie nur im
-Editor öffnen). Es läuft ohne Adminrechte und fragt nur für Schritt 5 einmal nach.
+Editor öffnen). Es läuft ohne Adminrechte und fragt nur für Schritt 6 einmal nach.
 
 Zuerst fragt ein kleines Fenster, **welche Programme** eingerichtet werden sollen: Die Toolbox ist immer dabei, die
 übrigen per Kästchen (oder *Alle auswählen*). Die Auswahl landet in `daten\installiert.json`; die Toolbox zeigt links
-nur diese Programme. Fehlt die Datei (Einrichtung von vor dieser Auswahl), gelten alle als eingerichtet. Danach:
+nur diese Programme. Fehlt die Datei (Einrichtung von vor dieser Auswahl), gelten alle als eingerichtet. Darunter
+zwei Kästchen für **Verknüpfungen** „Windows Toolbox“ – *auf dem Desktop* und *im Startmenü* (beim ersten Einrichten
+aus; Häkchen weg löscht sie wieder). Danach:
 
 1. sucht ein installiertes **Python 3.14** – genau diese Version, keine ältere oder neuere (fehlt es, installiert es
    Python 3.14 per winget),
@@ -92,14 +94,16 @@ nur diese Programme. Fehlt die Datei (Einrichtung von vor dieser Auswahl), gelte
      „Hardware-Monitor“ erscheinen statt als „Python“,
 4. lädt die Downloads aus den `programm.json` (feste Version, Prüfsumme wird kontrolliert), z. B. LibreHardwareMonitor
    0.9.6 nach `programme\hardware_monitor\lhm\`,
-5. nur mit Hardware-Monitor: holt **einmal** Adminrechte (UAC-Abfrage) und installiert damit PawnIO (Treiber für
+5. legt die angehakten Verknüpfungen auf `Toolbox.exe` an (ohne Fenster, z. B. nach einem Update, bleiben sie, wie
+   sie sind – zeigt eine nach dem Verschieben ins Leere, wird sie repariert),
+6. nur mit Hardware-Monitor: holt **einmal** Adminrechte (UAC-Abfrage) und installiert damit PawnIO (Treiber für
    CPU- und Mainboard-Sensoren) und die geplante Aufgabe `HardwareMonitor` (startet `HardwareMonitor.exe` beim
    Anmelden mit Adminrechten, ohne Nachfrage),
-6. nur mit Hardware-Monitor: startet ihn (bzw. neu, wenn er noch mit dem alten Programm lief).
+7. nur mit Hardware-Monitor: startet ihn (bzw. neu, wenn er noch mit dem alten Programm lief).
 
 Jeder Schritt prüft vorher, ob er schon erledigt ist – `Setup.exe` lässt sich also jederzeit erneut ausführen,
 z. B. nach einem `git pull` (neue Pakete) oder **nach dem Verschieben des Ordners**: dann wird nur die Aufgabe neu
-eingerichtet. Mit `-OhneAdmin` (im Terminal: `Setup.exe -OhneAdmin`) entfallen Schritt 5 und 6.
+eingerichtet. Mit `-OhneAdmin` (im Terminal: `Setup.exe -OhneAdmin`) entfallen Schritt 6 und 7.
 
 **Programme einzeln installieren und entfernen**: In der Toolbox unter Zahnrad → *Programme* – je Programm ein Knopf
 *Installieren* bzw. *Entfernen*. Das ruft `Setup.exe -Programme <id>` bzw. `Uninstall.exe -Programme <id>` auf
@@ -113,7 +117,8 @@ nichts, was sie bauen könnte. Es sind kleine C#-Programme aus `setup\setup_exe.
 das Repo dagegen als ZIP herunter, kann Windows SmartScreen beim ersten Start warnen („Der Computer wurde durch
 Windows geschützt“, weil die `.exe` nicht signiert ist) – dann *Weitere Informationen → Trotzdem ausführen*.
 
-**Toolbox starten**: Doppelklick auf `Toolbox.exe` – oder eine Verknüpfung darauf (Desktop, Startmenü, Taskleiste).
+**Toolbox starten**: Doppelklick auf `Toolbox.exe` – oder die Verknüpfung „Windows Toolbox“ auf dem Desktop bzw. im
+Startmenü (Kästchen in `Setup.exe`).
 Den Hardware-Monitor startest du über die Toolbox (Windows fragt dabei nach Adminrechten) oder
 `programme\hardware_monitor\HardwareMonitor.exe` (dann ohne Adminrechte, also ohne CPU-Werte). Autostart beim
 Anmelden ist nach dem Einrichten aus – einschalten in der Toolbox auf der Seite Hardware-Monitor; dann startet ihn
@@ -121,7 +126,8 @@ auch „Starten“ ohne Nachfrage.
 
 **Portabel**: Nach dem Einrichten steckt alles im Ordner. Verschieben oder auf einen anderen PC kopieren, dort
 `Setup.exe` erneut ausführen – fertig. Außerhalb des Ordners liegen nur PawnIO (ein Treiber muss in Windows
-registriert sein) und die geplante Aufgabe (speichert Windows selbst).
+registriert sein), die geplante Aufgabe (speichert Windows selbst) und die Verknüpfungen, falls angehakt – die
+biegt `Setup.exe` dabei auf den neuen Ort um.
 
 **Feste Versionen**: Jeder PC bekommt dieselbe Python-Version (`$PythonVersion` in `setup\setup.ps1`), dieselben
 Pakete (`requirements.txt`, mit `==`) und dieselben Downloads (Version und Prüfsumme in `programm.json`). Ein neues
@@ -145,8 +151,9 @@ wieder gestartet.
 Programme*, jeweils mit Neu starten und Beenden. „Alle Programme“ sind die Tools, die eigenständig weiterlaufen (z. B.
 der Hardware-Monitor) – gestoppte bleiben beim Neustart gestoppt.
 
-**Entfernen**: `Uninstall.exe` beendet Toolbox und Hardware-Monitor, löscht die Aufgabe und auf Wunsch alles Erzeugte
-(`runtime\`, die Starter, `lhm\`). Danach kann der Ordner gelöscht werden. PawnIO bleibt installiert
+**Entfernen**: `Uninstall.exe` (oder in der Toolbox Zahnrad → *Deinstallieren*) beendet Toolbox und Hardware-Monitor, löscht die Aufgabe und die Verknüpfungen
+auf `Toolbox.exe` (Desktop, Startmenü – auch umbenannte oder verschobene) und auf Wunsch alles Erzeugte (`runtime\`,
+die Starter, `lhm\`). Danach kann der Ordner gelöscht werden. PawnIO bleibt installiert
 (`winget uninstall namazso.PawnIO`). Nur einzelne Programme entfernen: siehe *Programme einzeln installieren und
 entfernen* oben.
 

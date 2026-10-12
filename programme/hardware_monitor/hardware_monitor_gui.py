@@ -76,7 +76,7 @@ def same_path(a, b):
 
 def task_points_here(info):
     """Startet die Aufgabe wirklich diesen Monitor – den Starter ohne Argumente – und nicht z. B. den Ort, an dem der
-    Ordner vor dem Verschieben lag? (Dasselbe prüft setup.ps1 in Schritt 5.)"""
+    Ordner vor dem Verschieben lag? (Dasselbe prüft setup.ps1 in Schritt 6.)"""
     return same_path(info.get("execute") or "", STARTER) and not (info.get("arguments") or "").strip()
 
 

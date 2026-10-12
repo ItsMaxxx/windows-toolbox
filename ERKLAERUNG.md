@@ -855,8 +855,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File setup\setup.ps1 %*
 |---|---|
 | (ohne) | Einrichten |
 | `-Entfernen` | Gegenstück |
-| `-OhneAdmin` | Einrichten ohne Schritt 5 und 6 |
-| `-Neustart` | lief der Hardware-Monitor, ihn in Schritt 6 auf jeden Fall neu starten – übergeben „Aktualisieren“ und „Neu einrichten“ in den Toolbox-Einstellungen |
+| `-OhneAdmin` | Einrichten ohne Schritt 6 und 7 |
+| `-Neustart` | lief der Hardware-Monitor, ihn in Schritt 7 auf jeden Fall neu starten – übergeben „Aktualisieren“ und „Neu einrichten“ in den Toolbox-Einstellungen |
 | `-Admin a,b` | INTERN: der Teil, der Adminrechte braucht. Das Skript startet sich dafür selbst noch einmal mit UAC-Abfrage (Funktion `Als-Admin`) und wartet auf dessen Ende/Exitcode. |
 
 Oben stehen Variablen für Pfade und Konstanten (`$Aufgabe = 'HardwareMonitor'`, `$IpcPort = 47815`,
@@ -906,7 +906,7 @@ genau auf die Versionen dort, z. B. nach `git pull` – auch abwärts) und eine 
    Das Skript baut die neue Datei als `….exe.neu` und vergleicht sie Byte für Byte mit der vorhandenen – gleich →
    „schon aktuell“. Läuft das Programm gerade, ist die Datei gesperrt → Exitcode 2. Beim Hardware-Monitor beendet
    `setup.ps1` ihn dann per „quit“, versucht es bis zu 10 s lang erneut (der Prozess räumt nach dem Beenden noch
-   kurz auf) und startet ihn in Schritt 6 neu. Bei der Toolbox gibt es nur eine Warnung – sie muss man selbst
+   kurz auf) und startet ihn in Schritt 7 neu. Bei der Toolbox gibt es nur eine Warnung – sie muss man selbst
    schließen.
 2. `Starter-Bauen`: `setup\starter.cs` nehmen, die `%PLATZHALTER%` ersetzen (Name, Version, relativer Weg zu
    `runtime\` und zum Skript – `Relativ` rechnet ihn über `[Uri]::MakeRelativeUri` aus, weil Windows PowerShell 5.1
@@ -921,12 +921,32 @@ Für jeden Eintrag in `"downloads"` (beim Hardware-Monitor: LibreHardwareMonitor
 `programme\hardware_monitor\lhm\`):
 
 - Liegt der Ordner noch an einem früheren Ort (`runtime\lhm\` bzw. `src\hardware_monitor\lhm\` aus älteren
-  Versionen), wird er verschoben – ein laufender Monitor hält die DLLs fest und wird dafür kurz beendet (Schritt 6
+  Versionen), wird er verschoben – ein laufender Monitor hält die DLLs fest und wird dafür kurz beendet (Schritt 7
   startet ihn neu).
 - Ist die `pruefdatei` da: Version prüfen (nur Warnung bei Abweichung).
 - Sonst: ZIP laden, SHA-256 vergleichen (bei Abweichung: löschen und Abbruch), entpacken, `Unblock-File`.
 
-#### Schritt 5 – Adminrechte: PawnIO und Aufgabe
+#### Schritt 5 – Verknüpfungen „Windows Toolbox“
+
+Im Auswahlfenster gibt es unter den Programmen zwei Kästchen: *Verknüpfung auf dem Desktop* und *Verknüpfung im
+Startmenü*. Eine Verknüpfung (`.lnk`) ist eine kleine Datei, die auf ein Programm zeigt – hier auf `Toolbox.exe`, mit
+deren Symbol. `Verknuepfungen-Einrichten` legt sie über das COM-Objekt `WScript.Shell` an (`CreateShortcut`, `Save`),
+das gehört zu Windows. Die Ordner liefert `[Environment]::GetFolderPath('Desktop')` bzw. `('Programs')` – so landet
+sie auch dann richtig, wenn OneDrive den Desktop verschoben hat; das Startmenü des Benutzers braucht keine
+Adminrechte. Der Name steht oben in `$VerknuepfungName`.
+
+Anders als `Toolbox.exe` selbst enthält eine Verknüpfung einen **festen Pfad**. Deshalb:
+
+- Ein Kästchen ist vorausgewählt, wenn es „unsere“ Verknüpfung schon gibt (`Verknuepfung-Unsere`: zeigt auf diesen
+  Ordner oder ins Leere, weil der Ordner verschoben wurde). Häkchen weg → gelöscht.
+- Ohne Fenster (`-Neustart` – also „Neu einrichten“ und „Aktualisieren“ –, `-Programme`) bleibt jede, wie sie ist:
+  Steht sie noch und zeigt hierher → „schon da“; zeigt sie ins Leere → wieder auf diesen Ordner. Hast du sie selbst
+  gelöscht oder woandershin verschoben, kommt sie nicht wieder – Setup sieht nur den festen Platz und deutet „fehlt“
+  als „so gewollt“. Zurückholen: Kästchen in `Setup.exe`.
+- Zeigt sie auf eine andere Toolbox, die es noch gibt (zweiter Klon), wird sie nie gelöscht – ersetzt nur, wenn man
+  das Kästchen ausdrücklich anhakt.
+
+#### Schritt 6 – Adminrechte: PawnIO und Aufgabe
 
 Prüft: Gibt es den Dienst „PawnIO“? Gibt es die Aufgabe, und zeigt sie auf DIESEN Ordner (Execute =
 `programme\hardware_monitor\HardwareMonitor.exe`, ohne Argumente)? Was fehlt, kommt in eine Liste, und nur dann gibt
@@ -938,11 +958,11 @@ es EINE UAC-Abfrage (`Als-Admin`). Im Admin-Durchlauf (`Admin-Schritte`):
   gibt es die Aufgaben-Definition nur an einer Stelle. Windows legt eine Aufgabe immer aktiv an – deshalb schaltet
   `task_command()` sie gleich wieder aus, wenn es sie vorher nicht gab (Autostart ist nach dem ersten Einrichten
   aus) oder sie deaktiviert war (Autostart bewusst aus). Nur eine Aufgabe, die schon an war, bleibt an.
-- **autostart-an / autostart-aus / monitor-starten**: gehören zu Schritt 6 (zurückstellen, wie es vorher war).
+- **autostart-an / autostart-aus / monitor-starten**: gehören zu Schritt 7 (zurückstellen, wie es vorher war).
 
 Nach dem Verschieben des Ordners zeigt die Aufgabe auf den alten Ort → nur dieser Schritt wird wiederholt.
 
-#### Schritt 6 – Alles wie vorher
+#### Schritt 7 – Alles wie vorher
 
 Ganz am Anfang von `Einrichten`, bevor irgendetwas passiert, hält `Zustand-Merken` fest, was der Nutzer eingestellt
 hat und das Einrichten anfassen könnte:
@@ -953,7 +973,7 @@ hat und das Einrichten anfassen könnte:
 - **die Einstellungsdateien in `daten\`** (Text jeder `.json`, außer `installiert.json` – die schreibt Einrichten ja
   selbst).
 
-Die Schritte 1–5 laufen in `Einrichten-Schritte`, und zwar in `try { … } finally { … }`: `Zustand-Abgleichen` und
+Die Schritte 1–6 laufen in `Einrichten-Schritte`, und zwar in `try { … } finally { … }`: `Zustand-Abgleichen` und
 der Neustart der Toolbox kommen also auch dann, wenn unterwegs etwas abbricht. `Zustand-Abgleichen`:
 
 - **Autostart** wie vorher (gab es die Aufgabe nicht: aus). Weicht er ab, kommt `autostart-an`/`autostart-aus` in
@@ -1111,9 +1131,12 @@ Bereich „Aktualisieren“:
 
   Gab es Neues, startet `os.startfile()` `Setup.exe -Neustart` in einem eigenen Konsolenfenster (wie ein
   Doppelklick) – dasselbe macht der Knopf „Neu einrichten“, nur ohne git. Das Setup beendet die Toolbox per „quit“,
-  bringt `runtime\` auf den Stand von `requirements.txt`, stellt alles wie vorher (Schritt 6: Autostart, laufender
+  bringt `runtime\` auf den Stand von `requirements.txt`, stellt alles wie vorher (Schritt 7: Autostart, laufender
   Hardware-Monitor neu gestartet) und startet zum Schluss die Toolbox. Hat alles geklappt, schließt sich das Fenster
   nach 5 s von selbst; bei gelben Warnungen oder einem Fehler bleibt es offen, bis man eine Taste drückt.
+- `deinstallieren()` (Abschnitt „Deinstallieren“, roter Knopf): fragt erst Ja/Nein (`messagebox.askyesno`), startet
+  dann `Uninstall.exe` per `os.startfile()` – genau wie ein Doppelklick darauf. Die Toolbox beendet `setup.ps1
+  -Entfernen` selbst per „quit“ (siehe 4.12).
 - `git()` führt git unsichtbar im Hauptordner aus (`git -C <Ordner> …` über `winutil.run_hidden`).
 
 → Ein neues Tool mit eigenem Programm muss für „Toolbox und alle Programme“ nichts an `toolbox.py` ändern – es gibt
@@ -1572,7 +1595,9 @@ runtime\python.exe programme\hardware_monitor\hardwaredaten.py
 
 `setup.ps1 -Entfernen`: Toolbox und Monitor per „quit“ beenden, Aufgabe löschen (notfalls mit UAC), auf Nachfrage
 alles Erzeugte und Heruntergeladene löschen: `runtime\`, die Starter (`Toolbox.exe`, `HardwareMonitor.exe`) und die
-Downloads (`lhm\`). `daten\` bleibt – das gehört dir und verschwindet erst mit dem Ordner. PawnIO bleibt installiert
+Downloads (`lhm\`). Die Verknüpfungen löscht es vorher immer, ohne Nachfrage (`Verknuepfungen-Loeschen` – danach
+zeigten sie ja ins Leere): jede `.lnk` auf diese `Toolbox.exe` auf dem Desktop und im Startmenü samt Unterordnern,
+also auch umbenannte oder verschobene. Verknüpfungen auf eine andere Toolbox bleiben. `daten\` bleibt – das gehört dir und verschwindet erst mit dem Ordner. PawnIO bleibt installiert
 (andere Programme nutzen es evtl. auch): `winget uninstall namazso.PawnIO`.
 
 ---
@@ -1611,9 +1636,10 @@ dem Loslassen `save()` → `daten\hardware_monitor.json` schreiben → „Gespei
 legt `"show"` in ihre Queue, antwortet „ok“ → der zweite Start beendet sich, das vorhandene Fenster kommt nach vorne.
 
 **G) Du verschiebst den Projektordner**
-`Toolbox.exe` und Verknüpfungen darauf funktionieren sofort weiter (relative Pfade). Die Aufgabe zeigt aber noch auf
-den alten Ort → Toolbox warnt „Aufgabe startet einen anderen Ort“ → `Einrichten.cmd` (Schritt 5 erkennt das, eine
-UAC-Abfrage) oder „Aufgabe aktualisieren“ in der Toolbox.
+`Toolbox.exe` im Ordner funktioniert sofort weiter (relative Pfade). Die Verknüpfungen „Windows Toolbox“ und die
+Aufgabe zeigen aber noch auf den alten Ort → Toolbox warnt „Aufgabe startet einen anderen Ort“ → `Setup.exe`
+(Schritt 5 biegt die Verknüpfungen um, Schritt 6 die Aufgabe, eine UAC-Abfrage) oder „Aufgabe aktualisieren“ in der
+Toolbox.
 
 **H) Du klickst in den Toolbox-Einstellungen „Aktualisieren“**
 `git fetch` → neue Commits? → `git pull --ff-only` → `Einrichten.cmd -Neustart` in eigenem Fenster → beendet die

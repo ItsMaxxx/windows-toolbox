@@ -230,6 +230,9 @@ class GuiSettingsPage(ToolPage):
                             label="Neuester Stand von GitHub", info=UPDATE_INFO),
                     Buttons(Button("Neu einrichten", self.neu_einrichten, name="setup", style="grau"),
                             label="Ohne Update, z. B. zum Reparieren", info=NEU_EINRICHTEN_INFO)),
+            Section("Deinstallieren",
+                    Buttons(Button("Deinstallieren", self.deinstallieren, name="deinstallieren", style="gefahr"),
+                            label="Toolbox und alle Programme", info=DEINSTALLIEREN_INFO)),
             Section("Info", Text(f"Toolbox {VERSION}\nEinstellungen und Logs: {daten.DATEN_DIR}")),
         ]
 
@@ -350,6 +353,25 @@ class GuiSettingsPage(ToolPage):
         """Wie nach einem Update, nur ohne git pull (siehe NEU_EINRICHTEN_INFO)."""
         self.setup_starten("●  Setup.exe läuft …")
 
+    def deinstallieren(self):
+        """Uninstall.exe in einem eigenen Fenster – dasselbe wie ein Doppelklick darauf. Es beendet die Toolbox
+        selbst."""
+        if not messagebox.askyesno(
+                "Deinstallieren",
+                "Toolbox und alle Programme deinstallieren?\n\nSie werden beendet, Autostart und die Verknüpfungen "
+                "auf dem Desktop und im Startmenü gelöscht. Im Fenster danach kannst du wählen, ob auch die "
+                "erzeugten Dateien (runtime\\ usw.) weg sollen. Deine Einstellungen in daten\\ bleiben.\n\n"
+                f"Ganz weg ist die Toolbox, wenn du danach einfach den Ordner löschst:\n{ROOT}",
+                icon="warning", parent=self):
+            return
+        try:
+            os.startfile(str(UNINSTALL_EXE), cwd=str(ROOT))
+        except OSError:
+            logging.exception("Uninstall.exe konnte nicht gestartet werden")
+            self.app.toast("Uninstall.exe startete nicht", error=True)
+            return
+        self.enable("deinstallieren", False)
+
     def setup_starten(self, text):
         """Setup.exe -Neustart in einem eigenen Fenster. Das beendet die Toolbox, bringt runtime\\ auf den Stand von
         requirements.txt, stellt alles wie vorher (Autostart, Einstellungen) und startet neu, was lief."""
@@ -376,6 +398,15 @@ NEU_EINRICHTEN_INFO = (
     "startet oder nach dem Verschieben des Ordners.\n\n"
     "Die Toolbox schließt sich kurz und kommt von selbst wieder. Alles, was du eingestellt hast, ist danach wie "
     "vorher: Einstellungen, Autostart an oder aus, laufende Programme laufen wieder, gestoppte bleiben gestoppt."
+)
+DEINSTALLIEREN_INFO = (
+    "Führt Uninstall.exe aus – dasselbe wie ein Doppelklick darauf im Hauptordner:\n\n"
+    "•  Die Toolbox und alle Programme (z. B. der Hardware-Monitor) werden beendet, die Autostart-Aufgabe und die "
+    "Verknüpfungen auf dem Desktop und im Startmenü gelöscht.\n"
+    "•  Im Fenster fragt es, ob auch die erzeugten und heruntergeladenen Dateien weg sollen (runtime\\, die "
+    "Starter-.exe, LibreHardwareMonitor).\n\n"
+    "Deine Einstellungen in daten\\ bleiben. Danach kannst du den Ordner löschen – oder mit Setup.exe alles wieder "
+    "einrichten. PawnIO bleibt installiert (nutzen evtl. auch andere Programme)."
 )
 NUR_TOOLBOX_INFO = (
     "•  Neu starten: schließt die Toolbox und öffnet sie gleich wieder – z. B. nach einem Update.\n"
