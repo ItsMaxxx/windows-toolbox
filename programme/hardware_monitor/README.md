@@ -74,6 +74,9 @@ ein zweiter Start beendet sich sofort.
   sofort gemessen, die Liste zeigt dafür kurz „Lade Sensordaten …“. Bei geschlossenem oder minimiertem Fenster werden
   nur CPU und GPU für die Icons gemessen – deshalb lädt das Fenster beim Öffnen kurz. Direkt nach dem Programmstart
   dauert es länger (~10 s), weil dann noch die übrige Hardware nachgeladen wird (vor allem der RAM).
+- **⚙ rechts daneben**: öffnet die Einstellungen – die Seite des Hardware-Monitors in der Toolbox. Läuft die Toolbox
+  nicht, wird sie gestartet, und zwar als normales Programm (über `explorer.exe`), auch wenn der Monitor selbst
+  Adminrechte hat.
 - **Klick auf einen Wert oder Gerätenamen** kopiert ihn in die Zwischenablage, z. B. „2786“ bei der Produkt-ID oder
   „G.Skill F4-3200C16-8GTZRX“ bei einem RAM-Riegel – aber nur direkt auf dem Text (die Hand als Mauszeiger zeigt es).
   Ein Klick auf die Beschriftung davor („Produkt-ID“) oder ins Leere daneben markiert nur die Zeile. Die Fußzeile

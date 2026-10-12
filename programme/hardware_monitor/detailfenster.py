@@ -15,9 +15,13 @@ Diese Datei baut daraus das Fenster und muss normalerweise nicht angefasst werde
 import ctypes
 import fnmatch
 import importlib
+import json
 import logging
 import re
+import socket
+import subprocess
 import threading
+import time
 import tkinter as tk
 import tkinter.font as tkfont
 from ctypes import wintypes
@@ -32,6 +36,47 @@ ICON_DATEI = Path(__file__).resolve().parents[2] / "toolbox" / "programm.ico"   
 # Fenstertitel: der Pfad des Programms, wie der Explorer seinen Ordner zeigt. Im Task-Manager steht er dann unter
 # „Hardware-Monitor“ und zeigt, welche Kopie läuft (z. B. nach dem Verschieben des Ordners).
 PROGRAMM_DATEI = Path(__file__).resolve().with_name("hardware_monitor.py")
+# Zahnrad oben rechts: öffnet die Seite des Hardware-Monitors in der Toolbox (toolbox_oeffnen)
+PROGRAMM_ID = json.loads(PROGRAMM_DATEI.with_name("programm.json").read_text(encoding="utf-8"))["id"]
+TOOLBOX_DIR = Path(__file__).resolve().parents[2]
+TOOLBOX_EXE = TOOLBOX_DIR / "Toolbox.exe"            # Starter der Toolbox (legt Setup.exe an)
+TOOLBOX_PORT = json.loads((TOOLBOX_DIR / "toolbox" / "programm.json").read_text(encoding="utf-8"))["port"]
+
+
+def toolbox_befehl(befehl):
+    """Schickt der laufenden Toolbox einen Befehl (siehe instance_server in toolbox.py). True, wenn sie „ok“ sagt."""
+    try:
+        with socket.create_connection(("127.0.0.1", TOOLBOX_PORT), timeout=0.5) as conn:
+            conn.sendall(f"{befehl}\n".encode())
+            return conn.recv(16).startswith(b"ok")
+    except OSError:
+        return False
+
+
+def toolbox_oeffnen():
+    """Die Seite des Hardware-Monitors in der Toolbox zeigen – blockiert bis zu 15 s, also im Hintergrund aufrufen.
+    Läuft die Toolbox, genügt „show hardware_monitor“. Sonst wird sie gestartet, und zwar über explorer.exe: Der
+    Monitor läuft meist mit Adminrechten (Aufgabe, UAC) – direkt gestartet, hätte die Toolbox sie auch. explorer.exe
+    startet sie als normales Programm, reicht aber keine Argumente weiter. Deshalb danach „show …“ schicken, sobald
+    sie antwortet. True, wenn die Toolbox die Seite zeigt."""
+    ctypes.windll.user32.AllowSetForegroundWindow(-1)  # ASFW_ANY: die Toolbox darf ihr Fenster nach vorne holen
+    befehl = f"show {PROGRAMM_ID}"
+    if toolbox_befehl(befehl):
+        return True
+    if not TOOLBOX_EXE.exists():
+        logging.warning("%s fehlt – Setup.exe ausführen", TOOLBOX_EXE)
+        return False
+    try:
+        subprocess.Popen(["explorer.exe", str(TOOLBOX_EXE)])
+    except OSError:
+        logging.exception("Toolbox konnte nicht gestartet werden")
+        return False
+    for _ in range(60):
+        time.sleep(0.25)
+        if toolbox_befehl(befehl):
+            return True
+    logging.warning("Toolbox hat nach 15 s nicht geantwortet")
+    return False
 
 
 # ---------- Bausteine für detailfenster_inhalt.py ----------
@@ -376,9 +421,17 @@ class Detailfenster:
             self.kopf[kind] = ttk.Label(kopf, text="–", style="KopfWert.TLabel")
             self.kopf[kind].pack(side="left", padx=(0, self.px(24)))
 
-        # rechts daneben: „Daten werden geladen …“, bis die erste passende Messung da ist, danach „● Live“
+        # ganz rechts das Zahnrad: Einstellungen des Monitors – die stehen auf seiner Seite in der Toolbox
+        zahnrad = ttk.Label(kopf, text="⚙", style="Zahnrad.TLabel", cursor="hand2")
+        zahnrad.pack(side="right")
+        zahnrad.bind("<Button-1>", lambda e: self.einstellungen_oeffnen())
+        zahnrad.bind("<Enter>", lambda e: (zahnrad.configure(foreground=AKZENT), self.fusszeile(
+            "Einstellungen des Hardware-Monitors – öffnet seine Seite in der Toolbox (startet sie, falls nötig).")))
+        zahnrad.bind("<Leave>", lambda e: (zahnrad.configure(foreground=SUB), self.fusszeile(HINWEIS)))
+
+        # links davon: „Daten werden geladen …“, bis die erste passende Messung da ist, danach „● Live“
         self.status = ttk.Label(kopf, style="KopfName.TLabel")
-        self.status.pack(side="right")
+        self.status.pack(side="right", padx=(0, self.px(12)))
         self.live = None                                 # True = „● Live“ steht schon da (bleibt bis zum Schließen)
         self.status_setzen(False)
 
@@ -411,6 +464,7 @@ class Detailfenster:
                         troughcolor=BG_LIST, focuscolor=BG, font=SCHRIFT)
         style.configure("KopfName.TLabel", foreground=SUB, font=("Segoe UI", 11))
         style.configure("KopfWert.TLabel", font=("Segoe UI Semibold", 18))
+        style.configure("Zahnrad.TLabel", foreground=SUB, font=("Segoe UI Symbol", 16))
         style.configure("Fuss.TLabel", foreground=SUB)
         style.configure("TNotebook", borderwidth=0, tabmargins=(0, 0, 0, 0))
         style.configure("TNotebook.Tab", background=BG, foreground=SUB, borderwidth=0,
@@ -604,6 +658,19 @@ class Detailfenster:
             self.live = live
             self.status.configure(text="●  Live" if live else "Daten werden geladen …",
                                   foreground=AKZENT if live else SUB)
+
+    def einstellungen_oeffnen(self):
+        """Zahnrad: die Toolbox auf der Seite des Hardware-Monitors öffnen (im Hintergrund, toolbox_oeffnen)."""
+        ergebnis = []
+        threading.Thread(target=lambda: ergebnis.append(toolbox_oeffnen()), daemon=True).start()
+
+        def warten():
+            if not ergebnis:
+                self.win.after(250, warten)
+            elif not ergebnis[0]:
+                self.bestaetigen("Toolbox ließ sich nicht öffnen – Details im Log", farbe=hex_color(AMPEL["rot"]))
+
+        self.win.after(250, warten)
 
     def melden(self):
         """Dem Mess-Thread sagen, was gebraucht wird: die Geräte des gewählten Tabs – oder nichts (Fenster zu)."""

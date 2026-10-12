@@ -759,6 +759,14 @@ class ToolboxApp(ctk.CTk):
             self.pages[tool.id] = tool.page(self.main, self, tool)
         self.show_page(self.pages[tool.id])
 
+    def show_programm(self, tool_id):
+        """Die Seite dieses Programms zeigen (samt Tab) – z. B. vom Zahnrad im Hardware-Monitor. Unbekannt oder nicht
+        eingerichtet: bleibt, wie es ist."""
+        tool = next((t for t in TOOLS if t.id == tool_id), None)
+        if tool:
+            self.show_category(tool.category)
+            self.show_tool(tool)
+
     def show_settings(self):
         for button in (*self.tab_buttons.values(), *self.sidebar_buttons.values()):
             self.mark(button, False)
@@ -834,6 +842,9 @@ class ToolboxApp(ctk.CTk):
                 task = self.ui_queue.get_nowait()
                 if task == "show":
                     self.show_window()
+                elif isinstance(task, tuple) and task[0] == "show":         # ("show", programm-id)
+                    self.show_programm(task[1])
+                    self.show_window()
                 elif task == "quit":
                     self.quit_app()
                     return
@@ -902,6 +913,7 @@ class ToolboxApp(ctk.CTk):
     def instance_server(self):
         """Befehle über eine lokale Verbindung, je einer pro Verbindung, Antwort "ok":
           show    ein zweiter Toolbox-Start holt damit dieses Fenster nach vorne
+          show <programm-id>   dasselbe, gleich auf der Seite dieses Programms (Zahnrad im Hardware-Monitor)
           status  läuft die Toolbox? (setup.ps1 fragt vor dem Einrichten)
           quit    beenden (setup.ps1, damit es runtime\\ erneuern bzw. löschen kann)"""
         try:
@@ -920,8 +932,11 @@ class ToolboxApp(ctk.CTk):
                 with conn:
                     try:
                         conn.settimeout(1)
-                        command = conn.recv(16).strip()
-                        if command in (b"show", b"quit"):
+                        command = conn.recv(64).strip()
+                        if command.startswith(b"show "):
+                            self.ui_queue.put(("show", command[5:].decode(errors="replace").strip()))
+                            conn.sendall(b"ok\n")
+                        elif command in (b"show", b"quit"):
                             self.ui_queue.put(command.decode())
                         if command in (b"show", b"status", b"quit"):
                             conn.sendall(b"ok\n")

@@ -567,7 +567,7 @@ Nummern 0–65535, damit mehrere Programme auf demselben PC Verbindungen annehme
 | Port | Programm | Befehle |
 |---|---|---|
 | 47815 | Hardware-Monitor | `status` / `reload` / `quit` |
-| 47816 | Toolbox | `show` / `status` / `quit` – „show“ holt bei einem zweiten Start das vorhandene Fenster nach vorne, „status“ und „quit“ benutzt `setup.ps1`, um eine laufende Toolbox vor dem Einrichten/Entfernen zu beenden |
+| 47816 | Toolbox | `show` / `show <programm-id>` / `status` / `quit` – „show“ holt bei einem zweiten Start das vorhandene Fenster nach vorne, „show hardware_monitor“ schickt das ⚙ im Detailfenster des Monitors, „status“ und „quit“ benutzt `setup.ps1`, um eine laufende Toolbox vor dem Einrichten/Entfernen zu beenden |
 
 Ein Port kann nur von EINEM Programm gleichzeitig belegt werden. Genau das nutzt die Toolbox zur
 Einzelinstanz-Erkennung: Antwortet jemand auf 47816, läuft schon eine Toolbox.
@@ -1098,7 +1098,11 @@ Schließen und Tray:
   vorne (Einzelinstanz über Port 47816).
 
 `instance_server` (eigener Thread): Lauscht auf 127.0.0.1:47816. „show“ und „quit“ legt er in die Queue, auf „show“,
-„status“ und „quit“ antwortet er „ok“. Eine Toolbox von vor dieser Version kennt nur „show“ – `setup.ps1` kann sie
+„status“ und „quit“ antwortet er „ok“. „show hardware_monitor“ (allgemein „show <programm-id>“) schickt das ⚙ im
+Detailfenster des Monitors: Die Queue bekommt dann `("show", id)`, und `poll_queue` ruft `show_programm(id)` auf
+(Tab und Seite wählen) und holt das Fenster nach vorne. Läuft die Toolbox noch nicht, startet der Monitor sie über
+`explorer.exe` – so läuft sie ohne die Adminrechte des Monitors – und schickt den Befehl, sobald sie antwortet
+(`toolbox_oeffnen` in `detailfenster.py`). Eine Toolbox von vor dieser Version kennt nur „show“ – `setup.ps1` kann sie
 deshalb nicht beenden. (Auf Linux/macOS wird `SO_REUSEADDR` gesetzt; unter Windows bewusst nicht, weil dort damit
 zwei Programme denselben Port belegen könnten.)
 

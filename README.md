@@ -232,7 +232,8 @@ Wert hinzufügen = Zeile schreiben, Wert weglassen = Zeile löschen. Die genauen
 - **GUI ↔ Hardware-Monitor**: Der Monitor läuft mit Adminrechten, die GUI ohne. Gesteuert wird über eine lokale
   Verbindung auf `127.0.0.1:47815` (Befehle `status`, `reload`, `quit`). Die GUI selbst lauscht auf Port `47816`
   (`show`, `status`, `quit`): ein zweiter Start holt damit nur das vorhandene Fenster nach vorne, `setup.ps1` beendet
-  sie damit vor dem Einrichten bzw. Entfernen. Beide Ports stehen als `"port"` in der jeweiligen `programm.json` –
+  sie damit vor dem Einrichten bzw. Entfernen. `show hardware_monitor` schickt das ⚙ im Detailfenster des Monitors –
+  die Toolbox zeigt dann dessen Seite. Beide Ports stehen als `"port"` in der jeweiligen `programm.json` –
   daraus lesen sie Python und `setup.ps1`, ebenso den Namen der Autostart-Aufgabe (`"aufgabe"`).
 - **Sparsam**: Bei geschlossenem oder minimiertem Detailfenster liest der Monitor nur CPU und GPU, bei offenem Fenster
   nur die Geräte des gewählten Tabs; Raten im Rechtsklick-Menü oder in der GUI.
