@@ -10,8 +10,9 @@ Welche Programme eingerichtet sind, steht in daten\installiert.json (ohne die To
 die Datei, gelten alle als eingerichtet: So war es, bevor man wählen konnte – und beim ersten Einrichten sind damit
 alle vorausgewählt. Die Toolbox liest dieselbe Datei und zeigt nur eingerichtete Programme.
 
-Einrichten (ohne Parameter) – erst ein kleines Fenster: welche Programme? (Abgewählte, die eingerichtet waren, werden
-entfernt.) Danach alles, was nach dem Klonen fehlt:
+Einrichten (ohne Parameter) – erst ein kleines Fenster: welche Sprache (aus toolbox\sprachen.json, vorausgewählt: die
+gespeicherte bzw. die von Windows – landet in daten\toolbox.json) und welche Programme? (Abgewählte, die eingerichtet
+waren, werden entfernt.) Danach alles, was nach dem Klonen fehlt:
   1. Python $PythonVersion finden (oder per winget installieren) – genau diese Version, keine ältere oder neuere
   2. runtime\ anlegen: eigenes Python im Projektordner, mit den Paketen aus requirements.txt (feste Versionen)
   3. je Programm zwei .exe:
@@ -87,12 +88,19 @@ $PyAufgabe = 'import sys; sys.path.insert(0, sys.argv[1]); import winutil; ' +
 
 
 # ---------- Programme (aus den programm.json) ----------
+function Texte-Laden($datei) {
+    <# Inhalt einer i18n.json (ID -> Sprache -> Text) – oder $null, wenn es sie nicht gibt oder sie kaputt ist. #>
+    if (-not (Test-Path $datei)) { return $null }
+    try { Get-Content -Raw -Encoding UTF8 $datei | ConvertFrom-Json } catch { $null }
+}
+
 function Lade-Programm($datei) {
     <# Liest einen Ausweis und ergänzt die fertigen Pfade: Ordner, Skript, Starter (die .exe zum Doppelklicken) und
        Host (die pythonw.exe-Kopie in runtime\, die der Starter aufruft – gleicher Dateiname wie der Starter). #>
     $p = Get-Content -Raw -Encoding UTF8 $datei | ConvertFrom-Json
     $ordner = Split-Path -Parent $datei
     $p | Add-Member Ordner $ordner
+    $p | Add-Member Texte (Texte-Laden (Join-Path $ordner 'i18n.json'))    # Name und Beschreibung je Sprache
     if ($p.starter) {                             # nur bei Programmen, die eigenständig laufen (nicht nur eine Seite)
         $p | Add-Member SkriptPfad (Join-Path $ordner $p.skript)
         $p | Add-Member StarterPfad ([IO.Path]::GetFullPath((Join-Path $ordner $p.starter)))
@@ -122,6 +130,52 @@ function Installierte-Speichern($ids) {
     New-Item -ItemType Directory -Force (Split-Path -Parent $InstalliertDatei) | Out-Null
     $json = ConvertTo-Json @{ programme = @($ids) }
     [IO.File]::WriteAllText($InstalliertDatei, $json, (New-Object Text.UTF8Encoding $false))   # ohne BOM, für Python
+}
+
+# Sprache der Toolbox und aller Programme: "sprache" in daten\toolbox.json – liest auch toolbox\i18n.py
+$ToolboxDatei = Join-Path $Root 'daten\toolbox.json'
+# Welche Sprachen es gibt (Code -> Name, in dieser Reihenfolge) – dieselbe Liste nimmt toolbox\i18n.py
+$SprachListe = Get-Content -Raw -Encoding UTF8 (Join-Path $Root 'toolbox\sprachen.json') | ConvertFrom-Json
+$SprachCodes = @($SprachListe.sprachen.PSObject.Properties.Name)
+
+function Uebersetzt($texte, $id, $sonst) {
+    <# Text $id aus einer i18n.json in jeder Sprache: Tabelle Code -> Text. Fehlt eine Übersetzung, die
+       Rückfallsprache, dann $sonst bzw. die ID – wie t() in toolbox\i18n.py. #>
+    $zeile = if ($texte) { $texte.$id }
+    $ergebnis = @{}
+    foreach ($code in $SprachCodes) {
+        $text = if ($zeile) { $zeile.$code }
+        if (-not $text -and $zeile) { $text = $zeile.($SprachListe.rueckfall) }
+        if (-not $text) { $text = if ($sonst) { $sonst } else { $id } }
+        $ergebnis[$code] = $text
+    }
+    $ergebnis
+}
+
+function Toolbox-Einstellungen {
+    <# Inhalt von daten\toolbox.json – oder ein leeres Objekt, wenn sie fehlt oder kaputt ist. #>
+    if (Test-Path $ToolboxDatei) {
+        try { $e = Get-Content -Raw -Encoding UTF8 $ToolboxDatei | ConvertFrom-Json; if ($e) { return $e } }
+        catch { }
+    }
+    New-Object psobject
+}
+
+function Sprache {
+    <# Code aus sprachen.json: die gespeicherte Sprache – sonst die Anzeigesprache von Windows, wenn es sie gibt, sonst
+       die Rückfallsprache (Englisch) – genau wie gewaehlte() in toolbox\i18n.py. #>
+    $gespeichert = (Toolbox-Einstellungen).sprache
+    if ($gespeichert -in $SprachCodes) { return $gespeichert }
+    $system = (Get-UICulture).TwoLetterISOLanguageName
+    if ($system -in $SprachCodes) { $system } else { $SprachListe.rueckfall }
+}
+
+function Sprache-Speichern($sprache) {
+    <# Schreibt "sprache" in daten\toolbox.json; alles andere darin bleibt, wie es ist. #>
+    New-Item -ItemType Directory -Force (Split-Path -Parent $ToolboxDatei) | Out-Null
+    $e = Toolbox-Einstellungen
+    $e | Add-Member -NotePropertyName sprache -NotePropertyValue $sprache -Force
+    [IO.File]::WriteAllText($ToolboxDatei, ($e | ConvertTo-Json), (New-Object Text.UTF8Encoding $false))
 }
 
 function Programm-Ids($text) {
@@ -348,10 +402,12 @@ function Verknuepfungen-Loeschen {
 
 # ---------- Auswahlfenster ----------
 function Auswahl-Fenster($vorher) {
-    <# Fragt in einem kleinen Fenster, welche Programme eingerichtet sein sollen ($vorher ist vorausgewählt).
-       Dazu zwei Kästchen für die Verknüpfungen (Schritt 5).
-       Rückgabe: Ids = die gewählten IDs (ohne Toolbox, evtl. leer), Verknuepfungen = je Ort $true/$false – oder $null
-       bei Abbrechen.
+    <# Fragt in einem kleinen Fenster nach der Sprache (vorausgewählt: Sprache) und welche Programme eingerichtet sein
+       sollen ($vorher ist vorausgewählt). Dazu zwei Kästchen für die Verknüpfungen (Schritt 5).
+       Rückgabe: Sprache = Code aus sprachen.json, Ids = die gewählten IDs (ohne Toolbox, evtl. leer),
+       Verknuepfungen = je Ort $true/$false – oder $null bei Abbrechen.
+       Texte: setup.… aus toolbox\i18n.json, Name und Beschreibung der Programme aus ihrer i18n.json. Es öffnet sich in
+       der vorausgewählten Sprache; ein Klick auf eine andere beschriftet sofort alles neu.
        WinForms gehört zum .NET Framework von Windows – Python und damit tkinter gibt es an dieser Stelle ja noch nicht. #>
     Add-Type -AssemblyName System.Windows.Forms, System.Drawing
     # Selbst skalieren statt von Windows unscharf hochzeichnen lassen (bei Anzeige-Skalierung über 100 %)
@@ -361,7 +417,15 @@ function Auswahl-Fenster($vorher) {
 
     $form = New-Object Windows.Forms.Form
     $s = $form.CreateGraphics().DpiX / 96                 # Skalierung für feste Pixelmaße
-    $form.Text = 'Toolbox einrichten'
+    $vorgewaehlt = Sprache
+    $toolboxTexte = Texte-Laden (Join-Path $Root 'toolbox\i18n.json')
+    # Alle Beschriftungen: Steuerelement und sein Text je Sprache – ein Klick auf eine Sprache setzt sie neu
+    $beschriftung = New-Object Collections.ArrayList
+    function Beschriften($control, $texte) {
+        [void]$beschriftung.Add([pscustomobject]@{ Control = $control; Texte = $texte })
+        $control.Text = $texte[$vorgewaehlt]
+    }
+    Beschriften $form (Uebersetzt $toolboxTexte 'setup.titel')
     $form.Icon = New-Object Drawing.Icon (Join-Path $Root 'toolbox\toolbox.ico')
     $form.Font = New-Object Drawing.Font('Segoe UI', 9)
     $form.FormBorderStyle = 'FixedDialog'
@@ -384,16 +448,41 @@ function Auswahl-Fenster($vorher) {
         $liste.Controls.Add($control)
     }
 
+    # Sprache der Toolbox und aller Programme – ändern geht später in der Toolbox (⚙ → Darstellung)
     $titel = New-Object Windows.Forms.Label
-    $titel.Text = 'Welche Programme sollen eingerichtet werden?'
+    Beschriften $titel (Uebersetzt $toolboxTexte 'setup.sprache')
     $titel.Font = New-Object Drawing.Font($form.Font, [Drawing.FontStyle]::Bold)
     Zeile $titel
+    $sprachen = New-Object Windows.Forms.FlowLayoutPanel  # eigener Container: die Optionsfelder schließen sich gegenseitig aus
+    $sprachen.AutoSize = $true
+    $sprachen.MaximumSize = New-Object Drawing.Size ([int](380 * $s)), 0     # viele Sprachen: in die nächste Zeile
+    $sprachKnoepfe = @()
+    foreach ($sprache in $SprachListe.sprachen.PSObject.Properties) {          # je Sprache aus sprachen.json ein Feld
+        $knopf = New-Object Windows.Forms.RadioButton
+        $knopf.Text = "$($sprache.Value) ($($sprache.Name.ToUpper()))"       # z. B. „Deutsch (DE)“
+        $knopf.Tag = $sprache.Name
+        $knopf.AutoSize = $true
+        $knopf.Checked = $sprache.Name -eq $vorgewaehlt
+        $knopf.Add_CheckedChanged({                       # andere Sprache gewählt: alles sofort neu beschriften
+            if ($this.Checked) { foreach ($b in $beschriftung) { $b.Control.Text = $b.Texte[$this.Tag] } }
+        }.GetNewClosure())
+        $sprachen.Controls.Add($knopf)
+        $sprachKnoepfe += $knopf
+    }
+    Zeile $sprachen 4
+
+    $titel = New-Object Windows.Forms.Label
+    Beschriften $titel (Uebersetzt $toolboxTexte 'setup.programme')
+    $titel.Font = New-Object Drawing.Font($form.Font, [Drawing.FontStyle]::Bold)
+    Zeile $titel 16
 
     $grau = [Drawing.SystemColors]::GrayText
     $kaestchen = @()
     foreach ($p in $Alle) {
         $box = New-Object Windows.Forms.CheckBox
-        $box.Text = "$($p.name) $($p.version)"
+        $name = Uebersetzt $p.Texte 'programm.name' $p.name
+        foreach ($code in @($name.Keys)) { $name[$code] = "$($name[$code]) $($p.version)" }
+        Beschriften $box $name
         $box.Tag = $p.id
         $box.Checked = $p.id -eq 'toolbox' -or $vorher -contains $p.id
         $box.Enabled = $p.id -ne 'toolbox'                # die Toolbox ist immer dabei
@@ -401,7 +490,7 @@ function Auswahl-Fenster($vorher) {
         $kaestchen += $box
         if ($p.beschreibung) {
             $text = New-Object Windows.Forms.Label
-            $text.Text = $p.beschreibung
+            Beschriften $text (Uebersetzt $p.Texte 'programm.beschreibung' $p.beschreibung)
             $text.ForeColor = $grau
             $text.MaximumSize = New-Object Drawing.Size ([int](380 * $s)), 0      # lange Texte umbrechen
             Zeile $text 0 18
@@ -409,25 +498,24 @@ function Auswahl-Fenster($vorher) {
     }
 
     $alle = New-Object Windows.Forms.LinkLabel
-    $alle.Text = 'Alle auswählen'
+    Beschriften $alle (Uebersetzt $toolboxTexte 'setup.alle')
     $alle.Add_LinkClicked({ foreach ($box in $kaestchen) { $box.Checked = $true } }.GetNewClosure())
     Zeile $alle 12
 
     $hinweis = New-Object Windows.Forms.Label
-    $hinweis.Text = "Abgewählte Programme werden entfernt, ihre Einstellungen bleiben.`n" +
-                    'Ändern geht jederzeit: Setup.exe erneut ausführen oder in der Toolbox unter Zahnrad → Programme.'
+    Beschriften $hinweis (Uebersetzt $toolboxTexte 'setup.hinweis')
     $hinweis.ForeColor = $grau
     $hinweis.MaximumSize = New-Object Drawing.Size ([int](380 * $s)), 0
     Zeile $hinweis 8
 
     $titel = New-Object Windows.Forms.Label
-    $titel.Text = 'Verknüpfungen'
+    Beschriften $titel (Uebersetzt $toolboxTexte 'setup.verknuepfungen')
     $titel.Font = New-Object Drawing.Font($form.Font, [Drawing.FontStyle]::Bold)
     Zeile $titel 16
     $ortKaestchen = @{}                                   # Ort -> Kästchen
     foreach ($ort in $Orte.Keys) {
         $box = New-Object Windows.Forms.CheckBox
-        $box.Text = if ($ort -eq 'Desktop') { 'Verknüpfung auf dem Desktop' } else { 'Verknüpfung im Startmenü' }
+        Beschriften $box (Uebersetzt $toolboxTexte $(if ($ort -eq 'Desktop') { 'setup.desktop' } else { 'setup.startmenue' }))
         $box.Checked = Verknuepfung-Unsere $ort            # beim ersten Einrichten aus; Häkchen weg löscht sie
         Zeile $box 6
         $ortKaestchen[$ort] = $box
@@ -436,10 +524,10 @@ function Auswahl-Fenster($vorher) {
     $knoepfe = New-Object Windows.Forms.FlowLayoutPanel
     $knoepfe.FlowDirection = 'RightToLeft'
     $abbrechen = New-Object Windows.Forms.Button
-    $abbrechen.Text = 'Abbrechen'
+    Beschriften $abbrechen (Uebersetzt $toolboxTexte 'setup.abbrechen')
     $abbrechen.DialogResult = 'Cancel'
     $ok = New-Object Windows.Forms.Button
-    $ok.Text = 'Einrichten'
+    Beschriften $ok (Uebersetzt $toolboxTexte 'setup.einrichten')
     $ok.DialogResult = 'OK'
     foreach ($knopf in $abbrechen, $ok) {
         $knopf.AutoSize = $true
@@ -455,9 +543,10 @@ function Auswahl-Fenster($vorher) {
     $ids = @($kaestchen | Where-Object { $_.Checked -and $_.Tag -ne 'toolbox' } | ForEach-Object { $_.Tag })
     $verknuepfungen = @{}
     foreach ($ort in $Orte.Keys) { $verknuepfungen[$ort] = $ortKaestchen[$ort].Checked }
+    $sprache = ($sprachKnoepfe | Where-Object Checked | Select-Object -First 1).Tag
     $form.Dispose()
     if ($ergebnis -ne 'OK') { return $null }
-    [pscustomobject]@{ Ids = $ids; Verknuepfungen = $verknuepfungen }
+    [pscustomobject]@{ Sprache = $sprache; Ids = $ids; Verknuepfungen = $verknuepfungen }
 }
 
 
@@ -474,7 +563,8 @@ function Zustand-Merken {
        - Autostart: die Aufgabe liegt in Windows, nicht in daten\ – und Windows legt sie beim Neu-Einrichten aktiv an
        - ob der Hardware-Monitor lief (ob die Toolbox lief, merkt sich Einrichten selbst: $toolboxLief)
        - welche weiteren Programme liefen (Weitere-Programme) – Einrichten beendet sie, danach laufen sie wieder
-       - die Einstellungsdateien in daten\ (Einrichten selbst schreibt dort nur installiert.json – die Auswahl) #>
+       - die Einstellungsdateien in daten\ (Einrichten selbst schreibt dort nur installiert.json – die Auswahl – und
+         nach dem Fenster die Sprache in toolbox.json) #>
     $dateien = @{}
     foreach ($f in Get-ChildItem (Join-Path $Root 'daten\*.json') -ErrorAction SilentlyContinue) {
         if ($f.Name -ne (Split-Path -Leaf $InstalliertDatei)) { $dateien[$f.Name] = [IO.File]::ReadAllText($f.FullName) }
@@ -636,6 +726,10 @@ function Einrichten {
         if ($null -eq $wahl) { Write-Host 'Abgebrochen – nichts geändert.'; return }
         $ids = $wahl.Ids
         $verknuepfungen = $wahl.Verknuepfungen
+        Sprache-Speichern $wahl.Sprache
+        # gehört zur Wahl im Fenster, nicht zu dem, was Zustand-Abgleichen am Ende wiederherstellt
+        $vorZustand.Dateien[(Split-Path -Leaf $ToolboxDatei)] = [IO.File]::ReadAllText($ToolboxDatei)
+        Ok "Sprache: $($wahl.Sprache)"
     }
     $ids = @($ids)
     Installierte-Speichern $ids                   # gleich speichern: Bricht unten etwas ab, gilt die Wahl trotzdem

@@ -34,6 +34,9 @@ windows-toolbox/
 │  ├─ base.py             Baukasten für Programmseiten (Section, Text, Choice, Slider, …)
 │  ├─ winutil.py          Windows-Helfer (UAC, Aufgabenplanung)
 │  ├─ daten.py            wo Einstellungen und Logs liegen (daten/), Lesen und Schreiben
+│  ├─ i18n.py             Sprachen: Texte aus der i18n.json eines Programms in der gewählten Sprache (t("id"))
+│  ├─ i18n.json           alle Texte der Toolbox und des Setup-Fensters (je ID eine Zeile pro Sprache)
+│  ├─ sprachen.json       welche Sprachen es gibt (Code und Name) – daraus bauen Toolbox und Setup ihre Auswahl
 │  ├─ toolbox.ico         Symbol der Toolbox (blauer Werkzeugkoffer) – auch für Setup.exe und Uninstall.exe
 │  └─ programm.ico        Standardsymbol der Programme (⚒ auf Grün), z. B. für den Hardware-Monitor
 └─ programme/
@@ -48,6 +51,7 @@ windows-toolbox/
       ├─ hardwaredaten.py          liest Hersteller, Modelle, IDs und Seriennummern für den Tab „Hardwaredaten“
       ├─ hardware_monitor_gui.py   seine Seite in der Toolbox
       ├─ hardware_monitor_einstellungen.py   Startwerte, Laden/Speichern – gemeinsam für Monitor und Seite
+      ├─ i18n.json                 alle Texte auf Deutsch und Englisch (je ID eine Zeile pro Sprache)
       └─ lhm/                      LibreHardwareMonitor (Download aus programm.json, nicht im Repo)
 ```
 
@@ -56,7 +60,7 @@ Die Aufteilung folgt einer einfachen Regel: **Code** (`toolbox/`, `programme/`, 
 
 ```
 daten/
-├─ toolbox.json              Einstellungen der Toolbox
+├─ toolbox.json              Einstellungen der Toolbox – auch die Sprache (gilt für alle Programme)
 ├─ hardware_monitor.json     Einstellungen des Hardware-Monitors
 ├─ installiert.json          welche Programme eingerichtet sind (schreibt Setup.exe)
 └─ logs/
@@ -75,7 +79,8 @@ Danach **Doppelklick auf `Setup.exe`** – sonst ist nichts nötig, nicht einmal
 öffnet ein Konsolenfenster und führt darin `setup\setup.ps1` aus (eine `.ps1` direkt doppelzuklicken würde sie nur im
 Editor öffnen). Es läuft ohne Adminrechte und fragt nur für Schritt 6 einmal nach.
 
-Zuerst fragt ein kleines Fenster, **welche Programme** eingerichtet werden sollen: Die Toolbox ist immer dabei, die
+Zuerst fragt ein kleines Fenster nach der **Sprache** (Deutsch/Englisch, vorausgewählt: die von Windows; später
+änderbar in der Toolbox unter ⚙ → *Darstellung*) und **welche Programme** eingerichtet werden sollen: Die Toolbox ist immer dabei, die
 übrigen per Kästchen (oder *Alle auswählen*). Die Auswahl landet in `daten\installiert.json`; die Toolbox zeigt links
 nur diese Programme. Fehlt die Datei (Einrichtung von vor dieser Auswahl), gelten alle als eingerichtet. Darunter
 zwei Kästchen für **Verknüpfungen** „Windows Toolbox“ – *auf dem Desktop* und *im Startmenü* (beim ersten Einrichten
@@ -170,7 +175,7 @@ listet alle Sensoren auf. Läuft das im Admin-Terminal und zeigt bei der CPU ech
 
 Was im Fenster steht, steht in `programme/hardware_monitor/detailfenster_inhalt.py` – Tab für Tab, eine Zeile pro Wert:
 ```python
-Tab("GPU",
+Tab("tab.gpu",                                     # Titel: ID aus i18n.json (Text je Sprache)
     Gruppe("gpu",
            Wert("GPU Core", typ="Temperatur"),
            Wert("GPU Hot Spot"),

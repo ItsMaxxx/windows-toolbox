@@ -18,6 +18,7 @@ schickt den Befehl "verbinden", dann fragt Discord in der App nach. Von selbst f
 mitten im Spiel nichts auf.
 
 Aufruf:  pythonw discord_plus.py   (oder DiscordPlus.exe, legt Setup.exe an)
+Alle Texte (Symbol, Meldungen an die Toolbox) stehen in i18n.json; die Sprache liest es beim Start und bei "reload".
 Fehler landen in daten/logs/discord_plus.log (pythonw hat keine Konsole).
 """
 
@@ -36,9 +37,10 @@ sys.dont_write_bytecode = True                              # keine __pycache__-
 sys.path.insert(0, str(Path(__file__).resolve().parent))    # Nachbardateien finden – auch beim Start mit python -m
 from discord_ipc import DiscordFehler, Verbindung, token_holen  # noqa: E402
 from discord_plus_einstellungen import (ANMELDUNG_FILE, AUSWEIS, IPC_PORT, LOG_FILE, REDIRECT_URI,  # noqa: E402
-                                          aktivitaet, load_settings, save_settings)
+                                          aktivitaet, load_settings, save_settings, t)
 
 import daten  # noqa: E402  (liegt in toolbox\, den Pfad setzt discord_plus_einstellungen)
+import i18n  # noqa: E402
 import winutil  # noqa: E402
 
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -68,12 +70,12 @@ def kanal_lesen(daten_kanal, ich):
 def kanal_text(kanal):
     """Für die Toolbox: was Discord gerade meldet, z. B. „Privater Anruf mit Anna“."""
     if kanal is None:
-        return "in keinem Anruf oder Voice-Chat"
-    namen = ", ".join(a["name"] for a in kanal["andere"]) or "niemand sonst"
+        return t("kanal.keiner")
+    namen = ", ".join(a["name"] for a in kanal["andere"]) or t("kanal.niemand")
     if kanal["art"] == "server":
-        ort = " · ".join(t for t in (kanal.get("server"), kanal["name"]) if t)
-        return f"Voice-Chat {ort} – mit {namen}"
-    return f"{'Privater Anruf' if kanal['art'] == 'privat' else 'Gruppenanruf'} mit {namen}"
+        ort = " · ".join(teil for teil in (kanal.get("server"), kanal["name"]) if teil)
+        return t("kanal.server", ort=ort, namen=namen)
+    return t("kanal.privat" if kanal["art"] == "privat" else "kanal.gruppe", namen=namen)
 
 
 class DiscordPlus:
@@ -94,7 +96,7 @@ class DiscordPlus:
         self.gesetzt = None              # zuletzt an Discord geschickte Aktivität (nur bei Änderung neu senden)
         # Für die Statusabfrage der Toolbox und den Tooltip des Symbols
         self.zustand = "start"           # einrichtung, discord_fehlt, nicht_angemeldet, warte, bereit, im_call, fehler
-        self.meldung = "Startet …"
+        self.meldung = t("meldung.startet")
         self.kanal = None
         self.lock = threading.Lock()
         self.icon = None
@@ -181,17 +183,17 @@ class DiscordPlus:
         """„Verbinden“ in der Toolbox: Discord fragt in der App nach – wartet, bis du dort klickst."""
         s = self.settings
         if not (s["client_id"] and s["client_secret"]):
-            self.melden("einrichtung", "Client-ID und Client-Secret fehlen (Toolbox-Seite, Einrichtung)")
+            self.melden("einrichtung", t("meldung.zugang_fehlt"))
             return
         try:
             self.verbunden()
         except OSError:
-            self.melden("discord_fehlt", "Discord läuft nicht – erst die Discord-App starten")
+            self.melden("discord_fehlt", t("meldung.discord_starten"))
             return
         except DiscordFehler as fehler:
-            self.melden("fehler", f"Discord lehnt die Client-ID ab: {fehler}")
+            self.melden("fehler", t("meldung.client_id_abgelehnt", fehler=fehler))
             return
-        self.melden("warte", "Bitte in Discord „Autorisieren“ klicken …")
+        self.melden("warte", t("meldung.autorisieren"))
         try:
             code = self.verbindung.autorisieren()
             token = token_holen(s["client_id"], s["client_secret"], grant_type="authorization_code", code=code,
@@ -239,15 +241,15 @@ class DiscordPlus:
         s = self.settings
         if not (s["client_id"] and s["client_secret"]):
             self.trennen()
-            self.melden("einrichtung", "Einrichtung fehlt – Anleitung auf der Toolbox-Seite")
+            self.melden("einrichtung", t("meldung.einrichtung"))
             return WARTEN
         try:
             self.verbunden()
             if not self.angemeldet and not self.anmelden():
                 if self.verbinden_fehler:
-                    self.melden("fehler", f"Verbinden fehlgeschlagen: {self.verbinden_fehler}")
+                    self.melden("fehler", t("meldung.verbinden_fehlgeschlagen", fehler=self.verbinden_fehler))
                 else:
-                    self.melden("nicht_angemeldet", "Nicht verbunden – auf der Toolbox-Seite „Verbinden“ klicken")
+                    self.melden("nicht_angemeldet", t("meldung.nicht_verbunden"))
                 return WARTEN
             antwort = self.verbindung.sprachkanal()
             kanal = kanal_lesen(antwort, self.ich) if antwort else None
@@ -257,11 +259,11 @@ class DiscordPlus:
             return ABFRAGE
         except DiscordFehler as fehler:
             self.trennen()
-            self.melden("fehler", f"Discord meldet: {fehler} (Code {fehler.code})")
+            self.melden("fehler", t("meldung.discord_fehler", fehler=fehler, code=fehler.code))
             return WARTEN
         except (OSError, ValueError):
             self.trennen()
-            self.melden("discord_fehlt", "Discord läuft nicht – wartet auf die Discord-App")
+            self.melden("discord_fehlt", t("meldung.discord_fehlt"))
             return WARTEN
 
     def server_name(self, guild_id):
@@ -284,14 +286,14 @@ class DiscordPlus:
             self.verbindung.aktivitaet_setzen(os.getpid(), neu)
             self.gesetzt = neu
         if not self.settings["call_status"]:
-            self.melden("bereit", "Pausiert – zeigt in Discord nichts an", kanal)
+            self.melden("bereit", t("meldung.pausiert"), kanal)
         elif neu:
             text = neu["details"] + (f" · {neu['state']}" if neu.get("state") else "")
-            self.melden("im_call", f"Zeigt an: {text}", kanal)
+            self.melden("im_call", t("meldung.zeigt_an", text=text), kanal)
         elif kanal:
-            self.melden("bereit", "Im Call – laut Einstellung nicht angezeigt", kanal)
+            self.melden("bereit", t("meldung.nicht_angezeigt"), kanal)
         else:
-            self.melden("bereit", "Verbunden – du bist in keinem Call", kanal)
+            self.melden("bereit", t("meldung.kein_call"), kanal)
 
     # ---------- Wächter-Thread ----------
     def waechter(self):
@@ -304,7 +306,9 @@ class DiscordPlus:
             if befehl == "quit":
                 break
             if befehl == "reload":
-                self.settings.update(load_settings())
+                if i18n.laden() and self.icon:   # Sprache in der Toolbox umgestellt: Menü sofort neu beschriften
+                    self.icon.update_menu()
+                self.settings.update(load_settings())       # Standardtexte in Discord dann auch in der neuen Sprache
             elif befehl == "verbinden":
                 self.verbinden()
             elif befehl == "abmelden":
@@ -372,11 +376,13 @@ class DiscordPlus:
         menue = pystray.Menu(
             pystray.MenuItem(lambda item: self.meldung, None, enabled=False),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Einstellungen öffnen", lambda icon, item: threading.Thread(
+            # Texte als Funktionen: pystray fragt sie bei jedem update_menu() neu (Sprachwechsel)
+            pystray.MenuItem(lambda item: t("menue.einstellungen"), lambda icon, item: threading.Thread(
                 target=winutil.toolbox_oeffnen, args=(AUSWEIS["id"],), daemon=True).start(), default=True),
-            pystray.MenuItem("Call-Status anzeigen", pausieren, checked=lambda item: self.settings["call_status"]),
+            pystray.MenuItem(lambda item: t("menue.call_status"), pausieren,
+                             checked=lambda item: self.settings["call_status"]),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("✕  Beenden", lambda icon, item: self.beenden()),
+            pystray.MenuItem(lambda item: f"✕  {t('menue.beenden')}", lambda icon, item: self.beenden()),
         )
         bild = Image.open(ICON_DATEI).convert("RGBA").resize((64, 64), Image.LANCZOS)
         self.icon = pystray.Icon("discord_plus", bild, f"Discord Plus: {self.meldung}", menue)

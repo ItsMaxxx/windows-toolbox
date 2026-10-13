@@ -7,6 +7,8 @@ Zwei Dateien in daten\\:
   discord_plus.json             Einstellungen – schreibt die Toolbox-Seite (Client-ID und -Secret stehen auch hier)
   discord_plus_anmeldung.json   Anmeldung bei Discord (Token) – schreibt nur das Programm selbst
 Getrennt, damit sich Toolbox und Programm nie gegenseitig etwas überschreiben.
+
+Alle Texte stehen in i18n.json (t("id"), siehe toolbox\\i18n.py) – auch das, was Freunde in Discord sehen.
 """
 
 import json
@@ -16,6 +18,9 @@ from pathlib import Path
 ORDNER = Path(__file__).resolve().parent
 sys.path.append(str(ORDNER.parents[1] / "toolbox"))     # daten.py (gemeinsam mit der Toolbox)
 import daten  # noqa: E402
+import i18n  # noqa: E402
+
+t = i18n.Texte(ORDNER / "i18n.json")   # alle Texte von Discord Plus: t("id") in der gewählten Sprache
 
 AUSWEIS = json.loads((ORDNER / "programm.json").read_text(encoding="utf-8"))
 IPC_PORT = AUSWEIS["port"]             # lokale Fernsteuerung durch die Toolbox (nur von diesem PC aus erreichbar)
@@ -28,8 +33,9 @@ PORTAL_URL = "https://discord.com/developers/applications"
 REDIRECT_URI = "http://localhost"      # muss in der Discord-App unter OAuth2 → Redirects eingetragen sein
 
 ANZEIGEN_BEI = ("beide", "privat", "server")
-# Art der Aktivität – mehr erlaubt Discord über diese Schnittstelle nicht (Doku: SET_ACTIVITY)
-ARTEN = {0: "Spielt", 2: "Hört", 3: "Schaut", 5: "Tritt an in"}
+# Art der Aktivität – mehr erlaubt Discord über diese Schnittstelle nicht (Doku: SET_ACTIVITY).
+# Angezeigt wird t("art.<Nummer>"), z. B. „Spielt“ bzw. „Playing“.
+ARTEN = (0, 2, 3, 5)
 NEBEN_NAMEN = (0, 2)                   # status_display_type: 0 = Name der App, 2 = Text (details)
 
 DEFAULT_SETTINGS = {
@@ -37,8 +43,8 @@ DEFAULT_SETTINGS = {
     "client_secret": "",               # dito (OAuth2 → Reset Secret) – bleibt nur auf diesem PC
     "call_status": True,                     # aus = nichts anzeigen (das Programm läuft weiter)
     "anzeigen_bei": "beide",           # "privat" = nur Anrufe (DM, Gruppe), "server" = nur Server-Voice-Chats
-    "text_privat": "Im Call",
-    "text_server": "Im Voice-Chat",
+    "text_privat": "",                 # leer = Standardtext der gewählten Sprache (t("standard.text_privat"))
+    "text_server": "",                 # dito – „Im Voice-Chat“ bzw. „In a voice chat“
     "namen": False,                    # „… mit Anna, Tom“ und das Profilbild – sehen dann alle deine Freunde
     "ort": False,                      # Server und Kanal bzw. Name der Gruppe
     "anzahl": True,                    # „3 Personen“ (nicht bei Anrufen zu zweit)
@@ -50,13 +56,20 @@ DEFAULT_SETTINGS = {
 
 def load_settings():
     """Liest die Einstellungen; alles Fehlende oder Ungültige bekommt den Startwert."""
-    s = daten.lesen(SETTINGS_FILE, DEFAULT_SETTINGS)
+    return pruefen(daten.lesen(SETTINGS_FILE, DEFAULT_SETTINGS))
+
+
+def pruefen(s):
+    """Alles Ungültige in den Einstellungen s bekommt den Startwert (ändert s und gibt es zurück)."""
     start = DEFAULT_SETTINGS
     for key in ("client_id", "client_secret"):
         s[key] = s[key].strip() if isinstance(s[key], str) else ""
     for key in ("text_privat", "text_server"):
-        if not isinstance(s[key], str) or len(s[key].strip()) < 2:      # Discord verlangt mindestens 2 Zeichen
-            s[key] = start[key]
+        text = s[key].strip() if isinstance(s[key], str) else ""
+        # Zu kurz (Discord verlangt mindestens 2 Zeichen) oder ein unveränderter Standardtext – egal in welcher
+        # Sprache: dann der Standardtext der gewählten Sprache. Eigene Texte bleiben, wie sie sind.
+        if len(text) < 2 or text in t.alle(f"standard.{key}"):
+            s[key] = t(f"standard.{key}")
     for key in ("call_status", "namen", "ort", "anzahl", "dauer"):
         if not isinstance(s[key], bool):
             s[key] = start[key]
@@ -81,10 +94,10 @@ def kuerzen(text, laenge=128):
 
 
 def namen_liste(namen, hoechstens=3):
-    """["Anna", "Tom", "Lea", "Ben"] -> "Anna, Tom, Lea und 1 weitere"."""
+    """["Anna", "Tom", "Lea", "Ben"] -> "Anna, Tom, Lea und 1 weitere" (bzw. "… and 1 more")."""
     if len(namen) <= hoechstens:
-        return " und ".join([", ".join(namen[:-1]), namen[-1]]) if len(namen) > 1 else "".join(namen)
-    return f"{', '.join(namen[:hoechstens])} und {len(namen) - hoechstens} weitere"
+        return t("anzeige.und", vorne=", ".join(namen[:-1]), letzter=namen[-1]) if len(namen) > 1 else "".join(namen)
+    return t("anzeige.weitere", namen=", ".join(namen[:hoechstens]), n=len(namen) - hoechstens)
 
 
 def aktivitaet(kanal, s, start):
@@ -104,7 +117,7 @@ def aktivitaet(kanal, s, start):
     andere = kanal["andere"]
     text = s["text_privat"] if privat else s["text_server"]
     if s["namen"] and andere:
-        text += " mit " + namen_liste([a["name"] for a in andere])
+        text = t("anzeige.mit", text=text, namen=namen_liste([a["name"] for a in andere]))
 
     zeile2 = []
     if s["ort"]:
@@ -114,7 +127,7 @@ def aktivitaet(kanal, s, start):
             zeile2.append(kanal["name"])
     personen = len(andere) + 1
     if s["anzahl"] and (personen > 2 or not privat):
-        zeile2.append("allein" if personen == 1 else f"{personen} Personen")
+        zeile2.append(t("anzeige.allein") if personen == 1 else t("anzeige.personen", n=personen))
 
     act = {"type": s["art"], "status_display_type": s["neben_namen"], "details": kuerzen(text)}
     zeile2 = " · ".join(t for t in zeile2 if t)

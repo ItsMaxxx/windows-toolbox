@@ -1,6 +1,7 @@
 """
 Was hardware_monitor.py und seine Seite in der Toolbox (hardware_monitor_gui.py) gemeinsam brauchen: Startwerte,
-erlaubte Werte, Laden und Speichern von daten\\hardware_monitor.json, Port und Name der Aufgabe.
+erlaubte Werte, Laden und Speichern von daten\\hardware_monitor.json, Port und Name der Aufgabe – und t, die Texte
+aus i18n.json (siehe toolbox\\i18n.py).
 
 Eigene Datei, weil die Toolbox hardware_monitor.py nicht importieren kann – das lädt beim Import LibreHardwareMonitor.
 Port und Aufgabe stehen in programm.json, weil auch setup\\setup.ps1 sie braucht.
@@ -14,12 +15,14 @@ from pathlib import Path
 ORDNER = Path(__file__).resolve().parent
 sys.path.append(str(ORDNER.parents[1] / "toolbox"))     # daten.py (gemeinsam mit der Toolbox)
 import daten  # noqa: E402
+import i18n  # noqa: E402
 
 AUSWEIS = json.loads((ORDNER / "programm.json").read_text(encoding="utf-8"))
 IPC_PORT = AUSWEIS["port"]             # lokale Fernsteuerung durch die Toolbox (nur von diesem PC aus erreichbar)
 AUFGABE = AUSWEIS["aufgabe"]           # geplante Aufgabe, die den Monitor beim Anmelden mit Adminrechten startet
 SETTINGS_FILE = daten.einstellungen(AUSWEIS["id"])
 LOG_FILE = daten.log(AUSWEIS["id"])
+t = i18n.Texte(ORDNER / "i18n.json")   # alle Texte des Hardware-Monitors: t("id") in der gewählten Sprache
 
 # Auswahl im Rechtsklick-Menü und in der Toolbox (Sekunden)
 ICON_RATES = (1, 2, 5, 10)      # Taskleisten-Icons (liest nur CPU und GPU)

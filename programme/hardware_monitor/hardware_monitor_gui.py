@@ -5,6 +5,7 @@ Die Toolbox läuft ohne Adminrechte, hardware_monitor mit. Deshalb:
   - Status, Beenden und "Einstellungen neu laden" gehen über eine lokale Verbindung (IPC_PORT),
   - Starten geht über die geplante Aufgabe (keine UAC-Abfrage) oder notfalls direkt mit UAC-Abfrage,
   - Einstellungen schreibt die Toolbox in daten\\hardware_monitor.json und sagt hardware_monitor dann "reload".
+Alle Texte stehen in i18n.json – hier steht nur ihre ID: t("seite.…") (siehe toolbox\\i18n.py).
 """
 
 import json
@@ -18,8 +19,9 @@ from base import BAD, GOOD, MUTED, WARN, Button, Buttons, Choice, Combo, Program
 
 FOLDER = Path(__file__).resolve().parent
 sys.path.append(str(FOLDER))
-# Startwerte, Raten, Port, Aufgabe, Laden/Speichern – gemeinsam mit hardware_monitor.py
+# Startwerte, Raten, Port, Aufgabe, Laden/Speichern, Texte – gemeinsam mit hardware_monitor.py
 import hardware_monitor_einstellungen as hm  # noqa: E402
+from hardware_monitor_einstellungen import t  # noqa: E402
 
 # Von Setup.exe angelegt: der Starter HardwareMonitor.exe (findet runtime\ relativ zu sich, deshalb ohne
 # Argumente) und dahinter pythonw.exe mit eigenem Namen und Symbol – so heißt der Prozess im Task-Manager
@@ -34,17 +36,9 @@ def sekunden(werte):
 
 ICON_RATES = sekunden(hm.ICON_RATES)
 POPUP_RATES = sekunden(hm.POPUP_RATES)
-ORDERS = {"CPU zuerst": ["cpu", "gpu"], "GPU zuerst": ["gpu", "cpu"]}
-AUTO = {"auto": "Automatisch"}
-CPU_CHOICES = ["Automatisch", "Core (Tctl/Tdie)", "CPU Package", "Core Max", "Core Average", "CCD1 (Tdie)", "CCD2 (Tdie)"]
-GPU_CHOICES = ["Automatisch", "GPU Core", "GPU Hot Spot", "GPU Memory Junction"]
-EFFIZIENZ = dict(zip(("Automatisch", "Immer an", "Aus"), hm.EFFIZIENZ))
-EFFIZIENZ_INFO = (                # Tooltip am „i“ neben der Auswahl
-    "Effizienzmodus von Windows 11 (grünes Blatt im Task-Manager):\n\n"
-    "•  Automatisch: an, solange das Detailfenster zu ist – beim Öffnen aus, damit es flüssig bleibt.\n"
-    "•  Immer an: auch bei offenem Fenster. Am sparsamsten, das Fenster reagiert evtl. träger.\n"
-    "•  Aus: läuft immer mit normaler Priorität."
-)
+# Sensornamen von LibreHardwareMonitor – die bleiben englisch; davor steht in der Liste noch „Automatisch“
+CPU_CHOICES = ["Core (Tctl/Tdie)", "CPU Package", "Core Max", "Core Average", "CCD1 (Tdie)", "CCD2 (Tdie)"]
+GPU_CHOICES = ["GPU Core", "GPU Hot Spot", "GPU Memory Junction"]
 
 
 def ipc(command, timeout=0.6):
@@ -81,7 +75,7 @@ def task_points_here(info):
 
 
 # ---------- Programm steuern (auch für „Toolbox und alle Programme“ in den Toolbox-Einstellungen) ----------
-# Alle drei blockieren eine Weile – nur im Hintergrund aufrufen (app.run_async).
+# Alle blockieren eine Weile – nur im Hintergrund aufrufen (app.run_async).
 def laeuft():
     return ipc("status") is not None
 
@@ -109,6 +103,11 @@ def starten():
     return winutil.run_elevated(str(STARTER), cwd=str(FOLDER))
 
 
+def neu_laden():
+    """Einstellungen und Sprache neu einlesen lassen (z. B. nach einem Sprachwechsel in der Toolbox)."""
+    ipc("reload")
+
+
 class HardwareMonitorPage(ToolPage):
     settings_file = hm.SETTINGS_FILE
     defaults = hm.DEFAULT_SETTINGS
@@ -118,50 +117,49 @@ class HardwareMonitorPage(ToolPage):
 
     def layout(self):
         grey = {"width": 150, "style": "grau"}
+        auto = {"auto": t("seite.automatisch")}
         return [
-            Section("Status",
-                    Text("●  Prüfe …", name="status", size=14),
-                    Buttons(Button("Starten", self.start, name="start"),
-                            Button("Beenden", self.stop, name="stop"),
-                            Button("Neu starten", self.restart, name="restart")),
-                    Text(f"⚠  {STARTER} fehlt – bitte Setup.exe ausführen.", name="missing", color=WARN,
+            Section(t("seite.status"),
+                    Text(f"●  {t('seite.status.pruefe')}", name="status", size=14),
+                    Buttons(Button(t("seite.starten"), self.start, name="start"),
+                            Button(t("seite.beenden"), self.stop, name="stop"),
+                            Button(t("seite.neu_starten"), self.restart, name="restart")),
+                    Text(f"⚠  {t('seite.starter_fehlt', starter=STARTER)}", name="missing", color=WARN,
                          hidden=True)),
-            Section("Autostart",
-                    Text("Startet den Hardware-Monitor beim Anmelden über die Aufgabenplanung "
-                         "(mit Adminrechten, ohne Nachfrage)."),
-                    Switch("Beim Anmelden automatisch starten", command=self.toggle_autostart, name="autostart"),
+            Section(t("seite.autostart"),
+                    Text(t("seite.autostart.text")),
+                    Switch(t("seite.autostart.schalter"), command=self.toggle_autostart, name="autostart"),
                     Text(name="task_label"),
-                    Buttons(Button("Aufgabe einrichten", self.setup_task, name="task_button", width=170))),
-            Section("Aktualisierung",
-                    Text("Wie oft gemessen wird. Seltener = sparsamer. "
-                         "Die Icons lesen nur CPU und GPU, das geöffnete Fenster die Geräte des gewählten Tabs."),
-                    Choice("Taskleisten-Icons", "icon_interval", ICON_RATES),
-                    Choice("Detailfenster", "popup_interval", POPUP_RATES),
-                    Choice("Effizienzmodus", "effizienzmodus", EFFIZIENZ, info=EFFIZIENZ_INFO)),
-            Section("Anzeige",
-                    Choice("Reihenfolge der Icons", "icon_order", ORDERS),
-                    Text("Wird nach „Neu starten“ übernommen", name="order_hint", color=WARN, hidden=True),
-                    Combo("Sensor im CPU-Icon", "cpu_sensor", CPU_CHOICES, names=AUTO),
-                    Combo("Sensor im GPU-Icon", "gpu_sensor", GPU_CHOICES, names=AUTO),
-                    Text("Eigene Namen kannst du eintippen (siehe hardware_monitor.py --list). "
-                         "Gibt es den Sensor nicht, wird automatisch gewählt."),
-                    Text("Farbe der Temperaturen – getrennt, weil CPUs unter Last deutlich heißer werden dürfen als "
-                         "Grafikkarten. Mainboard und Laufwerke im Detailfenster richten sich nach der CPU."),
-                    Slider("CPU gelb ab {} °C", "cpu_warn_temp", 40, 100, color=WARN),
-                    Slider("CPU rot ab {} °C", "cpu_hot_temp", 41, 110, color=BAD),
-                    Slider("GPU gelb ab {} °C", "gpu_warn_temp", 40, 100, color=WARN),
-                    Slider("GPU rot ab {} °C", "gpu_hot_temp", 41, 110, color=BAD)),
-            Section("Detailfenster",
-                    Text("Welche Werte im Detailfenster stehen, legst du in detailfenster_inhalt.py fest – "
-                         "eine Zeile pro Wert. Änderungen erscheinen beim nächsten Öffnen des Fensters, "
-                         "alle Sensornamen zeigt „hardware_monitor.py --list“."),
-                    Buttons(Button("Ordner öffnen", lambda: self.open(FOLDER), width=150, style="grau",
+                    Buttons(Button(t("seite.aufgabe.einrichten"), self.setup_task, name="task_button", width=170))),
+            Section(t("seite.aktualisierung"),
+                    Text(t("seite.aktualisierung.text")),
+                    Choice(t("seite.aktualisierung.icons"), "icon_interval", ICON_RATES),
+                    Choice(t("seite.aktualisierung.fenster"), "popup_interval", POPUP_RATES),
+                    Choice(t("seite.effizienz"), "effizienzmodus",
+                           dict(zip((t("seite.automatisch"), t("seite.effizienz.an"), t("seite.effizienz.aus")),
+                                    hm.EFFIZIENZ)),
+                           info=t("seite.effizienz.info"))),
+            Section(t("seite.anzeige"),
+                    Choice(t("seite.reihenfolge"), "icon_order",
+                           {t("seite.reihenfolge.cpu"): ["cpu", "gpu"], t("seite.reihenfolge.gpu"): ["gpu", "cpu"]}),
+                    Text(t("seite.reihenfolge.hinweis"), name="order_hint", color=WARN, hidden=True),
+                    Combo(t("seite.sensor_cpu"), "cpu_sensor", [auto["auto"], *CPU_CHOICES], names=auto),
+                    Combo(t("seite.sensor_gpu"), "gpu_sensor", [auto["auto"], *GPU_CHOICES], names=auto),
+                    Text(t("seite.sensor.text")),
+                    Text(t("seite.farben.text")),
+                    Slider(t("seite.cpu_gelb"), "cpu_warn_temp", 40, 100, color=WARN),
+                    Slider(t("seite.cpu_rot"), "cpu_hot_temp", 41, 110, color=BAD),
+                    Slider(t("seite.gpu_gelb"), "gpu_warn_temp", 40, 100, color=WARN),
+                    Slider(t("seite.gpu_rot"), "gpu_hot_temp", 41, 110, color=BAD)),
+            Section(t("seite.detailfenster"),
+                    Text(t("seite.detailfenster.text")),
+                    Buttons(Button(t("seite.ordner_oeffnen"), lambda: self.open(FOLDER), width=150, style="grau",
                                    ziel=FOLDER))),
-            Section("Erweitert",
-                    Buttons(Button("Log öffnen", lambda: self.open(hm.LOG_FILE), ziel=hm.LOG_FILE, **grey),
-                            Button("Einstellungsdatei öffnen", lambda: self.open(self.settings_file), 
+            Section(t("seite.erweitert"),
+                    Buttons(Button(t("seite.log_oeffnen"), lambda: self.open(hm.LOG_FILE), ziel=hm.LOG_FILE, **grey),
+                            Button(t("seite.einstellungsdatei_oeffnen"), lambda: self.open(self.settings_file),
                                    ziel=self.settings_file, **grey),
-                            Button("Alles zurücksetzen", self.reset, width=150, style="gefahr"))),
+                            Button(t("seite.zuruecksetzen"), self.reset, width=150, style="gefahr"))),
         ]
 
     # ---------- Einstellungen ----------
@@ -182,7 +180,7 @@ class HardwareMonitorPage(ToolPage):
             self.update_order_hint()
 
     def on_saved(self):
-        self.app.run_async(lambda: ipc("reload"))
+        self.app.run_async(neu_laden)
 
     def update_order_hint(self):
         self.show("order_hint", self.running_order is not None and self.running_order != self.data["icon_order"])
@@ -214,13 +212,15 @@ class HardwareMonitorPage(ToolPage):
             self.after(delay, lambda: self.app.run_async(lambda: ipc("status"), self.show_status))
 
     def show_status(self, status):
+        if not self.winfo_exists():
+            return                               # Seite wurde inzwischen neu gebaut (Sprachwechsel)
         running = bool(status and status.get("ok"))
         self.running_order = status.get("order") if running else None
         if running:                              # nur die Icons, die es gibt (ohne GPU-Temperatur kein GPU-Icon)
             werte = [f"{kind.upper()} {fmt_temp(status.get(kind))}" for kind in status.get("icons", ["cpu", "gpu"])]
-            text = "  ·  ".join(["●  Läuft"] + werte)
+            text = "  ·  ".join([f"●  {t('seite.status.laeuft')}"] + werte)
         else:
-            text = "●  Gestoppt"
+            text = f"●  {t('seite.status.gestoppt')}"
         self.w["status"].configure(text=text, text_color=GOOD if running else MUTED)
         self.enable("start", not running)
         self.enable("stop", running)
@@ -233,30 +233,30 @@ class HardwareMonitorPage(ToolPage):
 
     def start(self):
         if not STARTER.exists():
-            self.app.toast(f"{STARTER.name} fehlt – bitte Setup.exe ausführen", error=True)
+            self.app.toast(t("seite.toast.starter_fehlt", starter=STARTER.name), error=True)
             return
-        self.say("Wird gestartet …")
+        self.say(t("seite.status.startet"))
         self.enable("start", False)
 
         def done(ok):
             if not ok:
-                self.app.toast("Start abgebrochen oder fehlgeschlagen", error=True)
+                self.app.toast(t("seite.toast.start_fehlgeschlagen"), error=True)
             self.poll_status_soon()
 
         self.app.run_async(starten, done)
 
     def stop(self):
-        self.say("Wird beendet …")
+        self.say(t("seite.status.beendet"))
         self.app.run_async(lambda: ipc("quit"), lambda result: self.poll_status_soon())
 
     def restart(self):
-        self.say("Wird neu gestartet …")
+        self.say(t("seite.status.neustart"))
 
         def done(stopped):
             if stopped:
                 self.start()
             else:
-                self.app.toast("Programm reagiert nicht", error=True)
+                self.app.toast(t("seite.toast.reagiert_nicht"), error=True)
 
         self.app.run_async(beenden, done)
 
@@ -264,41 +264,42 @@ class HardwareMonitorPage(ToolPage):
     def refresh_task(self):
         task = hm.AUFGABE
         self.w["autostart"].configure(state="disabled")
-        self.w["task_label"].configure(text=f"Prüfe Aufgabe „{task}“ …", text_color=MUTED)
+        self.w["task_label"].configure(text=t("seite.aufgabe.pruefe", task=task), text_color=MUTED)
         self.app.run_async(lambda: winutil.task_info(task), self.show_task)
 
     def show_task(self, info):
+        if not self.winfo_exists():
+            return                               # Seite wurde inzwischen neu gebaut (Sprachwechsel)
         task, switch, label, button = hm.AUFGABE, self.w["autostart"], self.w["task_label"], self.w["task_button"]
         if info is None:
             switch.deselect()
-            button.configure(text="Aufgabe einrichten")
-            label.configure(text=f"Aufgabe „{task}“ gibt es noch nicht. „Aufgabe einrichten“ legt sie an "
-                                 f"(Windows fragt einmal nach Adminrechten).", text_color=WARN)
+            button.configure(text=t("seite.aufgabe.einrichten"))
+            label.configure(text=t("seite.aufgabe.fehlt", task=task), text_color=WARN)
             return
         enabled = info.get("state") != "Disabled"
         switch.configure(state="normal")
         switch.select() if enabled else switch.deselect()
         if task_points_here(info):
-            button.configure(text="Neu einrichten")
-            label.configure(text=f"Aufgabe „{task}“ in der Aufgabenplanung ({'aktiv' if enabled else 'deaktiviert'})",
+            button.configure(text=t("seite.aufgabe.neu_einrichten"))
+            label.configure(text=t("seite.aufgabe.aktiv" if enabled else "seite.aufgabe.deaktiviert", task=task),
                             text_color=MUTED)
         else:
-            button.configure(text="Aufgabe aktualisieren")
-            label.configure(text=f"⚠  Aufgabe „{task}“ startet einen anderen Ort: {info.get('execute')} "
-                                 f"{info.get('arguments')}\n„Aufgabe aktualisieren“ stellt sie auf diesen Ordner um "
-                                 f"(oder Setup.exe erneut ausführen).", text_color=WARN)
+            button.configure(text=t("seite.aufgabe.aktualisieren"))
+            text = t("seite.aufgabe.anderer_ort", task=task, ziel=info.get("execute"), argumente=info.get("arguments"))
+            label.configure(text=f"⚠  {text}", text_color=WARN)
 
     def setup_task(self):
         if not STARTER.exists():
-            self.app.toast(f"{STARTER.name} fehlt – bitte Setup.exe ausführen", error=True)
+            self.app.toast(t("seite.toast.starter_fehlt", starter=STARTER.name), error=True)
             return
         self.w["task_button"].configure(state="disabled")
-        self.w["task_label"].configure(text="Richte Aufgabe ein … (bitte die Windows-Abfrage bestätigen)",
-                                       text_color=MUTED)
+        self.w["task_label"].configure(text=t("seite.aufgabe.richte_ein"), text_color=MUTED)
 
         def done(ok):
+            if not self.winfo_exists():
+                return
             self.w["task_button"].configure(state="normal")
-            self.app.toast("Aufgabe eingerichtet ✓" if ok else "Einrichten fehlgeschlagen oder abgebrochen",
+            self.app.toast(t("seite.toast.aufgabe_eingerichtet") if ok else t("seite.toast.einrichten_fehlgeschlagen"),
                            error=not ok)
             self.refresh_task()
 
@@ -310,11 +311,12 @@ class HardwareMonitorPage(ToolPage):
 
         def done(ok):
             if not ok:
-                self.app.toast("Ändern fehlgeschlagen oder abgebrochen", error=True)
-            self.refresh_task()
+                self.app.toast(t("seite.toast.aendern_fehlgeschlagen"), error=True)
+            if self.winfo_exists():
+                self.refresh_task()
 
         self.app.run_async(lambda: winutil.set_task_enabled(hm.AUFGABE, enabled), done)
 
 
 SEITE = HardwareMonitorPage
-PROGRAMM = Programm(laeuft, beenden, starten)     # für „Toolbox und alle Programme“
+PROGRAMM = Programm(laeuft, beenden, starten, neu_laden)     # für „Toolbox und alle Programme“ und den Sprachwechsel

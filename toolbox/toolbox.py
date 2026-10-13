@@ -14,6 +14,8 @@ Beschreibung, Version …); deren "seite" ist die Datei mit der Programmseite (S
 Links erscheinen nur die eingerichteten (daten\\installiert.json, schreibt Setup.exe); einrichten und entfernen lassen
 sie sich in den Einstellungen unter „Programme“.
 Einstellungen der Toolbox: daten\\toolbox.json, Fehler: daten\\logs\\toolbox.log (siehe daten.py).
+Alle Texte stehen in toolbox\\i18n.json – hier steht nur ihre ID: t("…") (siehe i18n.py). Name und Beschreibung eines
+Programms kommen aus seiner i18n.json (programm.name, programm.beschreibung), sonst aus seiner programm.json.
 """
 
 import ctypes
@@ -44,11 +46,13 @@ PROGRAMME_DIR = ROOT / "programme"         # hier liegt je Programm ein Ordner (
 sys.path.insert(0, str(APP_DIR))           # damit base, winutil usw. gefunden werden – auch von den Programmseiten
 
 import daten  # noqa: E402
+import i18n  # noqa: E402
 import winutil  # noqa: E402
 from base import (BAD, BAR, BORDER, CARD, GOOD, HOVER, MUTED, SELECTED, TEXT, Button, Buttons, Choice,  # noqa: E402
-                  Section, Switch, Text, ToolInfo, ToolPage, Tooltip, apply_font, apply_theme, ziel_anzeigen)
+                  Section, Switch, Text, ToolInfo, ToolPage, Tooltip, apply_font, apply_theme, t, ziel_anzeigen)
 
-CATEGORIES = ["Allgemein", "Games"]     # Tabs oben, in dieser Reihenfolge
+# Tabs oben, in dieser Reihenfolge – wie "kategorie" in programm.json; angezeigt wird t("kategorie.<klein>")
+CATEGORIES = ["Allgemein", "Games"]
 
 AUSWEIS = json.loads((APP_DIR / "programm.json").read_text(encoding="utf-8"))    # wie bei jedem Programm
 VERSION = AUSWEIS["version"]
@@ -64,12 +68,16 @@ UNINSTALL_EXE = ROOT / "Uninstall.exe"
 INSTALLIERT_FILE = daten.einstellungen("installiert")
 GUI_PORT = AUSWEIS["port"]       # ein zweiter Start holt nur das laufende Fenster nach vorne; setup.ps1 sagt "quit"
 
+# Gespeicherter Wert -> Modus von CustomTkinter; angezeigt wird t("einstellungen.design.<klein>")
 APPEARANCE = {"Hell": "light", "Dunkel": "dark", "System": "system"}
 ZOOM_STUFEN = [0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0]    # Strg + Mausrad, Stufen wie im Browser
+# Knöpfe DE | EN | … in den Einstellungen, automatisch aus toolbox\sprachen.json; gilt für Toolbox und alle Programme
+SPRACHEN = {sprache.upper(): sprache for sprache in i18n.SPRACHEN}
 DEFAULT_SETTINGS = {
     "appearance": "Dunkel",
     "close_to_tray": True,
     "zoom": 1.0,
+    "sprache": i18n.SPRACHE,             # setzt Setup.exe; fehlt sie: die Anzeigesprache von Windows (siehe i18n.py)
 }
 
 logging.basicConfig(filename=daten.log("toolbox"), level=logging.INFO,
@@ -85,10 +93,19 @@ def find_ausweise():
         try:
             ausweis = json.loads(ausweis_datei.read_text(encoding="utf-8"))
             ausweis["ordner"] = ausweis_datei.parent
+            texte = ausweis_datei.with_name("i18n.json")
+            ausweis["texte"] = i18n.Texte(texte) if texte.exists() else None     # Name und Beschreibung je Sprache
             ausweise.append(ausweis)
         except (OSError, ValueError):
             logging.exception("Ausweis %s konnte nicht gelesen werden", ausweis_datei)
     return ausweise
+
+
+def anzeige(ausweis, feld):
+    """Name ("name") bzw. Beschreibung ("beschreibung") eines Programms in der gewählten Sprache – aus seiner
+    i18n.json (programm.name, programm.beschreibung), sonst so, wie es in programm.json steht."""
+    texte, id = ausweis.get("texte"), f"programm.{feld}"
+    return texte(id) if texte and id in texte else ausweis.get(feld, "")
 
 
 def installierte_ids(ausweise):
@@ -109,8 +126,8 @@ def find_tools(ausweise):
             module = importlib.util.module_from_spec(spec)
             sys.modules[file.stem] = module
             spec.loader.exec_module(module)
-            tools.append(ToolInfo(ausweis["id"], ausweis["name"], ausweis["kategorie"], ausweis.get("beschreibung", ""),
-                                  module.SEITE, getattr(module, "PROGRAMM", None)))
+            tools.append(ToolInfo(ausweis["id"], anzeige(ausweis, "name"), ausweis["kategorie"],
+                                  anzeige(ausweis, "beschreibung"), module.SEITE, getattr(module, "PROGRAMM", None)))
         except Exception:
             logging.exception("Programm %s konnte nicht geladen werden", ausweis["ordner"])
     return tools
@@ -119,6 +136,14 @@ def find_tools(ausweise):
 AUSWEISE = find_ausweise()
 INSTALLIERT = installierte_ids(AUSWEISE)                 # ändert sich nur über setup.ps1 – das startet die Toolbox neu
 TOOLS = find_tools([a for a in AUSWEISE if a["id"] in INSTALLIERT])
+
+
+def namen_setzen():
+    """Name und Beschreibung aller Programme in der gerade gewählten Sprache (nach einem Sprachwechsel)."""
+    ausweis_von = {a["id"]: a for a in AUSWEISE}
+    for tool in TOOLS:
+        tool.name = anzeige(ausweis_von[tool.id], "name")
+        tool.description = anzeige(ausweis_von[tool.id], "beschreibung")
 
 
 # ---------- Einstellungen ----------
@@ -131,6 +156,8 @@ def load_settings():
         settings["close_to_tray"] = DEFAULT_SETTINGS["close_to_tray"]
     if settings["zoom"] not in ZOOM_STUFEN:
         settings["zoom"] = DEFAULT_SETTINGS["zoom"]
+    if settings["sprache"] not in i18n.SPRACHEN:
+        settings["sprache"] = DEFAULT_SETTINGS["sprache"]
     return settings
 
 
@@ -152,11 +179,14 @@ def git(*args, timeout=30):
 
 
 def git_stand():
-    """Stand des Ordners für die Anzeige, z. B. „6c3fccf vom 10.10.2026“ – oder None ohne git bzw. ohne Repo."""
+    """Stand des Ordners für die Anzeige: (Commit, Datum), z. B. ("6c3fccf", "10.10.2026") – oder None ohne git bzw.
+    ohne Repo."""
     if not (ROOT / ".git").exists():
         return None
-    result = git("log", "-1", "--format=%h vom %cd", "--date=format:%d.%m.%Y")
-    return result.stdout.strip() if result is not None and result.returncode == 0 else None
+    result = git("log", "-1", "--format=%h %cd", "--date=format:%d.%m.%Y")
+    if result is None or result.returncode != 0 or " " not in result.stdout.strip():
+        return None
+    return tuple(result.stdout.strip().split(" ", 1))
 
 
 def git_holen():
@@ -168,15 +198,15 @@ def git_holen():
 
     result = git("fetch", "--quiet", timeout=120)
     if result is None or result.returncode != 0:
-        return fehler(result, "Abrufen fehlgeschlagen")
+        return fehler(result, t("git.abrufen"))
     result = git("rev-list", "--count", "HEAD..@{upstream}")
     if result is None or result.returncode != 0:
-        return fehler(result, "Kein Zweig auf GitHub zugeordnet")
+        return fehler(result, t("git.kein_zweig"))
     neu = int(result.stdout.strip() or 0)
     if neu:
         result = git("pull", "--ff-only", "--quiet", timeout=120)
         if result is None or result.returncode != 0:
-            return fehler(result, "git pull fehlgeschlagen")
+            return fehler(result, t("git.pull"))
     return neu, None
 
 
@@ -203,39 +233,38 @@ class GuiSettingsPage(ToolPage):
 
     def layout(self):
         return [
-            Section("Darstellung",
-                    Choice("Design", "appearance", list(APPEARANCE)),
-                    Text("Größer oder kleiner: Strg + Mausrad. Mausrad-Klick scrollt wie im Browser – Maus hoch oder "
-                         "runter bewegen, nochmal klicken beendet. Oder die Seite mit der linken Maustaste "
-                         "anfassen und ziehen.")),
-            Section("Fenster",
-                    Switch("Beim Schließen in den Infobereich minimieren", key="close_to_tray"),
-                    Text("Die Toolbox läuft dann unten rechts als Symbol weiter. Doppelklick bzw. Klick öffnet sie "
-                         "wieder, Rechtsklick → Beenden schließt sie ganz.")),
-            Section("Programme",
-                    Text("Eingerichtete Programme erscheinen links. Installieren und Entfernen laufen in einem eigenen "
-                         "Fenster; die Toolbox schließt sich dabei kurz und startet danach von selbst neu."),
+            Section(t("einstellungen.darstellung"),
+                    Choice(t("einstellungen.sprache"), "sprache", SPRACHEN),
+                    Choice(t("einstellungen.design"), "appearance",
+                           {t(f"einstellungen.design.{wert.lower()}"): wert for wert in APPEARANCE}),
+                    Text(t("einstellungen.darstellung.text"))),
+            Section(t("einstellungen.fenster"),
+                    Switch(t("einstellungen.fenster.tray"), key="close_to_tray"),
+                    Text(t("einstellungen.fenster.text"))),
+            Section(t("einstellungen.programme"),
+                    Text(t("einstellungen.programme.text")),
                     *[self.programm_zeile(a) for a in AUSWEISE]),
-            Section("Beenden und Neustart",
-                    Text("●  Prüfe Programme …", name="programme"),
-                    Buttons(Button("Neu starten", self.app.neu_starten, name="nur_neu"),
-                            Button("Beenden", self.app.quit_app, name="nur_ende", style="grau"),
-                            label="Nur Toolbox", info=NUR_TOOLBOX_INFO),
-                    Buttons(Button("Neu starten", lambda: self.alle(neu=True), name="alle_neu"),
-                            Button("Beenden", lambda: self.alle(neu=False), name="alle_ende", style="grau"),
-                            label="Toolbox und alle Programme", info=ALLE_INFO)),
-            Section("Aktualisieren",
-                    Text("●  Prüfe Stand …", name="stand"),
-                    Buttons(Button("Aktualisieren", self.aktualisieren, name="update"),
-                            label="Neuester Stand von GitHub", info=UPDATE_INFO),
-                    Buttons(Button("Neu einrichten", self.neu_einrichten, name="setup", style="grau",
+            Section(t("einstellungen.beenden"),
+                    Text(f"●  {t('einstellungen.programme.pruefe')}", name="programme"),
+                    Buttons(Button(t("knopf.neu_starten"), self.app.neu_starten, name="nur_neu"),
+                            Button(t("knopf.beenden"), self.app.quit_app, name="nur_ende", style="grau"),
+                            label=t("einstellungen.nur_toolbox"), info=t("info.nur_toolbox")),
+                    Buttons(Button(t("knopf.neu_starten"), lambda: self.alle(neu=True), name="alle_neu"),
+                            Button(t("knopf.beenden"), lambda: self.alle(neu=False), name="alle_ende", style="grau"),
+                            label=t("einstellungen.alle"), info=t("info.alle"))),
+            Section(t("einstellungen.aktualisieren"),
+                    Text(f"●  {t('einstellungen.stand.pruefe')}", name="stand"),
+                    Buttons(Button(t("knopf.aktualisieren"), self.aktualisieren, name="update"),
+                            label=t("einstellungen.aktualisieren.label"), info=t("info.update")),
+                    Buttons(Button(t("knopf.neu_einrichten"), self.neu_einrichten, name="setup", style="grau",
                                    ziel=f"{SETUP_EXE} -Neustart"),
-                            label="Ohne Update, z. B. zum Reparieren", info=NEU_EINRICHTEN_INFO)),
-            Section("Deinstallieren",
-                    Buttons(Button("Deinstallieren", self.deinstallieren, name="deinstallieren", style="gefahr",
-                                   ziel=UNINSTALL_EXE),
-                            label="Toolbox und alle Programme", info=DEINSTALLIEREN_INFO)),
-            Section("Info", Text(f"Toolbox {VERSION}\nEinstellungen und Logs: {daten.DATEN_DIR}")),
+                            label=t("einstellungen.neu_einrichten.label"), info=t("info.neu_einrichten"))),
+            Section(t("einstellungen.deinstallieren"),
+                    Buttons(Button(t("knopf.deinstallieren"), self.deinstallieren, name="deinstallieren",
+                                   style="gefahr", ziel=UNINSTALL_EXE),
+                            label=t("einstellungen.alle"), info=t("info.deinstallieren"))),
+            Section(t("einstellungen.info"),
+                    Text(t("einstellungen.info.text", version=VERSION, ordner=daten.DATEN_DIR))),
         ]
 
     def on_change(self, key, value):
@@ -243,35 +272,34 @@ class GuiSettingsPage(ToolPage):
             ctk.set_appearance_mode(APPEARANCE[value])
         elif key == "close_to_tray" and not value:
             self.app.stop_tray()
+        elif key == "sprache":
+            self.app.sprache_wechseln(value)
 
     # --- Programme ---
     def programm_zeile(self, ausweis):
         """Eine Zeile je Programm: Name und Version, die Beschreibung im „i“, daneben Installieren bzw. Entfernen."""
         knopf = f"programm_{ausweis['id']}"
         if ausweis["id"] in INSTALLIERT:
-            button = Button("Entfernen", lambda: self.einrichten(ausweis, False), name=knopf, style="gefahr",
+            button = Button(t("knopf.entfernen"), lambda: self.einrichten(ausweis, False), name=knopf, style="gefahr",
                             ziel=f"{UNINSTALL_EXE} -Programme {ausweis['id']}")
         else:
-            button = Button("Installieren", lambda: self.einrichten(ausweis, True), name=knopf,
+            button = Button(t("knopf.installieren"), lambda: self.einrichten(ausweis, True), name=knopf,
                             ziel=f"{SETUP_EXE} -Programme {ausweis['id']}")
-        return Buttons(button, label=f"{ausweis['name']} {ausweis.get('version', '')}".strip(),
-                       info=ausweis.get("beschreibung") or None)
+        return Buttons(button, label=f"{anzeige(ausweis, 'name')} {ausweis.get('version', '')}".strip(),
+                       info=anzeige(ausweis, "beschreibung") or None)
 
     def einrichten(self, ausweis, an):
         """Setup.exe bzw. Uninstall.exe -Programme <id> in einem eigenen Fenster. Beide beenden die Toolbox und
         starten sie am Ende neu – dann mit der geänderten Liste links."""
-        if not an and not messagebox.askyesno(
-                "Programm entfernen",
-                f"{ausweis['name']} entfernen?\n\nEs wird beendet, Autostart und heruntergeladene Dateien werden "
-                "gelöscht. Deine Einstellungen bleiben – über „Installieren“ ist es jederzeit wieder da.",
-                icon="warning", parent=self):
+        if not an and not messagebox.askyesno(t("entfernen.titel"), t("entfernen.frage", name=anzeige(ausweis, "name")),
+                                              icon="warning", parent=self):
             return
         exe = SETUP_EXE if an else UNINSTALL_EXE
         try:
             os.startfile(str(exe), arguments=f"-Programme {ausweis['id']}", cwd=str(ROOT))
         except OSError:
             logging.exception("%s konnte nicht gestartet werden", exe.name)
-            self.app.toast(f"{exe.name} startete nicht", error=True)
+            self.app.toast(t("toast.startete_nicht", name=exe.name), error=True)
             return
         self.enable(f"programm_{ausweis['id']}", False)
 
@@ -283,25 +311,28 @@ class GuiSettingsPage(ToolPage):
 
     def programme_pruefen(self):
         """Zeigt, welche Programme gerade laufen (die Abfrage läuft im Hintergrund)."""
-        tools = [t for t in TOOLS if t.programm]
+        tools = [tool for tool in TOOLS if tool.programm]
         if not tools:
-            self.w["programme"].configure(text="Keine Programme, die eigenständig laufen.", text_color=MUTED)
+            self.w["programme"].configure(text=t("programme.keine"), text_color=MUTED)
             return
 
         def zeigen(zustaende):
-            zeilen = [f"●  {t.name}: {'läuft' if an else 'gestoppt'}" for t, an in zip(tools, zustaende or [])]
+            if not self.winfo_exists():
+                return                           # Seite inzwischen neu gebaut (Sprachwechsel)
+            zeilen = [f"●  {t('programme.laeuft' if an else 'programme.gestoppt', name=tool.name)}"
+                      for tool, an in zip(tools, zustaende or [])]
             self.w["programme"].configure(text="\n".join(zeilen), text_color=MUTED)
 
-        self.app.run_async(lambda: [t.programm.laeuft() for t in tools], zeigen)
+        self.app.run_async(lambda: [tool.programm.laeuft() for tool in tools], zeigen)
 
     def alle(self, neu):
         """Erst jedes laufende Programm beenden (und bei neu wieder starten), dann die Toolbox selbst.
         Klappt bei einem Programm etwas nicht, bleibt die Toolbox offen und zeigt den Fehler."""
-        tools = [t for t in TOOLS if t.programm]
+        tools = [tool for tool in TOOLS if tool.programm]
         knoepfe = ("nur_neu", "nur_ende", "alle_neu", "alle_ende")
         for name in knoepfe:
             self.enable(name, False)
-        self.w["programme"].configure(text="●  Programme werden " + ("neu gestartet …" if neu else "beendet …"))
+        self.w["programme"].configure(text=f"●  {t('programme.neu_gestartet' if neu else 'programme.beendet')}")
 
         def work():
             fehler = []
@@ -317,7 +348,8 @@ class GuiSettingsPage(ToolPage):
             if fehler is None or fehler:
                 for name in knoepfe:
                     self.enable(name, True)
-                self.app.toast(f"Nicht geklappt: {', '.join(fehler or ['unbekannter Fehler'])}", error=True)
+                self.app.toast(t("toast.nicht_geklappt", namen=", ".join(fehler or [t("fehler.unbekannt")])),
+                               error=True)
                 self.programme_pruefen()
             elif neu:
                 self.app.neu_starten()
@@ -329,7 +361,9 @@ class GuiSettingsPage(ToolPage):
     # --- Aktualisieren ---
     def stand_pruefen(self):
         def zeigen(stand):
-            text = f"●  Stand: {stand}" if stand else "●  Kein Git-Ordner oder git fehlt – Aktualisieren nicht möglich."
+            if not self.winfo_exists():
+                return                           # Seite inzwischen neu gebaut (Sprachwechsel)
+            text = f"●  {t('stand.text', hash=stand[0], datum=stand[1]) if stand else t('stand.kein_git')}"
             self.w["stand"].configure(text=text, text_color=MUTED)
             self.enable("update", bool(stand))
 
@@ -338,41 +372,36 @@ class GuiSettingsPage(ToolPage):
     def aktualisieren(self):
         """git pull; gab es Neues, danach Setup.exe (setup_starten)."""
         self.enable("update", False)
-        self.w["stand"].configure(text="●  Suche nach Updates …", text_color=MUTED)
+        self.w["stand"].configure(text=f"●  {t('stand.suche')}", text_color=MUTED)
 
         def done(ergebnis):
-            neu, fehler = ergebnis or (0, "unbekannter Fehler")
+            neu, fehler = ergebnis or (0, t("fehler.unbekannt"))
             if fehler:
                 self.w["stand"].configure(text=f"●  {fehler}", text_color=BAD)
                 self.enable("update", True)
             elif not neu:
-                self.app.toast("Schon auf dem neuesten Stand ✓")
+                self.app.toast(t("toast.aktuell"))
                 self.stand_pruefen()
             else:
-                self.setup_starten(f"●  {neu} neue Änderung(en) geholt – Setup.exe läuft …")
+                self.setup_starten(f"●  {t('stand.geholt', n=neu)}")
 
         self.app.run_async(git_holen, done)
 
     def neu_einrichten(self):
         """Wie nach einem Update, nur ohne git pull (siehe NEU_EINRICHTEN_INFO)."""
-        self.setup_starten("●  Setup.exe läuft …")
+        self.setup_starten(f"●  {t('stand.setup_laeuft')}")
 
     def deinstallieren(self):
         """Uninstall.exe in einem eigenen Fenster – dasselbe wie ein Doppelklick darauf. Es beendet die Toolbox
         selbst."""
-        if not messagebox.askyesno(
-                "Deinstallieren",
-                "Toolbox und alle Programme deinstallieren?\n\nSie werden beendet, Autostart und die Verknüpfungen "
-                "auf dem Desktop und im Startmenü gelöscht. Im Fenster danach kannst du wählen, ob auch die "
-                "erzeugten Dateien (runtime\\ usw.) weg sollen. Deine Einstellungen in daten\\ bleiben.\n\n"
-                f"Ganz weg ist die Toolbox, wenn du danach einfach den Ordner löschst:\n{ROOT}",
-                icon="warning", parent=self):
+        if not messagebox.askyesno(t("deinstallieren.titel"), t("deinstallieren.frage", ordner=ROOT),
+                                   icon="warning", parent=self):
             return
         try:
             os.startfile(str(UNINSTALL_EXE), cwd=str(ROOT))
         except OSError:
             logging.exception("Uninstall.exe konnte nicht gestartet werden")
-            self.app.toast("Uninstall.exe startete nicht", error=True)
+            self.app.toast(t("toast.startete_nicht", name=UNINSTALL_EXE.name), error=True)
             return
         self.enable("deinstallieren", False)
 
@@ -384,44 +413,7 @@ class GuiSettingsPage(ToolPage):
             os.startfile(str(SETUP_EXE), arguments="-Neustart", cwd=str(SETUP_EXE.parent))
         except OSError:
             logging.exception("Setup.exe konnte nicht gestartet werden")
-            self.w["stand"].configure(text="●  Setup.exe startete nicht – bitte Setup.exe im Hauptordner "
-                                           "doppelklicken.", text_color=BAD)
-
-
-UPDATE_INFO = (
-    "Holt den neuesten Stand von GitHub (git pull) und führt danach Setup.exe aus:\n\n"
-    "•  Die Toolbox schließt sich kurz, Pakete in runtime\\ werden auf die Versionen aus requirements.txt gebracht.\n"
-    "•  Danach starten die Toolbox und die Programme, die liefen (z. B. der Hardware-Monitor), mit dem neuen "
-    "Code. Neue Programme richtest du selbst ein: unter „Programme“ → Installieren.\n\n"
-    "Alles, was du eingestellt hast, ist danach wie vorher: Einstellungen in daten\\, Autostart an oder aus, "
-    "gestoppte Programme bleiben gestoppt. Eigene Änderungen am Code bleiben unangetastet: Passen sie nicht zum "
-    "neuen Stand, bricht das Update mit einer Meldung ab."
-)
-NEU_EINRICHTEN_INFO = (
-    "Führt Setup.exe aus wie nach einem Update, nur ohne etwas von GitHub zu holen – z. B. wenn etwas nicht mehr "
-    "startet oder nach dem Verschieben des Ordners.\n\n"
-    "Die Toolbox schließt sich kurz und kommt von selbst wieder. Alles, was du eingestellt hast, ist danach wie "
-    "vorher: Einstellungen, Autostart an oder aus, laufende Programme laufen wieder, gestoppte bleiben gestoppt."
-)
-DEINSTALLIEREN_INFO = (
-    "Führt Uninstall.exe aus – dasselbe wie ein Doppelklick darauf im Hauptordner:\n\n"
-    "•  Die Toolbox und alle Programme (z. B. der Hardware-Monitor) werden beendet, die Autostart-Aufgabe und die "
-    "Verknüpfungen auf dem Desktop und im Startmenü gelöscht.\n"
-    "•  Im Fenster fragt es, ob auch die erzeugten und heruntergeladenen Dateien weg sollen (runtime\\, die "
-    "Starter-.exe, LibreHardwareMonitor).\n\n"
-    "Deine Einstellungen in daten\\ bleiben. Danach kannst du den Ordner löschen – oder mit Setup.exe alles wieder "
-    "einrichten. PawnIO bleibt installiert (nutzen evtl. auch andere Programme)."
-)
-NUR_TOOLBOX_INFO = (
-    "•  Neu starten: schließt die Toolbox und öffnet sie gleich wieder – z. B. nach einem Update.\n"
-    "•  Beenden: schließt die Toolbox ganz (auch das Symbol im Infobereich).\n\n"
-    "Programme wie der Hardware-Monitor laufen dabei weiter."
-)
-ALLE_INFO = (
-    "Wie „Nur Toolbox“, aber zusätzlich für jedes Programm, das gerade läuft (z. B. den Hardware-Monitor):\n\n"
-    "•  Neu starten: erst die Programme neu, dann die Toolbox. Gestoppte Programme bleiben gestoppt.\n"
-    "•  Beenden: erst die Programme, dann die Toolbox."
-)
+            self.w["stand"].configure(text=f"●  {t('stand.setup_fehler')}", text_color=BAD)
 
 
 # ---------- Seite mit der Maus scrollen (zusätzlich zum Mausrad) ----------
@@ -652,6 +644,7 @@ class ToolboxApp(ctk.CTk):
         self.pages = {}                         # einmal gebaute Seiten bleiben erhalten
         self.current_page = None
         self.selected = {}                      # zuletzt gewähltes Programm je Tab
+        self.kategorie = CATEGORIES[0]          # Tab, dessen Programme links stehen
         self.sidebar_buttons = {}
         self.tab_buttons = {}
         self.tray = None
@@ -695,14 +688,15 @@ class ToolboxApp(ctk.CTk):
                              hover_color=HOVER, text_color=TEXT, font=ctk.CTkFont(size=17, weight="bold"),
                              cursor="hand2", command=lambda: webbrowser.open(GITHUB_URL))
         name.grid(row=0, column=0, padx=(12, 20), pady=12)
-        Tooltip(name, "Auf GitHub öffnen")
+        self.github_tooltip = Tooltip(name, t("kopf.github"))
         ziel_anzeigen(name, self, GITHUB_URL)
 
         tabs = ctk.CTkFrame(bar, fg_color="transparent")
         tabs.grid(row=0, column=1, sticky="w")
         for category in CATEGORIES:
-            button = ctk.CTkButton(tabs, text=category, width=0, height=34, corner_radius=8, fg_color="transparent",
-                                   hover_color=HOVER, text_color=MUTED, font=ctk.CTkFont(size=14, weight="bold"),
+            button = ctk.CTkButton(tabs, text=t(f"kategorie.{category.lower()}"), width=0, height=34, corner_radius=8,
+                                   fg_color="transparent", hover_color=HOVER, text_color=MUTED,
+                                   font=ctk.CTkFont(size=14, weight="bold"),
                                    command=lambda c=category: self.show_category(c))
             button.pack(side="left", padx=2)
             self.tab_buttons[category] = button
@@ -745,13 +739,23 @@ class ToolboxApp(ctk.CTk):
         for name, button in self.tab_buttons.items():
             self.mark(button, name == category)
         self.mark(self.gear, False)
+        tools = self.sidebar_fuellen(category)
+        if not tools:
+            self.show_page(None)
+            return
+        remembered = self.selected.get(category)
+        self.show_tool(next((tool for tool in tools if tool.id == remembered), tools[0]))
+
+    def sidebar_fuellen(self, category):
+        """Seitenleiste mit den Programmen des Tabs füllen (alphabetisch) – gibt sie zurück."""
+        self.kategorie = category
         for child in self.sidebar.winfo_children():
             child.destroy()
         self.sidebar_buttons = {}
 
-        ctk.CTkLabel(self.sidebar, text=category.upper(), text_color=MUTED, anchor="w",
+        ctk.CTkLabel(self.sidebar, text=t(f"kategorie.{category.lower()}").upper(), text_color=MUTED, anchor="w",
                      font=ctk.CTkFont(size=11, weight="bold")).grid(row=0, column=0, sticky="ew", padx=14, pady=(16, 6))
-        tools = sorted((t for t in TOOLS if t.category == category), key=lambda t: t.name.casefold())
+        tools = sorted((tool for tool in TOOLS if tool.category == category), key=lambda tool: tool.name.casefold())
         for row, tool in enumerate(tools, start=1):
             button = ctk.CTkButton(self.sidebar, text=tool.name, anchor="w", height=36, corner_radius=8,
                                    fg_color="transparent", text_color=MUTED, hover_color=HOVER,
@@ -762,15 +766,12 @@ class ToolboxApp(ctk.CTk):
         if not tools:
             # Nur auf „Installieren“ verweisen, wenn es für diesen Tab auch etwas zu installieren gibt
             fehlt = any(a.get("kategorie") == category and a["id"] not in INSTALLIERT for a in AUSWEISE)
-            text = "Noch keine Programme –\ninstallieren unter ⚙ → Programme" if fehlt else "Noch keine Programme"
-            ctk.CTkLabel(self.sidebar, text=text, text_color=MUTED, justify="left").grid(
-                row=1, column=0, sticky="w", padx=12)
-            self.show_page(None)
-            return
-        remembered = self.selected.get(category)
-        self.show_tool(next((t for t in tools if t.id == remembered), tools[0]))
+            ctk.CTkLabel(self.sidebar, text=t("seitenleiste.leer_installieren" if fehlt else "seitenleiste.leer"),
+                         text_color=MUTED, justify="left").grid(row=1, column=0, sticky="w", padx=12)
+        return tools
 
     def show_tool(self, tool):
+        self.kategorie = tool.category
         self.selected[tool.category] = tool.id
         for name, button in self.tab_buttons.items():       # wieder grün, falls vorher das Zahnrad gewählt war
             self.mark(button, name == tool.category)
@@ -784,7 +785,7 @@ class ToolboxApp(ctk.CTk):
     def show_programm(self, tool_id):
         """Die Seite dieses Programms zeigen (samt Tab) – z. B. vom Zahnrad im Hardware-Monitor. Unbekannt oder nicht
         eingerichtet: bleibt, wie es ist."""
-        tool = next((t for t in TOOLS if t.id == tool_id), None)
+        tool = next((tool for tool in TOOLS if tool.id == tool_id), None)
         if tool:
             self.show_category(tool.category)
             self.show_tool(tool)
@@ -794,7 +795,8 @@ class ToolboxApp(ctk.CTk):
             self.mark(button, False)
         self.mark(self.gear, True)
         if "_settings" not in self.pages:
-            info = ToolInfo("_settings", "Einstellungen", "", "Einstellungen der Toolbox selbst.", GuiSettingsPage)
+            info = ToolInfo("_settings", t("einstellungen.titel"), "", t("einstellungen.untertitel"),
+                            GuiSettingsPage)
             self.pages["_settings"] = GuiSettingsPage(self.main, self, info)
         self.show_page(self.pages["_settings"])
 
@@ -821,7 +823,7 @@ class ToolboxApp(ctk.CTk):
             self.zoom_rest -= rasten * 120
             stufe = min(max(ZOOM_STUFEN.index(self.settings["zoom"]) + rasten, 0), len(ZOOM_STUFEN) - 1)
             self.settings["zoom"] = ZOOM_STUFEN[stufe]
-            self.toast(f"Zoom {round(ZOOM_STUFEN[stufe] * 100)} %")
+            self.toast(t("toast.zoom", prozent=round(ZOOM_STUFEN[stufe] * 100)))
             if self.zoom_job:
                 self.after_cancel(self.zoom_job)
             self.zoom_job = self.after(150, self.zoom_anwenden)
@@ -831,14 +833,41 @@ class ToolboxApp(ctk.CTk):
         self.zoom_job = None
         ctk.set_widget_scaling(self.settings["zoom"])
         if not save_settings(self.settings):
-            self.toast("Zoom konnte nicht gespeichert werden", error=True)
+            self.toast(t("toast.zoom_fehler"), error=True)
+
+    def sprache_wechseln(self, sprache):
+        """Sofort in der neuen Sprache: die Toolbox beschriftet sich neu (neu_beschriften), laufende Programme lesen
+        sie neu ein (Programm.neu_laden)."""
+        i18n.setzen(sprache)
+        # Beides erst, wenn der Klick fertig ist: set() speichert direkt nach on_change (sonst lesen die Programme noch
+        # die alte Sprache) und arbeitet danach noch mit der Einstellungsseite, die neu_beschriften ersetzt
+        self.after_idle(self.neu_beschriften)
+        for tool in TOOLS:
+            if tool.programm and tool.programm.neu_laden:
+                self.after_idle(lambda p=tool.programm: self.run_async(p.neu_laden))
+
+    def neu_beschriften(self):
+        """Nach einem Sprachwechsel: Kopfleiste und Seitenleiste neu beschriften, alle Seiten neu bauen (Programmseiten
+        beim nächsten Anzeigen) – und wieder die Einstellungen zeigen, auf denen umgeschaltet wurde."""
+        namen_setzen()
+        for category, button in self.tab_buttons.items():
+            button.configure(text=t(f"kategorie.{category.lower()}"))
+        self.github_tooltip.text = t("kopf.github")
+        if self.tray is not None:
+            self.tray.update_menu()
+        self.show_page(None)
+        for page in self.pages.values():
+            page.destroy()
+        self.pages = {}
+        self.sidebar_fuellen(self.kategorie)
+        self.show_settings()
 
     # --- Hilfen für Programmseiten ---
     def save(self):
         if save_settings(self.settings):
-            self.toast("Gespeichert ✓")
+            self.toast(t("toast.gespeichert"))
         else:
-            self.toast("Speichern fehlgeschlagen", error=True)
+            self.toast(t("toast.speichern_fehlgeschlagen"), error=True)
 
     def toast(self, text, error=False):
         """Kurze Meldung oben rechts, verschwindet nach ein paar Sekunden."""
@@ -872,7 +901,10 @@ class ToolboxApp(ctk.CTk):
                     self.quit_app()
                     return
                 else:
-                    task()
+                    try:
+                        task()
+                    except Exception:            # ein Fehler darf die Warteschlange nicht anhalten
+                        logging.exception("Fehler nach einer Hintergrundaufgabe")
         except queue.Empty:
             pass
         self.after(100, self.poll_queue)
@@ -894,8 +926,9 @@ class ToolboxApp(ctk.CTk):
             try:
                 import pystray
                 menu = pystray.Menu(
-                    pystray.MenuItem("Toolbox öffnen", lambda icon, item: self.ui_queue.put("show"), default=True),
-                    pystray.MenuItem("Beenden", lambda icon, item: self.ui_queue.put("quit")),
+                    pystray.MenuItem(lambda item: t("tray.oeffnen"), lambda icon, item: self.ui_queue.put("show"),
+                                     default=True),
+                    pystray.MenuItem(lambda item: t("tray.beenden"), lambda icon, item: self.ui_queue.put("quit")),
                 )
                 self.tray = pystray.Icon("toolbox", Image.open(ICON_FILE), "Toolbox", menu)
                 self.tray.run_detached()
@@ -930,7 +963,7 @@ class ToolboxApp(ctk.CTk):
                              cwd=str(ROOT), creationflags=winutil.CREATE_NO_WINDOW)
         except OSError:
             logging.exception("Neue Toolbox konnte nicht gestartet werden")
-            self.toast("Neustart fehlgeschlagen", error=True)
+            self.toast(t("toast.neustart_fehler"), error=True)
             return
         self.quit_app()
 

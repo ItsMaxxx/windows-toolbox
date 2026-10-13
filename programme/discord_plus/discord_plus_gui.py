@@ -6,6 +6,7 @@ Das Programm (discord_plus.py) läuft eigenständig ohne Adminrechte. Die Seite:
   - schreibt Einstellungen in daten\\discord_plus.json und sagt dem Programm dann "reload",
   - erklärt die einmalige Einrichtung (eigene Discord-App) und schickt „Verbinden“ ans Programm,
   - schaltet den Autostart über HKCU\\...\\Run (ohne UAC-Abfrage, siehe winutil.autostart_setzen).
+Alle Texte stehen in i18n.json – hier steht nur ihre ID: t("seite.…") (siehe toolbox\\i18n.py).
 """
 
 import copy
@@ -23,59 +24,24 @@ from base import (BAD, GOOD, MUTED, TEXT, WARN, Button, Buttons, Choice, Entry, 
 
 FOLDER = Path(__file__).resolve().parent
 sys.path.append(str(FOLDER))
-# Startwerte, Port, Laden/Speichern und was angezeigt wird – gemeinsam mit discord_plus.py
+# Startwerte, Port, Laden/Speichern, Texte und was angezeigt wird – gemeinsam mit discord_plus.py
 import discord_plus_einstellungen as ds  # noqa: E402
+from discord_plus_einstellungen import t  # noqa: E402
 
 # Von Setup.exe angelegt (wie beim Hardware-Monitor): im Task-Manager steht dann „Discord Plus“ statt „Python“
 STARTER = FOLDER / ds.AUSWEIS["starter"]
 SKRIPT = FOLDER / ds.AUSWEIS["skript"]
 
-ANZEIGEN_BEI = {"Anrufe und Server": "beide", "Nur Anrufe": "privat", "Nur Server": "server"}
-ARTEN = {text: art for art, text in ds.ARTEN.items()}
-NEBEN_NAMEN = {"Name der App": 0, "Text": 2}
 FARBEN = {"im_call": GOOD, "bereit": TEXT, "fehler": BAD}               # alles andere: WARN
 
-EINRICHTUNG = (
-    "Discord zeigt deinen Status nur an, wenn er von einer eigenen „App“ kommt. Die legst du einmal an "
-    "(etwa 3 Minuten, kostenlos):\n\n"
-    "1.  „Developer Portal öffnen“, mit deinem Discord-Konto anmelden, oben rechts „New Application“. "
-    "Der Name, den du dort eingibst, steht später hinter „Spielt“ – z. B. „Telefonat“ oder „Voice-Chat“. "
-    "Unter „General Information“ kannst du auch ein Bild hochladen (App Icon).\n"
-    "2.  Links „OAuth2“: die „Client ID“ kopieren und unten einfügen. Das „Client Secret“ zeigt Discord nur "
-    "einmal – bis dahin steht dort „Hidden for security“ und Kopieren ist gesperrt. Also „Reset Secret“ "
-    "klicken (bestätigen, ggf. Code aus der Authenticator-App), dann erscheint es: sofort kopieren und unten "
-    "einfügen. Es bleibt nur auf diesem PC (daten\\discord_plus.json).\n"
-    "3.  Auf derselben Seite unter „Redirects“ → „Add Redirect“: http://localhost eintragen (Knopf „Kopieren“) "
-    "und unten „Save Changes“.\n"
-    "4.  Hier „Verbinden“ klicken. Discord fragt in der App einmal, ob deine App auf dein Konto zugreifen darf → "
-    "„Autorisieren“. Danach fragt es nie wieder von selbst.\n"
-    "5.  In Discord unter Einstellungen → Aktivitätsprivatsphäre (Activity Privacy) muss „Meine Aktivität teilen“ "
-    "(Share my activity) an sein – sonst sieht niemand die Anzeige. Freunde sehen sie dann immer; darunter "
-    "(Where I Share Activity) stellst du ein, auf welchen Servern sie auch andere sehen.\n\n"
-    "Testen: Ruf jemanden an oder geh in einen Voice-Chat. Oben unter „Status“ steht dann, was Discord meldet."
-)
-HINWEISE = (
-    "•  Funktioniert nur mit der Discord-App auf diesem PC (nicht im Browser) – sie muss laufen.\n"
-    "•  Die Anzeige sehen alle, die auch sonst sehen, was du spielst: Freunde und Leute auf gemeinsamen Servern.\n"
-    "•  Läuft gleichzeitig ein Spiel, zeigt Discord beide Aktivitäten; neben deinem Namen steht meist das Spiel.\n"
-    "•  Die Dauer zählt ab dem Moment, in dem das Programm den Call bemerkt (spätestens nach 3 Sekunden)."
-)
-NAMEN_INFO = (
-    "Zeigt, mit wem du im Call bist („Im Call mit Anna“), und bei Anrufen zu zweit ihr Profilbild.\n\n"
-    "Das sehen alle deine Freunde – auch die, die die andere Person nicht kennen. Frag im Zweifel vorher."
-)
-NEBEN_NAMEN_INFO = (
-    "Was in der Mitgliederliste und Freundesliste kurz neben deinem Namen steht:\n\n"
-    "•  Name der App: z. B. „Spielt Telefonat“\n"
-    "•  Text: deine erste Zeile, z. B. „Im Call“\n\n"
-    "Im Profil steht immer alles."
-)
 
-# Beispiele für die Vorschau
-BEISPIEL_ANRUF = {"art": "privat", "id": "1", "name": "", "andere": [{"name": "Anna", "avatar": "bild"}]}
-BEISPIEL_SERVER = {"art": "server", "id": "2", "name": "Allgemein", "server": "Mein Server",
-                   "andere": [{"name": "Anna", "avatar": None}, {"name": "Tom", "avatar": None},
-                              {"name": "Lea", "avatar": None}]}
+def beispiele():
+    """Beispiele für die Vorschau: ein Anruf mit Anna und ein Voice-Chat auf einem Server."""
+    anruf = {"art": "privat", "id": "1", "name": "", "andere": [{"name": "Anna", "avatar": "bild"}]}
+    server = {"art": "server", "id": "2", "name": t("vorschau.kanal"), "server": t("vorschau.server_name"),
+              "andere": [{"name": "Anna", "avatar": None}, {"name": "Tom", "avatar": None},
+                         {"name": "Lea", "avatar": None}]}
+    return ((t("vorschau.anruf"), anruf), (t("vorschau.server"), server))
 
 
 def ipc(command, timeout=0.6):
@@ -96,24 +62,24 @@ def ipc(command, timeout=0.6):
 
 def vorschau(s, app):
     """So ungefähr sieht es in deinem Profil aus – für einen Anruf mit Anna und einen Server-Voice-Chat."""
-    app = app or "‹Name deiner App›"
+    app = app or t("vorschau.app")
     s = dict(s, call_status=True)
     bloecke = []
-    for titel, kanal in (("Anruf mit Anna", BEISPIEL_ANRUF), ("Voice-Chat auf einem Server", BEISPIEL_SERVER)):
+    for titel, kanal in beispiele():
         act = ds.aktivitaet(kanal, s, time.time() - 754)
         if act is None:
-            bloecke.append(f"{titel}:  wird nicht angezeigt")
+            bloecke.append(t("vorschau.nicht_angezeigt", titel=titel))
             continue
-        verb = ds.ARTEN[act["type"]]
+        verb = t(f"art.{act['type']}")
         zeilen = [f"{titel}:", f"      {verb} {app}", f"      {act['details']}"]
         if act.get("state"):
             zeilen.append(f"      {act['state']}")
         if act.get("timestamps"):
-            zeilen.append("      12:34 vergangen")
+            zeilen.append(f"      {t('vorschau.vergangen')}")
         if act.get("assets"):
-            zeilen.append("      (mit Annas Profilbild)")
+            zeilen.append(f"      {t('vorschau.profilbild')}")
         neben = app if act["status_display_type"] == 0 else act["details"]
-        zeilen.append(f"      neben deinem Namen: {verb} {neben}")
+        zeilen.append(f"      {t('vorschau.neben', verb=verb, neben=neben)}")
         bloecke.append("\n".join(zeilen))
     return "\n\n".join(bloecke)
 
@@ -126,7 +92,7 @@ def same_path(a, b):
 
 
 # ---------- Programm steuern (auch für „Toolbox und alle Programme“ in den Toolbox-Einstellungen) ----------
-# Alle drei blockieren eine Weile – nur im Hintergrund aufrufen (app.run_async).
+# Alle blockieren eine Weile – nur im Hintergrund aufrufen (app.run_async).
 def laeuft():
     return ipc("status") is not None
 
@@ -161,6 +127,11 @@ def starten():
     return False
 
 
+def neu_laden():
+    """Einstellungen und Sprache neu einlesen lassen (z. B. nach einem Sprachwechsel in der Toolbox)."""
+    ipc("reload")
+
+
 class DiscordPlusPage(ToolPage):
     settings_file = ds.SETTINGS_FILE
     defaults = ds.DEFAULT_SETTINGS
@@ -171,51 +142,52 @@ class DiscordPlusPage(ToolPage):
     def layout(self):
         grey = {"width": 150, "style": "grau"}
         return [
-            Section("Status",
-                    Text("●  Prüfe …", name="status", size=14),
+            Section(t("seite.status"),
+                    Text(f"●  {t('seite.status.pruefe')}", name="status", size=14),
                     Text(name="erkannt", color=TEXT, hidden=True),     # was Discord gerade meldet (zum Testen)
-                    Buttons(Button("Starten", self.start, name="start"),
-                            Button("Beenden", self.stop, name="stop"),
-                            Button("Neu starten", self.restart, name="restart"))),
-            Section("Einrichtung (einmalig)",
-                    Text(EINRICHTUNG, color=TEXT),
-                    Buttons(Button("Developer Portal öffnen", lambda: webbrowser.open(ds.PORTAL_URL), width=190,
+                    Buttons(Button(t("seite.starten"), self.start, name="start"),
+                            Button(t("seite.beenden"), self.stop, name="stop"),
+                            Button(t("seite.neu_starten"), self.restart, name="restart"))),
+            Section(t("seite.einrichtung"),
+                    Text(t("seite.einrichtung.text"), color=TEXT),
+                    Buttons(Button(t("seite.portal"), lambda: webbrowser.open(ds.PORTAL_URL), width=190,
                                    ziel=ds.PORTAL_URL),
-                            Button("http://localhost kopieren", self.redirect_kopieren, width=190, style="grau")),
-                    Entry("Client ID", "client_id", width=280),
-                    Entry("Client Secret", "client_secret", width=280, geheim=True),
-                    Buttons(Button("Verbinden", self.verbinden, name="verbinden"),
-                            Button("Abmelden", self.abmelden, name="abmelden", style="grau")),
+                            Button(t("seite.localhost_kopieren"), self.redirect_kopieren, width=190, style="grau")),
+                    Entry(t("seite.client_id"), "client_id", width=280),
+                    Entry(t("seite.client_secret"), "client_secret", width=280, geheim=True),
+                    Buttons(Button(t("seite.verbinden"), self.verbinden, name="verbinden"),
+                            Button(t("seite.abmelden"), self.abmelden, name="abmelden", style="grau")),
                     Text(name="anmeldung")),
-            Section("Call-Status",
-                    Text("Zeigt in Discord „Im Call“ an, sobald du telefonierst oder in einem Voice-Chat bist – "
-                         "auch für Freunde, die den Server oder Anruf nicht sehen können."),
-                    Switch("Anzeigen, wenn ich im Call bin", key="call_status"),
-                    Choice("Anzeigen bei", "anzeigen_bei", ANZEIGEN_BEI),
-                    Entry("Text bei Anrufen", "text_privat"),
-                    Entry("Text auf Servern", "text_server"),
-                    Switch("Namen anzeigen („… mit Anna“)", key="namen"),
-                    Text(NAMEN_INFO.split("\n\n")[1], color=WARN),
-                    Switch("Server und Kanal bzw. Gruppenname anzeigen", key="ort"),
-                    Switch("Personenzahl anzeigen (ab 3 Personen und auf Servern)", key="anzahl"),
-                    Switch("Dauer anzeigen", key="dauer"),
-                    Choice("Art", "art", ARTEN),
-                    Choice("Neben deinem Namen", "neben_namen", NEBEN_NAMEN, info=NEBEN_NAMEN_INFO)),
-            Section("Vorschau Call-Status",
+            Section(t("seite.call_status"),
+                    Text(t("seite.call_status.text")),
+                    Switch(t("seite.anzeigen"), key="call_status"),
+                    Choice(t("seite.anzeigen_bei"), "anzeigen_bei",
+                           {t(f"seite.anzeigen_bei.{wert}"): wert for wert in ds.ANZEIGEN_BEI}),
+                    Entry(t("seite.text_privat"), "text_privat"),
+                    Entry(t("seite.text_server"), "text_server"),
+                    Switch(t("seite.namen"), key="namen"),
+                    Text(t("seite.namen.warnung"), color=WARN),
+                    Switch(t("seite.ort"), key="ort"),
+                    Switch(t("seite.anzahl"), key="anzahl"),
+                    Switch(t("seite.dauer"), key="dauer"),
+                    Choice(t("seite.art"), "art", {t(f"art.{art}"): art for art in ds.ARTEN}),
+                    Choice(t("seite.neben_namen"), "neben_namen",
+                           {t("seite.neben_namen.app"): 0, t("seite.neben_namen.text"): 2},
+                           info=t("seite.neben_namen.info"))),
+            Section(t("seite.vorschau"),
                     Text(name="vorschau", color=TEXT),
-                    Text("Ungefähr – wie es genau aussieht, entscheidet Discord.")),
-            Section("Autostart",
-                    Text("Startet Discord Plus beim Anmelden an Windows (ohne Adminrechte, ohne Nachfrage). "
-                         "Es wartet dann im Hintergrund, bis Discord läuft."),
-                    Switch("Beim Anmelden automatisch starten", command=self.toggle_autostart, name="autostart"),
+                    Text(t("seite.vorschau.text"))),
+            Section(t("seite.autostart"),
+                    Text(t("seite.autostart.text")),
+                    Switch(t("seite.autostart.schalter"), command=self.toggle_autostart, name="autostart"),
                     Text(name="autostart_label")),
-            Section("Gut zu wissen", Text(HINWEISE)),
-            Section("Erweitert",
-                    Buttons(Button("Log öffnen", lambda: self.open(ds.LOG_FILE), ziel=ds.LOG_FILE, **grey),
-                            Button("Einstellungsdatei öffnen", lambda: self.open(self.settings_file), 
+            Section(t("seite.gut_zu_wissen"), Text(t("seite.hinweise"))),
+            Section(t("seite.erweitert"),
+                    Buttons(Button(t("seite.log_oeffnen"), lambda: self.open(ds.LOG_FILE), ziel=ds.LOG_FILE, **grey),
+                            Button(t("seite.einstellungsdatei_oeffnen"), lambda: self.open(self.settings_file),
                                    ziel=self.settings_file, **grey),
-                            Button("Ordner öffnen", lambda: self.open(FOLDER), ziel=FOLDER, **grey)),
-                    Buttons(Button("Alles zurücksetzen", self.reset, width=150, style="gefahr"))),
+                            Button(t("seite.ordner_oeffnen"), lambda: self.open(FOLDER), ziel=FOLDER, **grey)),
+                    Buttons(Button(t("seite.zuruecksetzen"), self.reset, width=150, style="gefahr"))),
         ]
 
     # ---------- Einstellungen ----------
@@ -228,19 +200,20 @@ class DiscordPlusPage(ToolPage):
             self.w["vorschau"].configure(text=vorschau(self.data, self.app_name))
 
     def on_saved(self):
-        self.app.run_async(lambda: ipc("reload"))
+        self.app.run_async(neu_laden)
 
     def reset(self):
-        """Wie ToolPage.reset, aber die Zugangsdaten bleiben – sonst müsste man die ganze Einrichtung wiederholen."""
+        """Wie ToolPage.reset, aber die Zugangsdaten bleiben – sonst müsste man die ganze Einrichtung wiederholen.
+        pruefen() setzt die Standardtexte der gewählten Sprache ein."""
         zugang = {k: self.data.get(k, "") for k in ("client_id", "client_secret")}
-        self.data = copy.deepcopy(self.defaults) | zugang
+        self.data = ds.pruefen(copy.deepcopy(self.defaults) | zugang)
         self.refresh()
         self.save()
 
     def redirect_kopieren(self):
         self.clipboard_clear()
         self.clipboard_append(ds.REDIRECT_URI)
-        self.app.toast(f"{ds.REDIRECT_URI} kopiert ✓")
+        self.app.toast(t("seite.toast.kopiert", text=ds.REDIRECT_URI))
 
     # ---------- Status und Steuerung ----------
     def on_show(self):
@@ -269,17 +242,18 @@ class DiscordPlusPage(ToolPage):
             self.after(delay, lambda: self.app.run_async(lambda: ipc("status"), self.show_status))
 
     def show_status(self, status):
+        if not self.winfo_exists():
+            return                               # Seite wurde inzwischen neu gebaut (Sprachwechsel)
         running = bool(status and status.get("ok"))
         if running:
             zustand = status.get("zustand")
-            self.w["status"].configure(text=f"●  Läuft  ·  {status.get('meldung')}",
+            self.w["status"].configure(text=f"●  {t('seite.status.laeuft', meldung=status.get('meldung'))}",
                                        text_color=FARBEN.get(zustand, WARN))
             erkannt = status.get("erkannt")
-            self.w["erkannt"].configure(text=f"Discord meldet: {erkannt}" if erkannt else "")
+            self.w["erkannt"].configure(text=t("seite.erkannt", text=erkannt) if erkannt else "")
             self.show("erkannt", bool(erkannt))
         else:
-            self.w["status"].configure(text="●  Gestoppt – ohne das Programm zeigt Discord nichts an",
-                                       text_color=MUTED)
+            self.w["status"].configure(text=f"●  {t('seite.status.gestoppt')}", text_color=MUTED)
             self.show("erkannt", False)
         self.enable("start", not running)
         self.enable("stop", running)
@@ -290,13 +264,15 @@ class DiscordPlusPage(ToolPage):
             self.app_name = status.get("app")
             self.w["vorschau"].configure(text=vorschau(self.data, self.app_name))
         if nutzer and status.get("zustand") not in ("einrichtung", "nicht_angemeldet"):
-            text, farbe = f"✓  Verbunden als {nutzer}" + (f" – App „{self.app_name}“" if self.app_name else ""), GOOD
+            text = (t("seite.verbunden_app", nutzer=nutzer, app=self.app_name) if self.app_name
+                    else t("seite.verbunden", nutzer=nutzer))
+            text, farbe = f"✓  {text}", GOOD
         elif not (self.data["client_id"] and self.data["client_secret"]):
-            text, farbe = "Noch nicht eingerichtet – Client ID und Client Secret fehlen.", WARN
+            text, farbe = t("seite.nicht_eingerichtet"), WARN
         elif running:
-            text, farbe = "Noch nicht verbunden – „Verbinden“ klicken.", WARN
+            text, farbe = t("seite.nicht_verbunden"), WARN
         else:
-            text, farbe = "Zum Verbinden muss das Programm laufen – „Verbinden“ startet es.", MUTED
+            text, farbe = t("seite.muss_laufen"), MUTED
         self.w["anmeldung"].configure(text=text, text_color=farbe)
         self.enable("abmelden", bool(nutzer))
 
@@ -304,28 +280,28 @@ class DiscordPlusPage(ToolPage):
         self.w["status"].configure(text=f"●  {text}", text_color=MUTED)
 
     def start(self):
-        self.say("Wird gestartet …")
+        self.say(t("seite.status.startet"))
         self.enable("start", False)
 
         def done(ok):
             if not ok:
-                self.app.toast("Start fehlgeschlagen – siehe Log", error=True)
+                self.app.toast(t("seite.toast.start_fehlgeschlagen"), error=True)
             self.poll_status_soon()
 
         self.app.run_async(starten, done)
 
     def stop(self):
-        self.say("Wird beendet …")
+        self.say(t("seite.status.beendet"))
         self.app.run_async(lambda: ipc("quit"), lambda result: self.poll_status_soon())
 
     def restart(self):
-        self.say("Wird neu gestartet …")
+        self.say(t("seite.status.neustart"))
 
         def done(stopped):
             if stopped:
                 self.start()
             else:
-                self.app.toast("Programm reagiert nicht", error=True)
+                self.app.toast(t("seite.toast.reagiert_nicht"), error=True)
 
         self.app.run_async(beenden, done)
 
@@ -335,10 +311,10 @@ class DiscordPlusPage(ToolPage):
             if isinstance(element, Entry) and element.key:
                 element.apply(self)
         if not (self.data["client_id"] and self.data["client_secret"]):
-            self.app.toast("Erst Client ID und Client Secret eintragen (Schritt 2)", error=True)
+            self.app.toast(t("seite.toast.zugang_fehlt"), error=True)
             return
         self.enable("verbinden", False)
-        self.w["anmeldung"].configure(text="Bitte in Discord „Autorisieren“ klicken …", text_color=WARN)
+        self.w["anmeldung"].configure(text=t("seite.autorisieren"), text_color=WARN)
 
         def work():
             if not laeuft() and not starten():
@@ -347,9 +323,11 @@ class DiscordPlusPage(ToolPage):
             return ipc("verbinden") is not None
 
         def done(ok):
+            if not self.winfo_exists():
+                return
             self.enable("verbinden", True)
             if not ok:
-                self.app.toast("Programm startet nicht – siehe Log", error=True)
+                self.app.toast(t("seite.toast.startet_nicht"), error=True)
             self.poll_status_soon()
 
         self.app.run_async(work, done)
@@ -364,22 +342,20 @@ class DiscordPlusPage(ToolPage):
         switch.select() if info and info["an"] else switch.deselect()
         if not STARTER.exists():
             switch.configure(state="disabled")
-            label.configure(text=f"⚠  {STARTER.name} fehlt – bitte Setup.exe ausführen.", text_color=WARN)
+            label.configure(text=f"⚠  {t('seite.starter_fehlt', starter=STARTER.name)}", text_color=WARN)
         elif info and not same_path(info["ziel"].strip('"'), STARTER):
-            label.configure(text=f"⚠  Der Eintrag startet einen anderen Ort: {info['ziel']}\nAus- und wieder "
-                                 f"einschalten stellt ihn auf diesen Ordner um.", text_color=WARN)
+            label.configure(text=f"⚠  {t('seite.autostart.anderer_ort', ziel=info['ziel'])}", text_color=WARN)
         elif info and not info["an"]:
-            label.configure(text="Im Task-Manager unter „Autostart“ deaktiviert – Einschalten erlaubt ihn wieder.",
-                            text_color=MUTED)
+            label.configure(text=t("seite.autostart.deaktiviert"), text_color=MUTED)
         else:
             label.configure(text="", text_color=MUTED)
 
     def toggle_autostart(self):
         an = bool(self.w["autostart"].get())
         if not winutil.autostart_setzen(ds.AUTOSTART, STARTER if an else None):
-            self.app.toast("Ändern fehlgeschlagen", error=True)
+            self.app.toast(t("seite.toast.aendern_fehlgeschlagen"), error=True)
         self.refresh_autostart()
 
 
 SEITE = DiscordPlusPage
-PROGRAMM = Programm(laeuft, beenden, starten)     # für „Toolbox und alle Programme“
+PROGRAMM = Programm(laeuft, beenden, starten, neu_laden)     # für „Toolbox und alle Programme“ und den Sprachwechsel

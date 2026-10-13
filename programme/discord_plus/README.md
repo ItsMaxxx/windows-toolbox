@@ -23,6 +23,7 @@ Einrichtung.
 | `discord_plus_einstellungen.py` | Startwerte, Laden/Speichern und **was** angezeigt wird (`aktivitaet()`) – gemeinsam für Programm und Seite |
 | `discord_plus_gui.py` | Seite in der Toolbox: Status, Einrichtung mit Anleitung, Anzeige-Einstellungen, Vorschau, Autostart |
 | `programm.json` | Ausweis: Name, Tab, Beschreibung, Version, Skript, Starter, Port, Name des Autostart-Eintrags |
+| `i18n.json` | alle Texte auf Deutsch und Englisch – auch das, was Freunde in Discord sehen („Im Call mit …“). Die Sprache stellt man in der Toolbox ein; ein unveränderter Standardtext („Im Call“) wechselt mit, eigene Texte bleiben |
 | `DiscordPlus.exe` | Starter (legt `Setup.exe` an, nicht im Repo) |
 | `discord_plus.ico` | Logo: Discord-Kreis mit dem Gesicht aus `logo_quelle.png` – in beiden `.exe` und im Infobereich |
 | `logo_quelle.png`, `logo_bauen.py` | Vorlage und Skript, das daraus `discord_plus.ico` baut (nur nach einer neuen Vorlage nötig) |

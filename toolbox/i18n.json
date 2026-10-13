@@ -1,0 +1,357 @@
+{
+  "programm.name": {
+    "de": "Toolbox",
+    "en": "Toolbox"
+  },
+  "programm.beschreibung": {
+    "de": "Die Oberfläche für alle Programme – ist immer dabei.",
+    "en": "The interface for all programs – always included."
+  },
+
+  "kategorie.allgemein": {
+    "de": "Allgemein",
+    "en": "General"
+  },
+  "kategorie.games": {
+    "de": "Games",
+    "en": "Games"
+  },
+
+  "kopf.github": {
+    "de": "Auf GitHub öffnen",
+    "en": "Open on GitHub"
+  },
+
+  "seitenleiste.leer": {
+    "de": "Noch keine Programme",
+    "en": "No programs yet"
+  },
+  "seitenleiste.leer_installieren": {
+    "de": "Noch keine Programme –\ninstallieren unter ⚙ → Programme",
+    "en": "No programs yet –\ninstall them under ⚙ → Programs"
+  },
+
+  "einstellungen.titel": {
+    "de": "Einstellungen",
+    "en": "Settings"
+  },
+  "einstellungen.untertitel": {
+    "de": "Einstellungen der Toolbox selbst.",
+    "en": "Settings of the Toolbox itself."
+  },
+  "einstellungen.darstellung": {
+    "de": "Darstellung",
+    "en": "Appearance"
+  },
+  "einstellungen.sprache": {
+    "de": "Sprache",
+    "en": "Language"
+  },
+  "einstellungen.design": {
+    "de": "Design",
+    "en": "Theme"
+  },
+  "einstellungen.design.hell": {
+    "de": "Hell",
+    "en": "Light"
+  },
+  "einstellungen.design.dunkel": {
+    "de": "Dunkel",
+    "en": "Dark"
+  },
+  "einstellungen.design.system": {
+    "de": "System",
+    "en": "System"
+  },
+  "einstellungen.darstellung.text": {
+    "de": "Größer oder kleiner: Strg + Mausrad. Mausrad-Klick scrollt wie im Browser – Maus hoch oder runter bewegen, nochmal klicken beendet. Oder die Seite mit der linken Maustaste anfassen und ziehen.",
+    "en": "Bigger or smaller: Ctrl + mouse wheel. Middle-click scrolls like in a browser – move the mouse up or down, click again to stop. Or grab the page with the left mouse button and drag it."
+  },
+  "einstellungen.fenster": {
+    "de": "Fenster",
+    "en": "Window"
+  },
+  "einstellungen.fenster.tray": {
+    "de": "Beim Schließen in den Infobereich minimieren",
+    "en": "Minimize to the notification area when closing"
+  },
+  "einstellungen.fenster.text": {
+    "de": "Die Toolbox läuft dann unten rechts als Symbol weiter. Doppelklick bzw. Klick öffnet sie wieder, Rechtsklick → Beenden schließt sie ganz.",
+    "en": "The Toolbox then keeps running as an icon at the bottom right. Clicking or double-clicking opens it again, right-click → Quit closes it completely."
+  },
+  "einstellungen.programme": {
+    "de": "Programme",
+    "en": "Programs"
+  },
+  "einstellungen.programme.text": {
+    "de": "Eingerichtete Programme erscheinen links. Installieren und Entfernen laufen in einem eigenen Fenster; die Toolbox schließt sich dabei kurz und startet danach von selbst neu.",
+    "en": "Installed programs appear on the left. Installing and removing run in a separate window; the Toolbox closes briefly and then restarts by itself."
+  },
+  "einstellungen.beenden": {
+    "de": "Beenden und Neustart",
+    "en": "Quit and restart"
+  },
+  "einstellungen.programme.pruefe": {
+    "de": "Prüfe Programme …",
+    "en": "Checking programs …"
+  },
+  "einstellungen.nur_toolbox": {
+    "de": "Nur Toolbox",
+    "en": "Toolbox only"
+  },
+  "einstellungen.alle": {
+    "de": "Toolbox und alle Programme",
+    "en": "Toolbox and all programs"
+  },
+  "einstellungen.aktualisieren": {
+    "de": "Aktualisieren",
+    "en": "Update"
+  },
+  "einstellungen.stand.pruefe": {
+    "de": "Prüfe Stand …",
+    "en": "Checking version …"
+  },
+  "einstellungen.aktualisieren.label": {
+    "de": "Neuester Stand von GitHub",
+    "en": "Latest version from GitHub"
+  },
+  "einstellungen.neu_einrichten.label": {
+    "de": "Ohne Update, z. B. zum Reparieren",
+    "en": "Without update, e.g. to repair"
+  },
+  "einstellungen.deinstallieren": {
+    "de": "Deinstallieren",
+    "en": "Uninstall"
+  },
+  "einstellungen.info": {
+    "de": "Info",
+    "en": "Info"
+  },
+  "einstellungen.info.text": {
+    "de": "Toolbox {version}\nEinstellungen und Logs: {ordner}",
+    "en": "Toolbox {version}\nSettings and logs: {ordner}"
+  },
+
+  "knopf.neu_starten": {
+    "de": "Neu starten",
+    "en": "Restart"
+  },
+  "knopf.beenden": {
+    "de": "Beenden",
+    "en": "Quit"
+  },
+  "knopf.aktualisieren": {
+    "de": "Aktualisieren",
+    "en": "Update"
+  },
+  "knopf.neu_einrichten": {
+    "de": "Neu einrichten",
+    "en": "Set up again"
+  },
+  "knopf.deinstallieren": {
+    "de": "Deinstallieren",
+    "en": "Uninstall"
+  },
+  "knopf.installieren": {
+    "de": "Installieren",
+    "en": "Install"
+  },
+  "knopf.entfernen": {
+    "de": "Entfernen",
+    "en": "Remove"
+  },
+
+  "info.update": {
+    "de": "Holt den neuesten Stand von GitHub (git pull) und führt danach Setup.exe aus:\n\n•  Die Toolbox schließt sich kurz, Pakete in runtime\\ werden auf die Versionen aus requirements.txt gebracht.\n•  Danach starten die Toolbox und die Programme, die liefen (z. B. der Hardware-Monitor), mit dem neuen Code. Neue Programme richtest du selbst ein: unter „Programme“ → Installieren.\n\nAlles, was du eingestellt hast, ist danach wie vorher: Einstellungen in daten\\, Autostart an oder aus, gestoppte Programme bleiben gestoppt. Eigene Änderungen am Code bleiben unangetastet: Passen sie nicht zum neuen Stand, bricht das Update mit einer Meldung ab.",
+    "en": "Gets the latest version from GitHub (git pull) and then runs Setup.exe:\n\n•  The Toolbox closes briefly, packages in runtime\\ are brought to the versions from requirements.txt.\n•  Then the Toolbox and the programs that were running (e.g. the Hardware Monitor) start with the new code. You set up new programs yourself: under “Programs” → Install.\n\nEverything you have set stays as it was: settings in daten\\, autostart on or off, stopped programs stay stopped. Your own changes to the code remain untouched: if they don't fit the new version, the update stops with a message."
+  },
+  "info.neu_einrichten": {
+    "de": "Führt Setup.exe aus wie nach einem Update, nur ohne etwas von GitHub zu holen – z. B. wenn etwas nicht mehr startet oder nach dem Verschieben des Ordners.\n\nDie Toolbox schließt sich kurz und kommt von selbst wieder. Alles, was du eingestellt hast, ist danach wie vorher: Einstellungen, Autostart an oder aus, laufende Programme laufen wieder, gestoppte bleiben gestoppt.",
+    "en": "Runs Setup.exe as after an update, just without fetching anything from GitHub – e.g. when something no longer starts or after moving the folder.\n\nThe Toolbox closes briefly and comes back by itself. Everything you have set stays as it was: settings, autostart on or off, running programs run again, stopped ones stay stopped."
+  },
+  "info.deinstallieren": {
+    "de": "Führt Uninstall.exe aus – dasselbe wie ein Doppelklick darauf im Hauptordner:\n\n•  Die Toolbox und alle Programme (z. B. der Hardware-Monitor) werden beendet, die Autostart-Aufgabe und die Verknüpfungen auf dem Desktop und im Startmenü gelöscht.\n•  Im Fenster fragt es, ob auch die erzeugten und heruntergeladenen Dateien weg sollen (runtime\\, die Starter-.exe, LibreHardwareMonitor).\n\nDeine Einstellungen in daten\\ bleiben. Danach kannst du den Ordner löschen – oder mit Setup.exe alles wieder einrichten. PawnIO bleibt installiert (nutzen evtl. auch andere Programme).",
+    "en": "Runs Uninstall.exe – the same as double-clicking it in the main folder:\n\n•  The Toolbox and all programs (e.g. the Hardware Monitor) are closed, the autostart task and the shortcuts on the desktop and in the Start menu are deleted.\n•  The window asks whether the generated and downloaded files should be removed too (runtime\\, the starter .exe files, LibreHardwareMonitor).\n\nYour settings in daten\\ are kept. Afterwards you can delete the folder – or set everything up again with Setup.exe. PawnIO stays installed (other programs may use it too)."
+  },
+  "info.nur_toolbox": {
+    "de": "•  Neu starten: schließt die Toolbox und öffnet sie gleich wieder – z. B. nach einem Update.\n•  Beenden: schließt die Toolbox ganz (auch das Symbol im Infobereich).\n\nProgramme wie der Hardware-Monitor laufen dabei weiter.",
+    "en": "•  Restart: closes the Toolbox and opens it again right away – e.g. after an update.\n•  Quit: closes the Toolbox completely (including the icon in the notification area).\n\nPrograms like the Hardware Monitor keep running."
+  },
+  "info.alle": {
+    "de": "Wie „Nur Toolbox“, aber zusätzlich für jedes Programm, das gerade läuft (z. B. den Hardware-Monitor):\n\n•  Neu starten: erst die Programme neu, dann die Toolbox. Gestoppte Programme bleiben gestoppt.\n•  Beenden: erst die Programme, dann die Toolbox.",
+    "en": "Like “Toolbox only”, but also for every program that is currently running (e.g. the Hardware Monitor):\n\n•  Restart: first the programs, then the Toolbox. Stopped programs stay stopped.\n•  Quit: first the programs, then the Toolbox."
+  },
+
+  "programme.keine": {
+    "de": "Keine Programme, die eigenständig laufen.",
+    "en": "No programs that run on their own."
+  },
+  "programme.laeuft": {
+    "de": "{name}: läuft",
+    "en": "{name}: running"
+  },
+  "programme.gestoppt": {
+    "de": "{name}: gestoppt",
+    "en": "{name}: stopped"
+  },
+  "programme.neu_gestartet": {
+    "de": "Programme werden neu gestartet …",
+    "en": "Restarting programs …"
+  },
+  "programme.beendet": {
+    "de": "Programme werden beendet …",
+    "en": "Closing programs …"
+  },
+
+  "entfernen.titel": {
+    "de": "Programm entfernen",
+    "en": "Remove program"
+  },
+  "entfernen.frage": {
+    "de": "{name} entfernen?\n\nEs wird beendet, Autostart und heruntergeladene Dateien werden gelöscht. Deine Einstellungen bleiben – über „Installieren“ ist es jederzeit wieder da.",
+    "en": "Remove {name}?\n\nIt will be closed, and its autostart and downloaded files will be deleted. Your settings are kept – “Install” brings it back anytime."
+  },
+
+  "deinstallieren.titel": {
+    "de": "Deinstallieren",
+    "en": "Uninstall"
+  },
+  "deinstallieren.frage": {
+    "de": "Toolbox und alle Programme deinstallieren?\n\nSie werden beendet, Autostart und die Verknüpfungen auf dem Desktop und im Startmenü gelöscht. Im Fenster danach kannst du wählen, ob auch die erzeugten Dateien (runtime\\ usw.) weg sollen. Deine Einstellungen in daten\\ bleiben.\n\nGanz weg ist die Toolbox, wenn du danach einfach den Ordner löschst:\n{ordner}",
+    "en": "Uninstall the Toolbox and all programs?\n\nThey will be closed, and autostart and the shortcuts on the desktop and in the Start menu deleted. In the next window you can choose whether the generated files (runtime\\ etc.) should be removed too. Your settings in daten\\ are kept.\n\nThe Toolbox is completely gone once you then simply delete the folder:\n{ordner}"
+  },
+
+  "stand.text": {
+    "de": "Stand: {hash} vom {datum}",
+    "en": "Version: {hash} from {datum}"
+  },
+  "stand.kein_git": {
+    "de": "Kein Git-Ordner oder git fehlt – Aktualisieren nicht möglich.",
+    "en": "No Git folder or git is missing – updating is not possible."
+  },
+  "stand.suche": {
+    "de": "Suche nach Updates …",
+    "en": "Looking for updates …"
+  },
+  "stand.geholt": {
+    "de": "{n} neue Änderung(en) geholt – Setup.exe läuft …",
+    "en": "Got {n} new change(s) – Setup.exe is running …"
+  },
+  "stand.setup_laeuft": {
+    "de": "Setup.exe läuft …",
+    "en": "Setup.exe is running …"
+  },
+  "stand.setup_fehler": {
+    "de": "Setup.exe startete nicht – bitte Setup.exe im Hauptordner doppelklicken.",
+    "en": "Setup.exe didn't start – please double-click Setup.exe in the main folder."
+  },
+
+  "git.abrufen": {
+    "de": "Abrufen fehlgeschlagen",
+    "en": "Fetching failed"
+  },
+  "git.kein_zweig": {
+    "de": "Kein Zweig auf GitHub zugeordnet",
+    "en": "No branch on GitHub assigned"
+  },
+  "git.pull": {
+    "de": "git pull fehlgeschlagen",
+    "en": "git pull failed"
+  },
+
+  "fehler.unbekannt": {
+    "de": "unbekannter Fehler",
+    "en": "unknown error"
+  },
+
+  "toast.gespeichert": {
+    "de": "Gespeichert ✓",
+    "en": "Saved ✓"
+  },
+  "toast.speichern_fehlgeschlagen": {
+    "de": "Speichern fehlgeschlagen",
+    "en": "Saving failed"
+  },
+  "toast.speichern_fehler": {
+    "de": "Speichern fehlgeschlagen: {fehler}",
+    "en": "Saving failed: {fehler}"
+  },
+  "toast.nicht_gefunden": {
+    "de": "Nicht gefunden: {name}",
+    "en": "Not found: {name}"
+  },
+  "toast.startete_nicht": {
+    "de": "{name} startete nicht",
+    "en": "{name} didn't start"
+  },
+  "toast.nicht_geklappt": {
+    "de": "Nicht geklappt: {namen}",
+    "en": "Didn't work: {namen}"
+  },
+  "toast.aktuell": {
+    "de": "Schon auf dem neuesten Stand ✓",
+    "en": "Already up to date ✓"
+  },
+  "toast.zoom": {
+    "de": "Zoom {prozent} %",
+    "en": "Zoom {prozent} %"
+  },
+  "toast.zoom_fehler": {
+    "de": "Zoom konnte nicht gespeichert werden",
+    "en": "Couldn't save the zoom level"
+  },
+  "toast.neustart_fehler": {
+    "de": "Neustart fehlgeschlagen",
+    "en": "Restart failed"
+  },
+
+  "tray.oeffnen": {
+    "de": "Toolbox öffnen",
+    "en": "Open Toolbox"
+  },
+  "tray.beenden": {
+    "de": "Beenden",
+    "en": "Quit"
+  },
+
+  "setup.titel": {
+    "de": "Toolbox einrichten",
+    "en": "Set up Toolbox"
+  },
+  "setup.sprache": {
+    "de": "Sprache",
+    "en": "Language"
+  },
+  "setup.programme": {
+    "de": "Welche Programme sollen eingerichtet werden?",
+    "en": "Which programs should be set up?"
+  },
+  "setup.alle": {
+    "de": "Alle auswählen",
+    "en": "Select all"
+  },
+  "setup.hinweis": {
+    "de": "Abgewählte Programme werden entfernt, ihre Einstellungen bleiben.\nÄndern geht jederzeit: Setup.exe erneut ausführen oder in der Toolbox unter ⚙ → Programme.",
+    "en": "Deselected programs are removed, their settings are kept.\nYou can change this anytime: run Setup.exe again or in the Toolbox under ⚙ → Programs."
+  },
+  "setup.verknuepfungen": {
+    "de": "Verknüpfungen",
+    "en": "Shortcuts"
+  },
+  "setup.desktop": {
+    "de": "Verknüpfung auf dem Desktop",
+    "en": "Shortcut on Desktop"
+  },
+  "setup.startmenue": {
+    "de": "Verknüpfung im Startmenü",
+    "en": "Shortcut in Start Menu"
+  },
+  "setup.einrichten": {
+    "de": "Einrichten",
+    "en": "Set up"
+  },
+  "setup.abbrechen": {
+    "de": "Abbrechen",
+    "en": "Cancel"
+  }
+}

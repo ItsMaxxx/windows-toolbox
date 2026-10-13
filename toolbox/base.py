@@ -36,10 +36,14 @@ import tkinter as tk
 import tkinter.font as tkfont
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 
 import customtkinter as ctk
 
 import daten
+import i18n
+
+t = i18n.Texte(Path(__file__).with_name("i18n.json"))     # Texte der Toolbox selbst: t("id") in der gewählten Sprache
 
 # Farben jeweils als (hell, dunkel) – CustomTkinter nimmt automatisch die passende.
 # Dunkel = Stil der PROOFM-Website (Navy-Hintergrund, grüner Akzent), hell = dieselben Töne auf hellem Grund.
@@ -108,10 +112,13 @@ class Programm:
       laeuft()  -> True, wenn es gerade läuft
       beenden() -> True, wenn es danach wirklich beendet ist (auf das Prozessende warten!)
       starten() -> True, wenn der Start geklappt hat
+    Optional:
+      neu_laden() -> Einstellungen und Sprache neu einlesen lassen – ruft die Toolbox nach einem Sprachwechsel auf
     """
     laeuft: Callable
     beenden: Callable
     starten: Callable
+    neu_laden: Callable | None = None
 
 
 @dataclass
@@ -424,9 +431,9 @@ class ToolPage(ctk.CTkScrollableFrame):
         try:
             daten.schreiben(self.settings_file, self.data)
         except OSError as error:
-            self.app.toast(f"Speichern fehlgeschlagen: {error.strerror or error}", error=True)
+            self.app.toast(t("toast.speichern_fehler", fehler=error.strerror or error), error=True)
             return
-        self.app.toast("Gespeichert ✓")
+        self.app.toast(t("toast.gespeichert"))
         self.on_saved()
 
     def set(self, key, value, later=False):
@@ -469,7 +476,7 @@ class ToolPage(ctk.CTkScrollableFrame):
         try:
             os.startfile(path)
         except OSError:
-            self.app.toast(f"Nicht gefunden: {path.name}", error=True)
+            self.app.toast(t("toast.nicht_gefunden", name=path.name), error=True)
 
     # --- Wird von der Toolbox bzw. von set() aufgerufen; Unterklassen können das überschreiben ---
     def layout(self):

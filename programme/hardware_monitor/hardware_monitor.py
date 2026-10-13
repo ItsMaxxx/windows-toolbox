@@ -44,7 +44,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))    # detailfenster find
 from detailfenster import ICON_DATEI, TYPE_LABELS, Detailfenster, fmt_value, temp_color  # noqa: E402
 # Startwerte, Raten, Port, Laden/Speichern – gemeinsam mit der Seite in der Toolbox
 from hardware_monitor_einstellungen import (ICON_RATES, IPC_PORT, LOG_FILE, POPUP_RATES, load_settings,  # noqa: E402
-                                            save_settings)
+                                            save_settings, t)
+import i18n  # noqa: E402  (Sprache – liegt in toolbox\, den Pfad ergänzt hardware_monitor_einstellungen)
 
 
 # ---------- Einstellungen ----------
@@ -322,8 +323,8 @@ def settings_speichern():
 
 def rate_label(seconds):
     if seconds == 1:
-        return "1 Sekunde"
-    return f"{seconds:g} Sekunden".replace(".", ",")
+        return t("menue.eine_sekunde")
+    return t("menue.sekunden", n=f"{seconds:g}".replace(".", ","))
 
 
 if "--list" in sys.argv:
@@ -471,14 +472,16 @@ class HardwareMonitorApp:
     # --- Rechtsklick-Menü ---
     def make_menu(self):
         return pystray.Menu(
-            pystray.MenuItem("Details anzeigen", lambda icon, item: self.ui_queue.put("toggle"), default=True),
+            # Texte als Funktionen: pystray fragt sie bei jedem update_menu() neu – so wirkt ein Sprachwechsel sofort
+            pystray.MenuItem(lambda item: t("menue.details"), lambda icon, item: self.ui_queue.put("toggle"),
+                             default=True),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem(lambda item: f"Icons aktualisieren: {rate_label(self.settings['icon_interval'])}",
+            pystray.MenuItem(lambda item: t("menue.icons", rate=rate_label(self.settings["icon_interval"])),
                              self.rate_menu("icon_interval", ICON_RATES)),
-            pystray.MenuItem(lambda item: f"Fenster aktualisieren: {rate_label(self.settings['popup_interval'])}",
+            pystray.MenuItem(lambda item: t("menue.fenster", rate=rate_label(self.settings["popup_interval"])),
                              self.rate_menu("popup_interval", POPUP_RATES)),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("✕  Beenden", lambda icon, item: self.ui_queue.put("quit")),
+            pystray.MenuItem(lambda item: f"✕  {t('menue.beenden')}", lambda icon, item: self.ui_queue.put("quit")),
         )
 
     def rate_menu(self, key, rates):
@@ -491,8 +494,11 @@ class HardwareMonitorApp:
         def checked(seconds):
             return lambda item: self.settings[key] == seconds
 
+        def label(seconds):
+            return lambda item: rate_label(seconds)
+
         return pystray.Menu(*[
-            pystray.MenuItem(rate_label(s), action(s), checked=checked(s), radio=True)
+            pystray.MenuItem(label(s), action(s), checked=checked(s), radio=True)
             for s in rates
         ])
 
@@ -566,7 +572,7 @@ class HardwareMonitorApp:
             self.shown[kind] = text
             icon.icon = make_icon(kind, value)
             shown = "–" if value is None else f"{text} °C"
-            icon.title = f"{kind.upper()}: {shown}  ·  Klick für Details"
+            icon.title = f"{kind.upper()}: {shown}  ·  {t('icon.klick')}"
 
     def sensor_loop(self):
         """Fenster zu (oder minimiert): alle `icon_interval` Sekunden nur CPU und GPU lesen.
@@ -659,12 +665,15 @@ class HardwareMonitorApp:
         window = SETTINGS["window"]              # gehört dem Fenster – die Toolbox hat evtl. einen alten Stand
         SETTINGS.update(load_settings())
         SETTINGS["window"] = window
+        neue_sprache = i18n.laden()              # in der Toolbox umgestellt? Menüs und Icons folgen gleich unten
         self.shown.clear()                       # Icons neu zeichnen (z. B. neue Farbgrenzen)
         ICON_SENSOREN.clear()                    # Icon-Sensoren neu suchen (z. B. anderer Sensor gewählt)
         for icon in self.icons.values():
             icon.update_menu()
         self.effizienz_anwenden()                # z. B. in der Toolbox auf „Immer an“ gestellt
-        if self.fenster:
+        if self.fenster and neue_sprache:
+            self.fenster.sprache_gewechselt()
+        elif self.fenster:
             self.fenster.aktualisieren()
         self.wake.set()
 

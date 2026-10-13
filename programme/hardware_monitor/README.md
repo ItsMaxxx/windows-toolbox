@@ -22,6 +22,7 @@ es über seine Seite in der Toolbox (*Allgemein → Hardware-Monitor*) oder per 
 | `hardwaredaten.py` | liest die festen Daten für den Tab „Hardwaredaten“ über WMI; `python hardwaredaten.py` gibt sie aus |
 | `hardware_monitor_gui.py` | Seite in der Toolbox: Status, Starten/Beenden, Autostart, Einstellungen |
 | `hardware_monitor_einstellungen.py` | Startwerte, erlaubte Werte, Laden und Speichern – gemeinsam für Programm und Seite |
+| `i18n.json` | alle Texte auf Deutsch und Englisch – je ID ein Block, eine Zeile pro Sprache (siehe *Sprachen*) |
 | `programm.json` | Ausweis: Name, Tab, Beschreibung, Version, Skript, Starter, Port, Aufgabe, Download von LibreHardwareMonitor |
 | `HardwareMonitor.exe` | Starter (legt `Setup.exe` an, nicht im Repo) – startet `hardware_monitor.py` ohne Argumente |
 | `lhm/` | LibreHardwareMonitor (nicht im Repo, siehe unten) |
@@ -118,18 +119,20 @@ Toolbox-Seite nutzen beide diese Datei.
 Was im Fenster steht, steht in `detailfenster_inhalt.py` – Tab für Tab, eine Zeile pro Wert:
 
 ```python
-Tab("GPU",
+Tab("tab.gpu",
     Gruppe("gpu",
            Wert("GPU Core", typ="Temperatur"),
            Wert("GPU Hot Spot"),
            Wert("GPU Fan *", typ="Lüfter")))       # * = beliebiger Text, hier: alle GPU-Lüfter
 ```
 
+- Beschriftungen (Tab-Titel, `Abschnitt`, `titel=`, `text=`) sind IDs aus `i18n.json` wie `"tab.gpu"` – so stehen
+  sie in jeder Sprache richtig da. Ein eigener Text ohne ID geht auch, er steht dann in jeder Sprache gleich da.
 - Geräte für `Gruppe(...)`: `cpu`, `gpu`, `ram`, `mainboard`, `laufwerk` (gilt für jedes Laufwerk einzeln),
   `netzwerk`, `akku`, `weitere`. `name=` beschränkt eine Gruppe auf Geräte mit passendem Namen (z. B. `"Intel*"`).
 - `typ=` ist nur nötig, wenn es denselben Namen mehrfach gibt; `text=` setzt eine eigene Beschriftung; `ohne=` schließt
   Namen aus, die trotz `*` nicht dazugehören (`Wert("CPU Core #*", ohne="*Distance*")`).
-- `Abschnitt("Lüfter", Wert(...), ...)` in einer Gruppe ist ein einklappbarer Unterpunkt; mit `eine_zeile=True` stehen
+- `Abschnitt("abschnitt.luefter", Wert(...), ...)` in einer Gruppe ist ein einklappbarer Unterpunkt; mit `eine_zeile=True` stehen
   gleichnamige Werte in einer Zeile (Fan #1: Drehzahl, dahinter die Ansteuerung als Balken mit %; dreht sich ein
   angesteuerter Lüfter nicht, steht dort grau „steht“). Zugeklappte Bereiche bleiben zu, bis das
   Programm beendet wird.
@@ -138,6 +141,30 @@ Tab("GPU",
 - Die genauen Namen zeigt `--list`. Den früheren Tab „Alles“ (alle Sensoren) kann man in `detailfenster_inhalt.py`
   wieder einkommentieren.
 - Gespeicherte Änderungen erscheinen beim nächsten Öffnen des Fensters, ohne Neustart.
+
+## Sprachen
+
+Alle Texte – Toolbox-Seite, Rechtsklick-Menü, Detailfenster, Erklärungen, Hardwaredaten – stehen in `i18n.json`: je ID ein
+Block, darin jede Sprache in einer eigenen Zeile:
+
+```json
+"seite.status.laeuft": {
+  "de": "Läuft",
+  "en": "Running"
+},
+```
+
+Im Code steht nur die ID: `t("seite.status.laeuft")`; Platzhalter wie `{task}` füllt `t("…", task=…)`. Fehlt eine
+Übersetzung, kommt der englische Text, fehlt auch der, die ID selbst (einmal je ID im Log) – es stürzt also nichts ab.
+Neue Sprache: in `toolbox\sprachen.json` eine Zeile ergänzen (`"fr": "Français"`) und hier in jedem Block eine Zeile
+(`"fr": "…"`). Den Knopf FR in der Toolbox und das Optionsfeld „Français (FR)“ im Setup-Fenster bauen beide daraus
+selbst, und ein Windows in dieser Sprache wählt sie automatisch vor.
+
+Welche Sprache gilt, steht in `daten\toolbox.json` (`"sprache"`) – gewählt im Setup-Fenster oder in der Toolbox unter
+⚙ → *Darstellung* (DE / EN). Ohne Eintrag gilt die Anzeigesprache von Windows, wenn es sie gibt (sonst Englisch). Ein Klick
+auf DE/EN wirkt sofort: Die Toolbox baut die Seite neu und schickt dem laufenden Monitor `reload` – Rechtsklick-Menü,
+Tooltips und ein offenes Detailfenster stellen sich gleich um. Sensornamen von LibreHardwareMonitor („CPU Package“)
+bleiben englisch; Zahlen und Einheiten sind noch fest (deutsches Komma).
 
 ## Hardwaredaten
 
