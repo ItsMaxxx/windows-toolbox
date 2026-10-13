@@ -1,0 +1,35 @@
+{
+  "programm.name": {
+    "de": "Cube Game",
+    "en": "Cube Game"
+  },
+  "programm.beschreibung": {
+    "de": "Das Spielfenster selbst ist die Arena – und es schrumpft ständig. Schieß gegen die Ränder, um es wieder aufzudrücken (cube_game).",
+    "en": "The game window itself is the arena – and it keeps shrinking. Shoot its edges to push them back out (cube_game)."
+  },
+
+  "page.play": {
+    "de": "Spielen",
+    "en": "Play"
+  },
+  "page.controls": {
+    "de": "W A S D bewegen  ·  Maus zielen  ·  Linksklick schießen  ·  Shift Dash  ·  Leertaste Rakete  ·  Tab Inventar  ·  T Shop  ·  Esc Menü  ·  F3 Tasten-Anzeige",
+    "en": "W A S D to move  ·  mouse to aim  ·  left click to shoot  ·  Shift dash  ·  Space rocket  ·  Tab inventory  ·  T shop  ·  Esc menu  ·  F3 key display"
+  },
+  "page.play.button": {
+    "de": "Spielen",
+    "en": "Play"
+  },
+  "page.advanced": {
+    "de": "Erweitert",
+    "en": "Advanced"
+  },
+  "page.open_folder": {
+    "de": "Ordner öffnen",
+    "en": "Open folder"
+  },
+  "page.start_failed": {
+    "de": "Cube Game konnte nicht gestartet werden",
+    "en": "Cube Game could not be started"
+  }
+}

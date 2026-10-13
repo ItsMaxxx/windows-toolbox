@@ -1,50 +1,52 @@
 """
-Seite des Cube Game in der Toolbox-GUI (Bausteine aus toolbox/base.py).
+Cube Game page in the toolbox GUI (building blocks from toolbox/base.py).
 
-Nur ein Startknopf: Das Spiel selbst (cube_game.py) läuft als eigenes Programm mit eigenem Fenster und wird von Hand
-geschrieben – siehe README.md in diesem Ordner. Einstellungen/Rekord kommen hierher, sobald das Spiel sie hat.
+Just a play button: the game itself (cube_game.py) runs as a separate program with its own window – see README.md in
+this folder. Settings and the high score will go here once the game has them.
+All texts live in i18n.json – only their IDs are here: t("page.…") (see toolbox\\i18n.py).
 """
 
 import json
 import subprocess
 from pathlib import Path
 
+import i18n
 import winutil
 from base import MUTED, Button, Buttons, Section, Text, ToolPage
 
 FOLDER = Path(__file__).resolve().parent
-AUSWEIS = json.loads((FOLDER / "programm.json").read_text(encoding="utf-8"))
+ID_CARD = json.loads((FOLDER / "programm.json").read_text(encoding="utf-8"))
+t = i18n.Texte(FOLDER / "i18n.json")
 
-# Von Setup.exe angelegt (wie beim Hardware-Monitor): der Starter CubeGame.exe – im Task-Manager steht dann
-# „Cube Game“ statt „Python“. Fehlt er noch, startet die Seite das Skript direkt mit dem Python der Toolbox.
-STARTER = FOLDER / AUSWEIS["starter"]
-SKRIPT = FOLDER / AUSWEIS["skript"]
+# Created by Setup.exe (like the Hardware Monitor's): the launcher CubeGame.exe – Task Manager then shows "Cube Game"
+# instead of "Python". If it's missing, the page starts the script directly with the toolbox's Python.
+LAUNCHER = FOLDER / ID_CARD["starter"]
+SCRIPT = FOLDER / ID_CARD["skript"]
 
 
 class CubeGamePage(ToolPage):
     def layout(self):
         return [
-            Section("Spielen",
-                    Text("W A S D bewegen", color=MUTED),
-                    Buttons(Button("Spielen", self.spielen, ziel=self.spiel_ziel))),
-            Section("Erweitert",
-                    Buttons(Button("Ordner öffnen", lambda: self.open(FOLDER), width=150, style="grau",
+            Section(t("page.play"),
+                    Text(t("page.controls"), color=MUTED),
+                    Buttons(Button(t("page.play.button"), self.play, ziel=self.play_target))),
+            Section(t("page.advanced"),
+                    Buttons(Button(t("page.open_folder"), lambda: self.open(FOLDER), width=150, style="grau",
                                    ziel=FOLDER))),
         ]
 
-    def befehl(self):
-        return [str(STARTER)] if STARTER.exists() else [winutil.pythonw_exe(), str(SKRIPT)]
+    def command(self):
+        return [str(LAUNCHER)] if LAUNCHER.exists() else [winutil.pythonw_exe(), str(SCRIPT)]
 
-    def spiel_ziel(self):
-        """Was „Spielen“ startet – steht beim Drüberfahren unten links."""
-        return " ".join(self.befehl())
+    def play_target(self):
+        """What "Play" starts – shown in the bottom left on hover."""
+        return " ".join(self.command())
 
-    def spielen(self):
-        befehl = self.befehl()
+    def play(self):
         try:
-            subprocess.Popen(befehl, cwd=str(FOLDER))
+            subprocess.Popen(self.command(), cwd=str(FOLDER))
         except OSError:
-            self.app.toast("Cube Game konnte nicht gestartet werden", error=True)
+            self.app.toast(t("page.start_failed"), error=True)
 
 
 SEITE = CubeGamePage

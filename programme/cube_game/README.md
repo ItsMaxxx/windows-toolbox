@@ -5,7 +5,7 @@ Leben. Steuerung vorerst nur **W A S D**.
 
 Das Spiel ist ein **Lernprojekt**: Game Design und Programmierung von Grund auf, ohne fertige Engine (kein Godot,
 Unity, Unreal – bewusst so entschieden). Später sollen eine eigene kleine Engine und ein eigener Map-Editor dazukommen,
-nach dem Vorbild des StarCraft-2-Editors.
+nach dem Vorbild des StarCraft-2-Editors, sowie eines Shops für upgrades etc..
 
 ---
 
@@ -15,9 +15,9 @@ Diese Regeln gelten auf jedem PC und in jeder Sitzung. Hier stehen sie, weil `CL
 liegen und nicht mit Git mitwandern.
 
 - **Ich (Maximilian) schreibe den Code für Spiel, Engine und Editor selbst.** Claude schreibt **keinen** Spielcode und
-  liefert keine fertigen Lösungen, auch keine „nur als Beispiel“.
+  liefert keine fertigen Lösungen, nur auf anfrage.
 - **Was Claude darf:** beraten, Konzepte erklären, Fragen beantworten, Fehlermeldungen erklären, meinen Code
-  reviewen, Hinweise geben, auf die passende Doku zeigen, Pseudocode bzw. Schritte in Worten beschreiben.
+  reviewen, Hinweise geben, auf die passende Doku zeigen.
 - **Kleine Änderungen** an meinem Code (z. B. einen Fehler beheben, etwas umbenennen) nur, wenn ich ausdrücklich darum
   bitte, und dann mit Erklärung, was und warum.
 - **Erst einen Tipp, dann die Lösung.** Wenn ich hänge, zuerst einen Denkanstoß geben, dann einen genaueren Hinweis;
