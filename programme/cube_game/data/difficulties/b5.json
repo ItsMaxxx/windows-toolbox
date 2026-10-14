@@ -6,8 +6,8 @@
   "core_chance": 0.04,
   "unlock": { "requires": "b4" },
   "hints": ["Huge swarms", "Fat Guys and Shields in the swarms", "Blasts and piercing shots pay off"],
-  "arena": { "start_size": [800, 560], "shrink_speed": 14, "shrink_growth": 2, "max_shrink_speed": 28, "armor": 10 },
-  "spawning": { "first_spawn": 2, "start_interval": 2.6, "min_interval": 1.0, "interval_drop": 0.011 },
+  "arena": { "start_size": [800, 560], "shrink_speed": 14, "shrink_growth": 2.5, "max_shrink_speed": 29, "armor": 15 },
+  "spawning": { "first_spawn": 2, "start_interval": 2.4, "min_interval": 0.9, "interval_drop": 0.011 },
   "enemies": [
     { "type": "basic",     "weight": 50, "after": 0 },
     { "type": "shooter",   "weight": 20, "after": 10,  "growth": 3 },
@@ -25,26 +25,31 @@
   "swarms": [
     {
       "type": "basic", "after": 20,
-      "start_chance": 0.035, "chance_growth": 0.0012, "max_chance": 0.25,
-      "start_size": 10, "growth_time": 10, "max_size": 45, "min_gap": 5
+      "start_chance": 0.03, "chance_growth": 0.001, "max_chance": 0.2,
+      "start_size": 9, "growth_time": 10, "max_size": 40, "min_gap": 6
     },
     {
       "type": "charger", "after": 45,
-      "start_chance": 0.02, "chance_growth": 0.0008, "max_chance": 0.15,
-      "start_size": 6, "growth_time": 12, "max_size": 25, "min_gap": 8
+      "start_chance": 0.02, "chance_growth": 0.0007, "max_chance": 0.13,
+      "start_size": 5, "growth_time": 13, "max_size": 22, "min_gap": 9
     }
   ],
   "phases": [
-    { "from": 80, "to": 110, "weights": { "basic": "x2", "charger": "x2" }, "announce": "The horde is coming!" },
-    { "from": 110, "enemy_stats": { "all": { "contact_damage": "x1.25", "shot_damage": "x1.25", "blast_damage": "x1.25" } }, "announce": "Enemies hit harder!" },
+    { "from": 80, "to": 110, "weights": { "basic": "x2", "charger": "x2" }, "spawn": { "basic": 10, "charger": 4 },
+      "spawn_interval": "x0.85", "announce": "The horde is coming!" },
+    { "from": 110, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
     { "from": 160, "arena": { "armor": "+15" }, "announce": "The walls harden!" },
-    { "from": 200, "enemy_stats": { "all": { "max_hp": "+1" } } },
-    { "from": 240, "to": 270, "weights": { "basic": "x2", "charger": "x2" }, "announce": "The horde is coming!" },
+    { "from": 200, "enemy_stats": { "all": { "base_hp": "+1" } } },
+    { "from": 240, "to": 270, "weights": { "basic": "x2", "charger": "x2" }, "spawn": { "basic": 12, "charger": 5, "fat": 2 },
+      "spawn_interval": "x0.85", "announce": "The horde is coming!" },
+    { "from": 280, "arena": { "armor": "+10" }, "announce": "The walls harden!" },
     { "from": 300, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
-    { "from": 390, "enemy_stats": { "all": { "max_hp": "+1" } } },
+    { "from": 325, "to": 360, "weights": { "fat": "+15", "shield": "+15" }, "spawn": { "basic": 6, "fat": 2, "shield": 1 }, "spawn_interval": "x0.65", "announce": "Final wave!" },
+    { "from": 345, "to": 360, "spawn": { "charger": 4, "shield": 2 }, "spawn_interval": "x0.8", "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "arena": { "shrink_speed": "x1.2" }, "announce": "Hold on!" },
+    { "from": 390, "enemy_stats": { "all": { "base_hp": "+1" } } },
     { "from": 420, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" }
   ],
   "enemy_stats": {
-    "all": { "max_hp": "+2" }
+    "all": { "base_hp": "+2" }
   }
 }

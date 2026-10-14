@@ -2,9 +2,8 @@
 The game menu between runs (Play in the main menu leads here). Left: the ship as it will start the next run. Right:
 the chosen level and four tabs: the levels (level_panel.py – every level with indicators of what's coming), the
 loadout (which weapon in which slot, loadout_panel.py), and where cores are spent (only here): the skill tree
-(skill_tree_panel.py) and the card shop with the card collection (card_panel.py) – that one only once "Card shop"
-is bought in the skill tree. Start begins a run, Back returns to
-the main menu.
+(skill_tree_panel.py) and the card shop with the card collection (card_panel.py) – that tab only appears once "Card
+shop" is bought in the skill tree. Start begins a run, Back returns to the main menu.
 
 Mouse: click a level, a tab, an upgrade (buys its next level), a card or a button – right click a card in the
 collection for a small menu (sell). In the loadout, drag weapons onto the slots.
@@ -95,11 +94,14 @@ class GameMenuScene(Scene):
 
     # --- layout (window coordinates) ---
 
-    @staticmethod
-    def tab_rects():
+    def tabs(self):
+        """The tabs to show: (key, label) – the cards only once the card shop is bought."""
+        return [(key, label) for key, label in TABS if key != "cards" or self.profile.owns(skill_tree.CARD_SHOP)]
+
+    def tab_rects(self):
         width, height = TAB_SIZE
         return {key: pygame.Rect(RIGHT_LEFT + index * (width + TAB_GAP), TAB_TOP, width, height)
-                for index, (key, _) in enumerate(TABS)}
+                for index, (key, _) in enumerate(self.tabs())}
 
     def back_rect(self):
         return pygame.Rect((MARGIN, self.rect.height - MARGIN - BACK_SIZE[1]), BACK_SIZE)
@@ -125,7 +127,7 @@ class GameMenuScene(Scene):
             thing = self.loadout_panel.thing_at(position)
             if thing is not None:
                 return ("loadout", thing)
-        elif self.profile.owns(skill_tree.CARD_SHOP):
+        elif self.tab == "cards":
             thing = self.card_panel.thing_at(position)
             if thing is not None:
                 return ("cards", thing)
@@ -229,8 +231,8 @@ class GameMenuScene(Scene):
             elif event.key in START_KEYS:
                 self.start()
             elif event.key == pygame.K_TAB:
-                keys = [key for key, _ in TABS]
-                self.tab = keys[(keys.index(self.tab) + 1) % len(keys)]
+                keys = [key for key, _ in self.tabs()]
+                self.tab = keys[(keys.index(self.tab) + 1) % len(keys)] if self.tab in keys else keys[0]
                 self.hovered = self.menu = None
             elif event.key in DIFFICULTY_LEFT_KEYS:
                 self.step_difficulty(-1)
@@ -255,13 +257,8 @@ class GameMenuScene(Scene):
             self.tree_panel.draw(surface, self.hovered[1] if self.hovered and self.hovered[0] == "node" else None)
         elif self.tab == "loadout":
             self.loadout_panel.draw(surface, self.hovered[1] if self.hovered and self.hovered[0] == "loadout" else None)
-        elif self.profile.owns(skill_tree.CARD_SHOP):
+        elif self.tab == "cards":
             self.card_panel.draw(surface, self.hovered[1] if self.hovered and self.hovered[0] == "cards" else None)
-        else:
-            center = ((RIGHT_LEFT + self.rect.width - MARGIN) // 2, (TREE_TOP + TREE_BOTTOM) // 2)
-            title = draw_text(surface, "CARDS LOCKED", 40, LOCKED, center=center)
-            draw_text(surface, "Unlock the Card shop in the skill tree (below Core luck).", 24, settings.TEXT_MUTED,
-                      midtop=(center[0], title.bottom + 12))
         self.draw_info(surface)
         self.draw_warnings(surface)
         self.draw_button(surface, self.back_rect(), "Back", 28, self.hovered == "back")
@@ -291,6 +288,7 @@ class GameMenuScene(Scene):
             ("LMB", ship.weapons[0].name if ship.weapons[0] else "empty"),
             ("RMB", ship.weapons[1].name if ship.weapons[1] else "empty"),
             ("Energy", f"{ship.max_energy:g}  ·  +{ship.energy_regen:g}/s"),
+            ("Armor", f"{min(ship.armor, settings.MAX_SHIP_ARMOR):g}%  ·  {ship.invulnerable_time:g} s"),
             (settings.ABILITY_KEY_NAMES[0], dash.name if dash else None),
             (settings.ABILITY_KEY_NAMES[1], rocket.name if rocket else None),
             (settings.BUILD_KEY_NAME, f"Watchtower ×{ship.watchtower.max_count}" if ship.watchtower else None),
@@ -327,7 +325,7 @@ class GameMenuScene(Scene):
                   midright=(self.rect.width - MARGIN, name.centery + 2))
 
     def draw_tabs(self, surface):
-        for key, label in TABS:
+        for key, label in self.tabs():
             self.draw_button(surface, self.tab_rects()[key], label, 24, key == self.tab,
                              hovered=self.hovered == ("tab", key))
 

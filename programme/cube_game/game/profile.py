@@ -31,7 +31,7 @@ class Profile:
         self.loadout = [STARTER, None]  # weapon key in each weapon slot (left / right mouse button), None: empty
         self.difficulty = default_key()
         self.best_times = {}            # difficulty key -> seconds survived
-        self.cards = []                 # the card collection: [{"key": "damage", "active": True}, …]
+        self.cards = []                 # the card collection: [{"key": "damage:gun", "active": True}, …]
         self.card_offers = []           # the card shop's offers: card keys, None for a sold slot
         self.settings = dict(SETTINGS)  # from the toolbox page – read only
 
@@ -48,7 +48,7 @@ class Profile:
             profile.cores = data["cores"]
         for key, level in dict(data.get("levels") or {}).items():
             if key in NODES_BY_KEY and isinstance(level, int) and level > 0:
-                profile.levels[key] = min(level, NODES_BY_KEY[key].max_level)
+                profile.levels[key] = level     # more than the node has now: level() caps it
         loadout = data.get("loadout")
         if (isinstance(loadout, list) and len(loadout) == 2 and any(loadout)
                 and all(key is None or key in WEAPON_TYPES for key in loadout) and loadout[0] != loadout[1]):
@@ -62,15 +62,17 @@ class Profile:
             profile.difficulty = default_key()
         rules = cards.RULES
         saved_cards = data.get("cards") if isinstance(data.get("cards"), list) else []
-        valid = [card for card in saved_cards if isinstance(card, dict) and card.get("key") in cards.CARDS]
+        weapon = profile.loadout[0] or STARTER          # old weapon cards (for every weapon) become this weapon's
+        valid = [(cards.saved_key(card.get("key"), weapon), card) for card in saved_cards if isinstance(card, dict)]
+        valid = [(key, card) for key, card in valid if key]
         active = 0
-        for card in valid[:rules.max_owned]:    # never more than allowed (e.g. a limit was lowered): the first count
+        for key, card in valid[:rules.max_owned]:   # never more than allowed (e.g. a limit was lowered): the first count
             is_active = card.get("active") is True and active < rules.max_active
             active += is_active
-            profile.cards.append({"key": card["key"], "active": is_active})
+            profile.cards.append({"key": key, "active": is_active})
         offers = data.get("card_offers")
         if isinstance(offers, list):
-            profile.card_offers = [key if key in cards.CARDS else None for key in offers]
+            profile.card_offers = [cards.saved_key(key, weapon) for key in offers]
         settings = data.get("settings") if isinstance(data.get("settings"), dict) else {}
         for key, default in SETTINGS.items():
             if isinstance(settings.get(key), type(default)):
@@ -99,7 +101,9 @@ class Profile:
     # --- skill tree ---
 
     def level(self, key):
-        return self.levels.get(key, 0)
+        """The bought level of node key – at most its levels now (data/skilltree.json may have fewer since)."""
+        node = NODES_BY_KEY.get(key)
+        return min(self.levels.get(key, 0), node.max_level) if node else self.levels.get(key, 0)
 
     def owns(self, key):
         return self.level(key) > 0

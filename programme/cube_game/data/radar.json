@@ -2,8 +2,5 @@
   "size": 150,
   "cooldown": 4,
   "duration": 2.5,
-  "size_per_level": 30,
-  "cooldown_per_level": -0.75,
-  "duration_per_level": 1,
   "min_cooldown": 1
 }

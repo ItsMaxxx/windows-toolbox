@@ -16,7 +16,7 @@ class Shooter(Enemy):
     skin = ShooterSkin()
     shot_color = (200, 90, 255)
     stats = {                       # fallback – see data/enemies.json
-        "max_hp": 2, "speed": 95, "size": 28, "contact_damage": 25,
+        "base_hp": 2, "speed": 95, "size": 28, "contact_damage": 25,
         "shooting_distance": 320,   # stops walking when the ship is this close
         "fire_range": 520,          # fires when the ship is at most this far away
         "fire_interval": 1.5,       # seconds between shots

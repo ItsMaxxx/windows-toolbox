@@ -1,6 +1,6 @@
 {
   "watchtower": {
-    "max_hp": 150,
+    "base_hp": 150,
     "size": 24,
     "vision": 320,
     "throw_range": 420,

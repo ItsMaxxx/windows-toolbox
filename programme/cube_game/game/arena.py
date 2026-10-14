@@ -19,7 +19,7 @@ just moving one way.
 import pygame
 
 from engine.collision import keep_inside
-from game import settings
+from game import settings, ship_data
 from game.enemies.roster import apply
 
 SIDES = ("left", "right", "top", "bottom")
@@ -38,6 +38,7 @@ class Arena:
         self.base_armor = armor
         self.changes = []                   # (value, operation, number) from the active phases – set by the scene
         self.fixed_speed = False
+        self.ship_size = ship_data.current()["size"]   # the edges stop there – set by the scene from its ship
         self.elapsed = 0.0                  # seconds this arena has been shrinking
         self.rect = pygame.FRect((0, 0), size)
         self.rect.center = desktop.main.center
@@ -85,7 +86,7 @@ class Arena:
     def squeeze(self, distance):
         """Moves every edge inwards by distance – each tick a little. It stops at the ship's size: then the ship is
         crushed."""
-        smallest = settings.SHIP_SIZE
+        smallest = self.ship_size
         step_x = min(distance, max(0.0, (self.rect.width - smallest) / 2))
         step_y = min(distance, max(0.0, (self.rect.height - smallest) / 2))
         self.rect.inflate_ip(-2 * step_x, -2 * step_y)       # inflate keeps the centre in place
@@ -93,7 +94,7 @@ class Arena:
     def hit(self, distance, ship):
         """The ship was hit: the arena gets 2 × distance narrower and lower – the edges away from ship (a point) move
         in more than the near ones (settings.HIT_SIDE_BIAS). Stops at the ship's size, like squeeze()."""
-        smallest = settings.SHIP_SIZE
+        smallest = self.ship_size
         rect = self.rect
         for low, high, size, position in (("left", "right", rect.width, ship[0] - rect.left),
                                           ("top", "bottom", rect.height, ship[1] - rect.top)):

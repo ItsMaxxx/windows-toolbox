@@ -5,8 +5,9 @@ once its time has come ("after"), and its weight grows by "growth" every minute 
 become more and more common.
 
 Phases: stretches of the run (from … to …) that change the weights – e.g. three times as many snipers for 40 seconds –
-and/or buff the enemies (as roster buffs that last as long as the phase). A phase can announce itself on screen: its
-text goes into announcements, which the scene shows and empties.
+and/or the time between two enemies, buff the enemies (as roster buffs that last as long as the phase) and/or bring a
+few extra enemies once, when they start (each at its own spawn point). A phase can announce itself on screen: its text
+goes into announcements, which the scene shows and empties.
 
 Swarms: once per second there's a small chance that a whole group of enemies appears at one spot. The longer the game
 goes on, the more likely swarms get and the bigger they are. A difficulty can have several kinds of swarms (basic,
@@ -37,6 +38,7 @@ SPAWN_DISTANCE = (250, 500) # pixels beyond the window's corners
 SWARM_SPACING = 14          # how tightly packed a swarm is (pixels)
 SWARM_GAP = 300             # pixels at least between a swarm's nearest enemy and the window
 SWARM_TRIES = 24            # random directions tried to find an edge far enough away
+MIN_INTERVAL = 0.1          # seconds between enemies, whatever the phases say
 
 
 class Spawner:
@@ -60,8 +62,14 @@ class Spawner:
 
     @property
     def interval(self):
+        """Seconds between two enemies right now: the level's (getting shorter over time), changed by the active
+        phases' spawn_interval (in file order) – a phase may go below min_interval."""
         spawning = self.spawning
-        return max(spawning.min_interval, spawning.start_interval - spawning.interval_drop * self.elapsed)
+        interval = max(spawning.min_interval, spawning.start_interval - spawning.interval_drop * self.elapsed)
+        for phase in self.active_phases():
+            if phase.spawn_interval:
+                interval = apply(interval, *phase.spawn_interval)
+        return max(MIN_INTERVAL, interval)
 
     def swarm_chance(self, swarms):
         return min(swarms.max_chance, swarms.start_chance + swarms.chance_growth * self.elapsed)
@@ -92,8 +100,8 @@ class Spawner:
         extra windows' rectangles (nothing appears in them)."""
         self.windows = list(windows)
         self.elapsed += dt
-        self.start_phases()
-        new = self.swarm(arena, dt)
+        new = self.start_phases(arena)
+        new += self.swarm(arena, dt)
         self.timer -= dt
         if self.timer <= 0:
             self.timer = self.interval
@@ -111,8 +119,10 @@ class Spawner:
             key = EVOLUTIONS[key]
         return self.roster.create(key, position)
 
-    def start_phases(self):
-        """Phases whose time has come: their buffs go on all enemies (until the phase ends), their text is shown."""
+    def start_phases(self, arena):
+        """Phases whose time has come: their buffs go on all enemies (until the phase ends), their text is shown, a
+        faster spawn_interval counts right away. Returns their extra enemies."""
+        new = []
         for index, phase in enumerate(self.phases):
             if index in self.started or self.elapsed < phase.start:
                 continue
@@ -126,6 +136,11 @@ class Spawner:
                                               target=None if target == "all" else target))
             if phase.announce:
                 self.announcements.append(phase.announce)
+            for key, count in phase.spawn:
+                new += [self.create(key, self.spawn_point(arena)) for _ in range(count)]
+            if phase.spawn_interval:
+                self.timer = min(self.timer, self.interval)     # don't wait out the old, longer gap
+        return new
 
     def swarm(self, arena, dt):
         """Once per second, for each kind of swarm: maybe one – a group of enemies packed around one spawn point."""

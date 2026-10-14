@@ -12,4 +12,4 @@ class FatGuy(BasicEnemy):
     name = "Fat Guy"
     tier = 2
     skin = FatSkin()
-    stats = {"max_hp": 8, "speed": 90, "size": 38, "contact_damage": 25}    # fallback – see data/enemies.json
+    stats = {"base_hp": 8, "speed": 90, "size": 38, "contact_damage": 25}    # fallback – see data/enemies.json

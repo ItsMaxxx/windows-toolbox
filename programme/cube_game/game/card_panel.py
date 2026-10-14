@@ -10,6 +10,7 @@ import pygame
 from engine.ui import draw_text, font
 from game import settings
 from game.cards import CARDS
+from game.cards.card import WeaponCard
 from game.icons import CORE_COLOR, draw_core
 
 OFFER_SIZE = (150, 118)
@@ -95,7 +96,7 @@ class CardPanel:
             self.report(self.shop.reroll(), "New offers")
         elif thing and thing[0] == "offer":
             key = self.shop.offers[thing[1]]
-            name = f"{CARDS[key].name} {CARDS[key].effect()}" if key else ""
+            name = f"{CARDS[key].full_name} {CARDS[key].effect()}" if key else ""
             self.report(self.shop.buy(thing[1]), f"{name} added to your cards")
         elif thing and thing[0] == "owned":
             card = self.shop.profile.cards[thing[1]]
@@ -108,13 +109,13 @@ class CardPanel:
         index = thing[1]
         card = CARDS[self.shop.profile.cards[index]["key"]]
         refund = self.shop.rules.sell_refund
-        return (f"{card.name} {card.effect()}",
+        return (f"{card.full_name} {card.effect()}",
                 [(f"Sell (+{refund} core{'' if refund == 1 else 's'})", lambda: self.sell(index))])
 
     def sell(self, index):
         card = CARDS[self.shop.profile.cards[index]["key"]]
         self.shop.sell(index)
-        self.show_message(f"Sold {card.name} (+{self.shop.rules.sell_refund} cores)", SUCCESS)
+        self.show_message(f"Sold {card.full_name} (+{self.shop.rules.sell_refund} cores)", SUCCESS)
 
     def report(self, problem, success):
         if problem:
@@ -129,13 +130,20 @@ class CardPanel:
             return f"New offers for {rules.reroll_price} cores"
         if thing and thing[0] == "offer" and self.shop.offers[thing[1]]:
             card = CARDS[self.shop.offers[thing[1]]]
-            return f"{card.name} {card.effect()}  ·  active cards apply at the start of every run"
+            return f"{card.full_name} {card.effect()}  ·  active cards apply at the start of every run"
         if thing and thing[0] == "owned":
             owned = self.shop.profile.cards[thing[1]]
             card = CARDS[owned["key"]]
             toggle = "deactivate" if owned["active"] else "activate"
-            return f"{card.name} {card.effect()}  ·  left click: {toggle}  ·  right click: more (sell)"
+            return (f"{card.full_name} {card.effect()}{self.not_equipped(card)}  ·  left click: {toggle}  ·  "
+                    f"right click: more (sell)")
         return None
+
+    def not_equipped(self, card):
+        """ "  ·  no effect: … isn't in a slot" for a weapon card whose weapon isn't in the loadout, else ""."""
+        if isinstance(card, WeaponCard) and card.weapon not in self.shop.profile.loadout:
+            return f"  ·  no effect: the {card.label} isn't in a slot"
+        return ""
 
     # --- drawing ---
 
@@ -165,7 +173,7 @@ class CardPanel:
         pygame.draw.rect(surface, card.color, rect, width=3 if hovered else 1, border_radius=8)
         band = pygame.Rect(rect.left, rect.top, rect.width, 22)
         pygame.draw.rect(surface, card.color, band, border_top_left_radius=8, border_top_right_radius=8)
-        draw_text(surface, card.category.upper(), 18, settings.BACKGROUND, center=band.center)
+        draw_text(surface, card.label.upper(), 18, settings.BACKGROUND, center=band.center)
         draw_text(surface, fit(card.name, 22, rect.width - 12), 22, settings.TEXT,
                   midtop=(rect.centerx, rect.top + 30))
         draw_text(surface, card.effect(), 34, card.color, midtop=(rect.centerx, rect.top + 52))

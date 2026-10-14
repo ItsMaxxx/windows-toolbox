@@ -8,12 +8,19 @@ units from the middle – skill_tree_panel.py says how big a unit is); the lines
 
 The ship starts with nothing but its gun: the shop, the card shop, the other weapons, both abilities and all bonuses
 come from here.
-Upgrades of a weapon, the rocket or the energy are listed in EFFECTS (which value of which part); how much one level
-adds is in data/weapons.json ("tree" of that part). What the bought nodes (and the active cards from the card shop) do
-to a new run is in the functions at the bottom – the game menu uses them, too, to show the next run's ship.
+
+What each node costs and does is in data/skilltree.json (explained in data/README.md): its costs and its values –
+mostly "per_level", how much one level adds. reload() reads it again – the game menu calls it every time it opens (via
+difficulty.reload()). The costs in DEFAULT_NODES and the values in DEFAULT_VALUES below are only the fallback if the
+file lacks them or they're invalid.
+Upgrades of a weapon, the rocket or the energy are listed in EFFECTS (which value of which part they raise). What the
+bought nodes (and the active cards from the card shop) do to a new run is in the functions at the bottom – the game
+menu uses them, too, to show the next run's ship.
 """
 
-from dataclasses import dataclass
+import json
+from dataclasses import dataclass, field, replace
+from pathlib import Path
 
 from game.buildings.watchtower import WatchtowerKit
 from game.cards import CARDS
@@ -23,14 +30,13 @@ from game.rocket import Rocket
 from game.ship import Ship
 from game.weapons import STARTER, WEAPON_TYPES, data, unlocked as weapon_unlocked
 
-HEAD_START_STARS = 10           # stars per level of "Head start"
-ARENA_BONUS = (60, 40)          # pixels wider/higher per level of "Bigger arena"
-CORE_LUCK_BONUS = 0.005         # drop chance per level of "Core luck" (on top of the difficulty's)
+FILE = Path(__file__).resolve().parents[1] / "data" / "skilltree.json"
 
 SHOP, DASH, ROCKET, HEAD_START, BIGGER_ARENA, CORE_LUCK, WATCHTOWER = (
     "shop", "dash", "rocket", "head_start", "bigger_arena", "core_luck", "watchtower")
 RADAR, RADAR_SIZE, RADAR_COOLDOWN, RADAR_DURATION = "radar", "radar_size", "radar_cooldown", "radar_duration"
 BURNING_GROUND = "burning_ground"
+ARMOR, RECOVERY = "armor", "recovery"        # the ship's hull
 CARD_SHOP = "card_shop"         # the Cards tab of the game menu – without it, no cards (and active ones don't apply)
 
 
@@ -63,25 +69,31 @@ class Node:
     requires: tuple             # keys of the nodes that have to be bought first (all of them)
     branch: str                 # key in BRANCHES: its colour
     position: tuple             # (x, y) in grid units from the middle of the tree – y grows downwards
+    values: dict = field(default_factory=dict, compare=False)   # what it does (DEFAULT_VALUES, data/skilltree.json)
 
     @property
     def max_level(self):
         return len(self.costs)
 
 
-NODES = [
+# the tree as built in – reload() makes NODES from it with the costs and values of data/skilltree.json. Descriptions
+# in DESCRIBED get the node's values filled in ({…}).
+DEFAULT_NODES = [
     Node(SHOP, "Shop", "T during a run: buy upgrades with stars. Killed enemies drop stars.", (1,), (), "ship",
          (0, 0)),
 
     # ship – downwards
-    Node(HEAD_START, "Head start", f"Every run starts with {HEAD_START_STARS} more stars.", (2, 3, 5), (SHOP,),
+    Node(HEAD_START, "Head start", "Every run starts with {per_level:g} more stars.", (2, 3, 5), (SHOP,),
          "ship", (-0.9, 1.1)),
-    Node(BIGGER_ARENA, "Bigger arena", f"The window starts {ARENA_BONUS[0]} × {ARENA_BONUS[1]} px bigger.",
+    Node(BIGGER_ARENA, "Bigger arena", "The window starts {width:g} × {height:g} px bigger.",
          (2, 4, 6), (HEAD_START,), "ship", (-0.9, 2.4)),
-    Node(CORE_LUCK, "Core luck", f"Cores drop more often: +{CORE_LUCK_BONUS:.1%} per level.", (3, 6, 9), (SHOP,),
+    Node(CORE_LUCK, "Core luck", "Cores drop more often: +{per_level:.1%} per level.", (3, 6, 9), (SHOP,),
          "ship", (0.9, 1.1)),
     Node(CARD_SHOP, "Card shop", "Unlocks the Cards tab: buy cards with cores – active cards apply at the start of "
          "every run.", (4,), (CORE_LUCK,), "ship", (0.9, 2.4)),
+    Node(ARMOR, "Armor", "Every hit squeezes the window less.", (3, 6, 10), (BIGGER_ARENA,), "ship", (-0.9, 3.3)),
+    Node(RECOVERY, "Recovery", "After a hit you stay invulnerable for longer.", (2, 4, 6), (ARMOR,), "ship",
+         (0, 3.3)),
 
     # energy and the laser behind it – upwards
     Node("max_energy", "Max energy", "More energy for your weapons.", (2, 4, 6), (SHOP,), "energy", (-0.9, -1.1)),
@@ -145,8 +157,8 @@ NODES = [
 
     # watchtower and radar – up and to the right
     Node(WATCHTOWER, "Watchtower",
-         "B: throw a tower (stars) – its own window keeps watching there. +1 tower per level.", (3, 5, 8), (SHOP,),
-         "scouting", (2.6, -1.25)),
+         "B: throw a tower (stars) – its own window keeps watching there. +{per_level:g} tower per level.", (3, 5, 8),
+         (SHOP,), "scouting", (2.6, -1.25)),
     Node(RADAR, "Radar", "Every now and then a light blue window shows the biggest enemy group out of sight.", (4,),
          (WATCHTOWER,), "scouting", (3.8, -1.95)),
     Node(RADAR_SIZE, "Scan size", "The radar's window gets bigger.", (2, 4, 6), (RADAR,), "scouting", (3.4, -3.15)),
@@ -154,13 +166,126 @@ NODES = [
     Node(RADAR_DURATION, "Scan time", "The radar's window stays open longer.", (2, 4, 6), (RADAR,), "scouting",
          (5.25, -1.75)),
 ]
-NODES_BY_KEY = {node.key: node for node in NODES}
+# what each node does – the fallback for data/skilltree.json. "per_level": how much one level adds (to the value in
+# EFFECTS, or as below); nodes that only unlock something have none.
+DEFAULT_VALUES = {
+    HEAD_START: {"per_level": 10},                  # stars at the start of a run
+    BIGGER_ARENA: {"per_level": (60, 40)},          # pixels wider, higher
+    CORE_LUCK: {"per_level": 0.005},                # drop chance (on top of the level's)
+    ARMOR: {"per_level": 5},                        # percent off every hit
+    RECOVERY: {"per_level": 0.15},                  # seconds invulnerable after a hit
+    "max_energy": {"per_level": 20},
+    "energy_regen": {"per_level": 4},
+    "gun_energy": {"per_level": -1},
+    "gun_attack_speed": {"per_level": 0.3},
+    "gun_damage": {"per_level": 0.4},
+    "mg_attack_speed": {"per_level": 1, "spread_per_level": 3},
+    "mg_damage": {"per_level": 0.1, "spread_per_level": 3},
+    "mg_energy": {"per_level": -0.4},
+    "mg_precision": {"per_level": -6},
+    "mg_wall_push": {"per_level": 1.5},
+    "mg_shot_speed": {"per_level": 100},
+    "cannon_damage": {"per_level": 1},
+    "cannon_attack_speed": {"per_level": 0.1},
+    "cannon_energy": {"per_level": -2},
+    "cannon_piercing": {"per_level": 1},
+    "cannon_shot_speed": {"per_level": 80},
+    "cannon_wall_push": {"per_level": 6},
+    "laser_damage": {"per_level": 0.01},
+    "laser_energy": {"per_level": -0.12},
+    "laser_wall_push": {"per_level": 0.4},
+    "rocket_cooldown": {"per_level": -0.6},
+    "rocket_radius": {"per_level": 15},
+    "rocket_damage": {"per_level": 1},
+    "rocket_wall_push": {"per_level": 20},
+    BURNING_GROUND: {"duration": 3, "damage_per_second": 1.5, "radius": 0.8},   # radius: share of the blast radius
+    WATCHTOWER: {"per_level": 1},                   # towers standing at once
+    RADAR_SIZE: {"per_level": 30},                  # pixels
+    RADAR_COOLDOWN: {"per_level": -0.75},           # seconds (negative: sooner)
+    RADAR_DURATION: {"per_level": 1},               # seconds
+}
+MUST_NOT_BE_NEGATIVE = {HEAD_START, BIGGER_ARENA, CORE_LUCK, WATCHTOWER, BURNING_GROUND, ARMOR, RECOVERY}
+DESCRIBED = {HEAD_START, BIGGER_ARENA, CORE_LUCK, WATCHTOWER}      # descriptions with their values in them
+NODES = []                      # the tree as it is now (filled by reload(), changed in place)
+NODES_BY_KEY = {}
 
-# upgrade nodes: node key -> (part, value) – the part is a section of data/weapons.json (a weapon's key, "rocket" or
-# "energy"), its "tree" says how much one level adds to the value
+
+def reload(warnings):
+    """Reads data/skilltree.json again into NODES and NODES_BY_KEY. Problems are added to warnings (a list)."""
+    try:
+        data = json.loads(FILE.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            raise ValueError("should be { … }")
+    except (OSError, ValueError) as error:
+        warnings.append(f"skilltree.json: can't be read ({error}) – using built-in values")
+        data = {}
+    for key in data.keys() - {node.key for node in DEFAULT_NODES}:
+        warnings.append(f"skilltree.json: unknown node \"{key}\" – ignored")
+    NODES.clear()
+    for node in DEFAULT_NODES:
+        entry = data.get(node.key, {})
+        if not isinstance(entry, dict):
+            warnings.append(f"skilltree.json {node.key}: should be {{ … }} – using built-in values")
+            entry = {}
+        costs, values = read_node(node, entry, warnings)
+        description = node.description
+        if node.key in DESCRIBED:
+            per_level = values["per_level"]
+            texts = dict(width=per_level[0], height=per_level[1]) if isinstance(per_level, tuple) else values
+            description = description.format(**texts)
+        NODES.append(replace(node, costs=costs, values=values, description=description))
+    NODES_BY_KEY.clear()
+    NODES_BY_KEY.update((node.key, node) for node in NODES)
+
+
+def read_node(node, entry, warnings):
+    """(costs, values) of node: the valid ones from its entry in the file, else the built-in ones."""
+    costs, values = node.costs, dict(DEFAULT_VALUES.get(node.key, {}))
+    for name, value in entry.items():
+        where = f"skilltree.json {node.key}.{name}"
+        if name == "costs":
+            if (isinstance(value, list) and value
+                    and all(isinstance(cost, int) and not isinstance(cost, bool) and cost >= 0 for cost in value)):
+                costs = tuple(value)
+            else:
+                warnings.append(f"{where}: {json.dumps(value)} is not valid (whole numbers, one per level) – using "
+                                f"{json.dumps(list(costs))}")
+        elif name not in values:
+            known = ", ".join(["costs", *values]) or "costs"
+            warnings.append(f"skilltree.json {node.key}: unknown value \"{name}\" – ignored (only {known})")
+        elif isinstance(values[name], tuple):           # a pair: Bigger arena's [wider, higher]
+            if isinstance(value, list) and len(value) == 2 and all(number(part, False) for part in value):
+                values[name] = tuple(value)
+            else:
+                warnings.append(f"{where}: {json.dumps(value)} is not valid ([wider, higher]) – using "
+                                f"{json.dumps(values[name])}")
+        elif number(value, node.key not in MUST_NOT_BE_NEGATIVE):
+            values[name] = value
+        else:
+            warnings.append(f"{where}: {json.dumps(value)} is not valid – using {json.dumps(values[name])}")
+    return costs, values
+
+
+def number(value, negative_allowed):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    return negative_allowed or value >= 0
+
+
+def amount(profile, key, name="per_level"):
+    """What the bought levels of node key add: its value name × its level (0 if not bought)."""
+    return NODES_BY_KEY[key].values[name] * profile.level(key)
+
+
+reload([])                      # until the game menu reads it again (with its warnings)
+
+# upgrade nodes: node key -> (part, value) – the part is a weapon's key, "rocket", "energy" (the ship's) or "ship"
+# (its hull), the value what one level raises by the node's "per_level"
 EFFECTS = {
     "max_energy": ("energy", "max"),
     "energy_regen": ("energy", "regen"),
+    ARMOR: ("ship", "armor"),
+    RECOVERY: ("ship", "invulnerable_time"),
     "gun_energy": ("gun", "energy_use"),
     "gun_attack_speed": ("gun", "attack_speed"),
     "gun_damage": ("gun", "damage"),
@@ -187,7 +312,8 @@ EFFECTS = {
 EFFECT_UNITS = {"damage": " damage", "attack_speed": " shots/s", "energy_use": " energy per shot",
                 "wall_push": " px wall push", "projectile_speed": " px/s projectile speed", "spread": "° spread",
                 "piercing": " enemy pierced", "max": " max energy", "regen": " energy/s", "cooldown": " s cooldown",
-                "blast_radius": " px blast radius"}
+                "blast_radius": " px blast radius", "armor": "% less damage from hits",
+                "invulnerable_time": " s invulnerable after a hit"}
 PER_SECOND = {"damage": " damage/s", "energy_use": " energy/s", "wall_push": " px/s wall push"}    # the laser's
 
 
@@ -196,34 +322,34 @@ def effect_text(node):
     if node.key not in EFFECTS:
         return None
     part, value = EFFECTS[node.key]
-    amount = data.STATS[part]["tree"][value]
+    per_level = node.values["per_level"]
     if part == "laser" and value in PER_SECOND:         # its values are per bolt – per second says more
-        text = f"{amount * data.STATS[part]['attack_speed']:+.3g}{PER_SECOND[value]}"
+        text = f"{per_level * data.STATS[part]['attack_speed']:+.3g}{PER_SECOND[value]}"
     else:
-        text = f"{amount:+g}{EFFECT_UNITS[value]}"
-    if part == "machine_gun" and value in ("damage", "attack_speed"):
-        text += f", {data.STATS[part]['spread_per_upgrade']:+g}° spread"
+        text = f"{per_level:+g}{EFFECT_UNITS[value]}"
+    if "spread_per_level" in node.values:
+        text += f", {node.values['spread_per_level']:+g}° spread"
     return text + " per level"
 
 
 # --- what the bought nodes do to a new run ---
 
 def start_ship(profile, center):
-    """The ship a run starts with: the weapons of the loadout (at least the gun), its energy, the unlocked abilities,
-    the watchtower kit, the head start stars and the active cards (once the card shop is unlocked) – with every
-    bought upgrade."""
+    """The ship a run starts with: the weapons of the loadout (at least the gun), its energy and hull, the unlocked
+    abilities, the watchtower kit, the head start stars and the active cards (once the card shop is unlocked) – with
+    every bought upgrade."""
     ship = Ship(center)
     ship.weapons = [build_weapon(profile, key) if key and weapon_unlocked(profile, key) else None
                     for key in profile.loadout]
     if not any(ship.weapons):
         ship.weapons[0] = build_weapon(profile, STARTER)
     for node_key, (part, value) in EFFECTS.items():
-        if part == "energy" and profile.owns(node_key):
-            ship.upgrade(value, data.STATS[part]["tree"][value] * profile.level(node_key))
+        if part in ("energy", "ship") and profile.owns(node_key):
+            ship.upgrade(value, amount(profile, node_key))
     ship.abilities = [Dash() if profile.owns(DASH) else None, build_rocket(profile) if profile.owns(ROCKET) else None]
-    ship.stars = HEAD_START_STARS * profile.level(HEAD_START)
+    ship.stars = round(amount(profile, HEAD_START))
     if profile.owns(WATCHTOWER):
-        ship.watchtower = WatchtowerKit(max_count=profile.level(WATCHTOWER))
+        ship.watchtower = WatchtowerKit(max_count=round(amount(profile, WATCHTOWER)))
     for key in profile.active_cards() if profile.owns(CARD_SHOP) else ():
         CARDS[key].apply_card(ship)                  # a dash card without the dash simply changes nothing
     return ship
@@ -234,7 +360,9 @@ def build_weapon(profile, key):
     weapon = WEAPON_TYPES[key]()
     for node_key, (part, value) in EFFECTS.items():
         if part == key and profile.owns(node_key):
-            weapon.apply_tree(value, profile.level(node_key))
+            weapon.upgrade(value, amount(profile, node_key))
+            if "spread_per_level" in NODES_BY_KEY[node_key].values:      # the machine gun spreads more
+                weapon.upgrade("spread", amount(profile, node_key, "spread_per_level"))
     return weapon
 
 
@@ -243,8 +371,8 @@ def build_rocket(profile):
     rocket = Rocket()
     for node_key, (part, value) in EFFECTS.items():
         if part == "rocket" and profile.owns(node_key):
-            rocket.apply_tree(value, profile.level(node_key))
-    rocket.burning = profile.owns(BURNING_GROUND)
+            rocket.upgrade(value, amount(profile, node_key))
+    rocket.burning = dict(NODES_BY_KEY[BURNING_GROUND].values) if profile.owns(BURNING_GROUND) else None
     return rocket
 
 
@@ -252,15 +380,16 @@ def start_radar(profile):
     """The run's radar with the bought upgrades – None if it isn't unlocked."""
     if not profile.owns(RADAR):
         return None
-    return Radar(profile.level(RADAR_SIZE), profile.level(RADAR_COOLDOWN), profile.level(RADAR_DURATION))
+    return Radar(amount(profile, RADAR_SIZE), amount(profile, RADAR_COOLDOWN), amount(profile, RADAR_DURATION))
 
 
 def start_arena_size(profile, difficulty):
     width, height = difficulty.arena.start_size
     level = profile.level(BIGGER_ARENA)
-    return round(width + ARENA_BONUS[0] * level), round(height + ARENA_BONUS[1] * level)
+    wider, higher = NODES_BY_KEY[BIGGER_ARENA].values["per_level"]
+    return round(width + wider * level), round(height + higher * level)
 
 
 def core_chance(profile, difficulty):
     """Chance that a killed enemy drops a core: the difficulty's plus "Core luck"."""
-    return difficulty.core_chance + CORE_LUCK_BONUS * profile.level(CORE_LUCK)
+    return difficulty.core_chance + amount(profile, CORE_LUCK)

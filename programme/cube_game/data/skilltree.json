@@ -1,0 +1,52 @@
+{
+  "shop":                { "costs": [3] },
+  "head_start":          { "costs": [4, 8, 14], "per_level": 10 },
+  "bigger_arena":        { "costs": [5, 10, 16], "per_level": [60, 40] },
+  "core_luck":           { "costs": [6, 12, 20], "per_level": 0.005 },
+  "card_shop":           { "costs": [12] },
+  "armor":               { "costs": [6, 12, 20], "per_level": 5 },
+  "recovery":            { "costs": [5, 10, 16], "per_level": 0.15 },
+
+  "max_energy":          { "costs": [5, 10, 16], "per_level": 20 },
+  "energy_regen":        { "costs": [5, 10, 16], "per_level": 4 },
+
+  "laser":               { "costs": [20] },
+  "laser_damage":        { "costs": [6, 12, 20], "per_level": 0.01 },
+  "laser_energy":        { "costs": [6, 12, 20], "per_level": -0.12 },
+  "laser_wall_push":     { "costs": [6, 12, 20], "per_level": 0.4 },
+
+  "gun_energy":          { "costs": [4, 8, 14], "per_level": -1 },
+  "gun_attack_speed":    { "costs": [4, 8, 14], "per_level": 0.3 },
+  "gun_damage":          { "costs": [4, 8, 14], "per_level": 0.4 },
+
+  "machine_gun":         { "costs": [15] },
+  "mg_attack_speed":     { "costs": [5, 10, 16], "per_level": 1, "spread_per_level": 3 },
+  "mg_damage":           { "costs": [5, 10, 16], "per_level": 0.1, "spread_per_level": 3 },
+  "mg_energy":           { "costs": [5, 10, 16], "per_level": -0.4 },
+  "mg_precision":        { "costs": [6, 12, 20], "per_level": -6 },
+  "mg_wall_push":        { "costs": [5, 10, 16], "per_level": 1.5 },
+  "mg_shot_speed":       { "costs": [5, 10, 16], "per_level": 100 },
+
+  "cannon":              { "costs": [15] },
+  "cannon_damage":       { "costs": [5, 10, 16], "per_level": 1 },
+  "cannon_attack_speed": { "costs": [5, 10, 16], "per_level": 0.1 },
+  "cannon_energy":       { "costs": [5, 10, 16], "per_level": -2 },
+  "cannon_piercing":     { "costs": [15, 30], "per_level": 1 },
+  "cannon_shot_speed":   { "costs": [5, 10, 16], "per_level": 80 },
+  "cannon_wall_push":    { "costs": [5, 10, 16], "per_level": 6 },
+
+  "dash":                { "costs": [8] },
+
+  "rocket":              { "costs": [10] },
+  "rocket_cooldown":     { "costs": [5, 10, 16], "per_level": -0.6 },
+  "rocket_radius":       { "costs": [5, 10, 16], "per_level": 15 },
+  "rocket_damage":       { "costs": [5, 10, 16], "per_level": 1 },
+  "rocket_wall_push":    { "costs": [5, 10, 16], "per_level": 20 },
+  "burning_ground":      { "costs": [40], "duration": 3, "damage_per_second": 1.5, "radius": 0.8 },
+
+  "watchtower":          { "costs": [8, 14, 22], "per_level": 1 },
+  "radar":               { "costs": [12] },
+  "radar_size":          { "costs": [5, 10, 16], "per_level": 30 },
+  "radar_cooldown":      { "costs": [5, 10, 16], "per_level": -0.75 },
+  "radar_duration":      { "costs": [5, 10, 16], "per_level": 1 }
+}

@@ -9,7 +9,7 @@ All buffs on a stat are combined like this: (value + all adds) × all factors �
 matter in which order the buffs came.
 
 Where a buff goes: enemy.buffs (just that one enemy) or roster.buffs (all enemies of the run, also ones spawned later;
-target: only one type, e.g. "charger"). max_hp and size are read when an enemy spawns – buffs on them only affect
+target: only one type, e.g. "charger"). base_hp and size are read when an enemy spawns – buffs on them only affect
 enemies spawned while the buff is active.
 """
 
@@ -18,7 +18,7 @@ from dataclasses import dataclass
 
 @dataclass
 class Buff:
-    stat: str                       # e.g. "speed", "max_hp", "shot_damage" – a key in the enemy's stats
+    stat: str                       # e.g. "speed", "base_hp", "shot_damage" – a key in the enemy's stats
     add: float = 0                  # flat: added to the value
     factor: float = 1               # multiplied with (value + adds)
     duration: float | None = None   # seconds – None: until it's removed

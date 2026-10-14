@@ -1,7 +1,8 @@
 """
-Dash cooldown card: The dash is ready again sooner (not below 0.3 s).
+Dash cooldown card: The dash is ready again sooner (not below its min_cooldown in data/abilities.json).
 """
 
+from game import ability_data
 from game.cards.card import Card
 from game.dash import Dash
 
@@ -14,7 +15,10 @@ class DashCooldownCard(Card):
     amount = -0.1
     card_amount = -0.3
     unit = " s"
-    minimum = 0.3
+
+    @property
+    def minimum(self):
+        return ability_data.STATS["dash"]["min_cooldown"]
 
     def targets(self, ship):
         return [ability for ability in ship.abilities if isinstance(ability, Dash)]

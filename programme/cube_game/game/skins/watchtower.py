@@ -36,7 +36,7 @@ class WatchtowerSkin:
             angle = tower.age * SWEEP_SPEED
             end = (body.centerx + math.cos(angle) * radius, body.centery + math.sin(angle) * radius)
             pygame.draw.line(surface, self.color, body.center, end, 2)
-            max_hp = max(1, round(tower.values["max_hp"]))
+            max_hp = max(1, round(tower.values["base_hp"]))
             if tower.hp < max_hp:
                 self.draw_health(surface, tower, body, max_hp)
 

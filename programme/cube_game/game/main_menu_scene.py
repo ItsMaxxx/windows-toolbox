@@ -9,7 +9,7 @@ from engine.button import Button
 from engine.desktop import work_area
 from engine.menu import Menu
 from engine.ui import draw_text
-from game import settings
+from game import settings, ship_data
 from game.ship_shape import draw_ship
 
 
@@ -46,7 +46,7 @@ class MainMenuScene(Scene):
         aim = pygame.Vector2(pygame.mouse.get_pos()) - ship_center
         if aim.length_squared() < 1:
             aim = pygame.Vector2(0, -1)
-        draw_ship(surface, ship_center, aim.normalize(), 46, settings.SHIP_COLOR)
+        draw_ship(surface, ship_center, aim.normalize(), 46, ship_data.current()["color"])
 
         draw_text(surface, "CUBE GAME", 80, settings.TEXT, midtop=(area.centerx, 130))
         draw_text(surface, "the window is the arena", 26, settings.TEXT_MUTED, midtop=(area.centerx, 192))

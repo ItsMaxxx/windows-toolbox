@@ -15,7 +15,7 @@ class Sniper(Enemy):
     name = "Sniper"
     skin = SniperSkin()
     stats = {                       # fallback – see data/enemies.json
-        "max_hp": 1, "speed": 80, "size": 22, "contact_damage": 25,
+        "base_hp": 1, "speed": 80, "size": 22, "contact_damage": 25,
         "preferred_distance": 650,  # walks closer when further than this + close_in …
         "back_off": 150,            # … backs off when closer than this - back_off
         "close_in": 80,

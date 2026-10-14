@@ -5,22 +5,30 @@
   "goal": 210,
   "core_chance": 0.06,
   "unlock": { "requires": "a2" },
-  "hints": ["Many ranged units", "Snipers shoot from far outside – watch for their line", "Fewer enemies, but they keep their distance"],
-  "arena": { "start_size": [800, 560], "shrink_speed": 8, "shrink_growth": 1.5, "max_shrink_speed": 17, "armor": 0 },
-  "spawning": { "first_spawn": 2.5, "start_interval": 3.4, "min_interval": 1.5, "interval_drop": 0.008 },
+  "hints": ["Many ranged units", "Snipers shoot from far outside – watch for their line", "Basic swarms cover the shooters behind them"],
+  "arena": { "start_size": [800, 560], "shrink_speed": 7, "shrink_growth": 2, "max_shrink_speed": 21, "armor": 2 },
+  "spawning": { "first_spawn": 2.5, "start_interval": 2.6, "min_interval": 0.85, "interval_drop": 0.012 },
   "enemies": [
-    { "type": "basic",   "weight": 35, "after": 0 },
+    { "type": "basic",   "weight": 30, "after": 0 },
     { "type": "shooter", "weight": 30, "after": 10, "growth": 3 },
     { "type": "sniper",  "weight": 20, "after": 30, "growth": 4 },
     { "type": "charger", "weight": 8,  "after": 90 }
   ],
-  "swarms": [],
+  "swarms": {
+    "type": "basic", "after": 50,
+    "start_chance": 0.025, "chance_growth": 0.0009, "max_chance": 0.14,
+    "start_size": 6, "growth_time": 11, "max_size": 26, "min_gap": 8
+  },
   "phases": [
-    { "from": 60, "to": 90, "weights": { "sniper": "x3" }, "announce": "Snipers incoming!" },
-    { "from": 110, "enemy_stats": { "all": { "max_hp": "+1" } } },
-    { "from": 140, "to": 170, "weights": { "shooter": "x2", "sniper": "x2" }, "announce": "Long range incoming!" },
-    { "from": 180, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
-    { "from": 250, "enemy_stats": { "all": { "max_hp": "+1" } } },
+    { "from": 60, "to": 90, "weights": { "sniper": "x3" }, "spawn": { "sniper": 3 }, "spawn_interval": "x0.8",
+      "announce": "Snipers incoming!" },
+    { "from": 100, "enemy_stats": { "all": { "base_hp": "+1" } } },
+    { "from": 140, "to": 170, "weights": { "shooter": "x2", "sniper": "x2" }, "spawn": { "shooter": 3, "sniper": 2 },
+      "spawn_interval": "x0.8", "announce": "Long range incoming!" },
+    { "from": 165, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
+    { "from": 180, "to": 210, "weights": { "shooter": "x2", "sniper": "x1.5" }, "spawn": { "sniper": 3, "shooter": 2 }, "spawn_interval": "x0.65", "announce": "Final wave!" },
+    { "from": 195, "to": 210, "spawn": { "shooter": 3, "sniper": 2 }, "spawn_interval": "x0.8", "announce": "Hold on!" },
+    { "from": 250, "enemy_stats": { "all": { "base_hp": "+1" } } },
     { "from": 300, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" }
   ]
 }

@@ -36,7 +36,7 @@ class Artillery(Enemy):
     name = "Artillery"
     skin = ArtillerySkin()
     stats = {                       # fallback – see data/enemies.json
-        "max_hp": 3, "speed": 60, "size": 32, "contact_damage": 25,
+        "base_hp": 3, "speed": 60, "size": 32, "contact_damage": 25,
         "fire_range": 900,          # sets up (once it has been seen) and fires when the ship is at most this far away …
         "min_range": 220,           # … and at least this far – closer, it packs up and backs away
         "setup_time": 1.0,          # seconds its feet take to come out

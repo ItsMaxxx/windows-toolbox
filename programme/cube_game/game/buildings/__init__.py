@@ -13,7 +13,7 @@ from game.buildings.watchtower import Watchtower
 
 BUILDING_TYPES = {"watchtower": Watchtower}
 FILE = Path(__file__).resolve().parents[2] / "data" / "buildings.json"
-MUST_BE_POSITIVE = {"max_hp", "size", "vision", "throw_time"}      # 0 would break things
+MUST_BE_POSITIVE = {"base_hp", "size", "vision", "throw_time"}      # 0 would break things
 STATS = {}                          # type key -> {stat: value}: data/buildings.json over the class fallbacks
 
 

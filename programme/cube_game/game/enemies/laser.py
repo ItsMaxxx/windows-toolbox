@@ -16,7 +16,7 @@ class Laser(Sniper):
     tier = 2
     skin = LaserSkin()
     stats = {                       # fallback – see data/enemies.json
-        "max_hp": 2, "speed": 70, "size": 26, "contact_damage": 25,
+        "base_hp": 2, "speed": 70, "size": 26, "contact_damage": 25,
         "preferred_distance": 650, "back_off": 150, "close_in": 80,
         "fire_range": 900, "aim_time": 1.5, "lock_time": 0.4, "reload_time": 3.0, "turn_speed": 60, "fire_cone": 30,
         "shot_damage": 50,          # pixels, when the ship touches the beam (once per beam)

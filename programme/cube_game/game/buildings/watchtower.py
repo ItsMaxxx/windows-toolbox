@@ -45,7 +45,7 @@ class WatchtowerKit:
 
 class Watchtower(Entity):
     stats = {                   # fallback only – the real values are in data/buildings.json
-        "max_hp": 150,          # takes enemy damage in pixels like the ship (a Basic touching it: 25)
+        "base_hp": 150,          # takes enemy damage in pixels like the ship (a Basic touching it: 25)
         "size": 24,             # pixels (square)
         "vision": 320,          # side length of its window
         "throw_range": 420,     # how far it's thrown from the ship
@@ -68,7 +68,7 @@ class Watchtower(Entity):
         self.target = pygame.Vector2(target)
         self.rect.center = self.start
         self.flight = 0.0                       # seconds in the air so far
-        self.hp = self.values["max_hp"]
+        self.hp = self.values["base_hp"]
         self.hit_timer = 0.0
         self.flash = 0.0
         self.age = 0.0                          # seconds since it was thrown (for the skin's animation)

@@ -393,6 +393,62 @@ Notizen / offene Fragen:
   HP, mehr Schaden, härtere Wände, Wellen) sind über das Level verteilt, die letzte kurz vor dem Ziel; zwei weitere
   kommen danach für alle, die weiterspielen.
 - **Karten erst über den Skilltree:** neuer Knoten *Card shop* (4 Cores, unter *Core luck*, `skill_tree.CARD_SHOP`).
-  Ohne ihn ist der Reiter *Cards* gesperrt und aktive Karten wirken nicht (`start_ship`).
+  Ohne ihn gibt es den Reiter *Cards* nicht und aktive Karten wirken nicht (`start_ship`).
 - Grundwerte gesenkt: Schiff 320 → 280 px/s (`SHIP_SPEED`), Gun 1 → 0,8 Schuss/s (`data/weapons.json`).
 - Offen: **Boss** (T1 bei A6, T2 bei B2 mit mehr Fähigkeiten) – kommt als eigener Schritt.
+- 14.10.2026 (Claude, auf Wunsch gebaut): **Schiffswerte in `data/ships.json`** (`game/ship_data.py`): Größe, Tempo,
+  Energie, Unverwundbarkeit nach Treffer, Farbe, Name – ein Eintrag pro Schiff, `ship` wählt das geflogene. Ersetzt
+  `SHIP_SIZE`, `SHIP_SPEED`, `SHIP_COLOR`, `INVULNERABLE_TIME` in `settings.py` und `energy.max` / `energy.regen` in
+  `data/weapons.json` (dort bleibt nur `energy.tree`). Die Arena stoppt jetzt bei der Größe des geflogenen Schiffs.
+- 14.10.2026 (Claude, auf Wunsch gebaut): Phasen können **einmalig Gegner dazuholen** (`spawn`) und das
+  **Spawn-Tempo ändern** (`spawn_interval`), solange sie laufen (`Spawner.start_phases`, `Spawner.interval`). A1: die
+  Shooter-Welle ab 1:00 bringt sofort 3 Shooter, und 20 s lang kommen die Gegner 40 % schneller.
+- 14.10.2026 (Claude, auf Wunsch gebaut): Reiter *Levels* zeigt unter *Numbers* die Grundwerte des Levels (Arena,
+  Wände, Spawn-Abstand, erster Gegner, Cores – mit *Bigger arena* / *Core luck* des Spielstands), und die Ereignisse
+  nennen die Werte ihrer Phase (`level_panel.numbers`, `change_text`).
+- 14.10.2026 (Claude, auf Wunsch gebaut): **Skilltree komplett in `data/skilltree.json`**: pro Knoten `costs` (Cores pro
+  Stufe, Listenlänge = Zahl der Stufen) und was eine Stufe bringt (`per_level`, bei der MG dazu `spread_per_level`,
+  bei Burning ground dessen Werte). Ersetzt `tree`, `spread_per_upgrade`, `burning` und `energy` in `weapons.json`,
+  die `*_per_level` in `radar.json` und `HEAD_START_STARS`, `ARENA_BONUS`, `CORE_LUCK_BONUS` im Code; auch die Türme
+  pro Stufe *Watchtower* sind jetzt einstellbar. `weapon.apply_tree` → `upgrade`, angewendet in `skill_tree.py`.
+  `Profile.level()` deckelt bei weniger Stufen.
+- 14.10.2026 (Claude, auf Wunsch gebaut): **Fähigkeiten in `data/abilities.json`** (`game/ability_data.py`): Dash
+  (Cooldown, Distanz, Dauer) und Rakete (bisher in `weapons.json`; neu auch Tempo, Beschleunigung, Größe), dazu je
+  `min_cooldown` – ersetzt die festen Werte in `dash.py` / `rocket.py` und die Minima der Cooldown-Karten.
+- 14.10.2026 (Claude, auf Wunsch): Gegnerwert `max_hp` heißt jetzt **`base_hp`** – in `data/enemies.json`, in
+  `enemy_stats` der Level-Dateien und im Code – ebenso beim Wachturm (`buildings.json`).
+- 14.10.2026 (Claude, auf Wunsch): **Finale in jedem Level** (A1–B6): Phasen *Final wave!* und *Hold on!* kurz vor dem
+  Ziel, beide enden beim `goal` (`data/difficulties/README.md`, Abschnitt Aufbau). A1 bewusst milder; in A1–A6 nur
+  Tier-1-Gegner (Evolutionen bleiben den B-Levels vorbehalten).
+- 14.10.2026 (Claude, auf Wunsch gebaut): **Schwierigkeit steigt von Level zu Level** (A1 und A2 unverändert). Vorher
+  war A3 kaum schwerer als A1 und B3 leichter als A6 – A2 hatte Schwärme und eine dauerhafte Phase `spawn_interval`
+  `"x0.75"`, A3 bis B6 nicht. Jetzt wächst jedes Level um etwa ein Viertel bis ein Drittel (Gegner-HP pro Sekunde,
+  gewichtet nach Gefährlichkeit, mit Schwärmen, Evolutionen und Phasen), dazu die Last im Finale und der Wanddruck
+  (Schrumpftempo ÷ (1 − Panzerung)) – jeweils am Ende des Ziels gemessen. A5 behält die härtesten Wände bis dahin
+  (Panzerung am Ende 45 statt 60 %, damit A6 und später darüber bleiben). Die Grundwerte stehen direkt in `spawning`,
+  ohne versteckte Dauerphasen.
+- 14.10.2026 (Claude, auf Wunsch gebaut): **Jede Wellen-Ansage holt Gegner dazu** – wie in A1/A2: Phasen mit `weights`
+  und `announce` (*Chargers incoming!*, *Snipers incoming!*, *The horde is coming!* …) haben jetzt ein `spawn` und
+  meist ein kürzeres `spawn_interval`. Survival: *Evolution begins!* bringt 3 Fat Guys und einen Cannoneer.
+- 14.10.2026 (Claude, auf Wunsch gebaut): **Neue Schiffswerte** – in `data/ships.json` (Grundwert), im Shop (Sterne),
+  als Karte und (außer Magnet) im Skilltree unter *Bigger arena*:
+  - **Armor** (`armor`, %): jeder Treffer quetscht die Arena so viel Prozent weniger (`Ship.absorb`), höchstens
+    `MAX_SHIP_ARMOR` (60 %). Nicht verwechseln mit der Panzerung der Wände (`arena.armor` im Level).
+  - **Recovery** (`invulnerable_time`, s): länger unverwundbar nach einem Treffer, höchstens `MAX_INVULNERABLE_TIME` (3 s).
+    Der Grundwert ist dafür von 1 auf 0,5 s gesunken.
+  - **Magnet** (`magnet_radius`, px): Sterne und Cores werden von weiter her angezogen (ersetzt `MAGNET_RADIUS` in
+    `star_pickup.py`).
+  Karten können jetzt auch ein `maximum` haben (wie `minimum` bei Cooldowns). Der Shop hat drei Spalten (Ship | Weapons,
+  Dash | Rocket, Watchtower), das Inventar und die Schiffsspalte im Spielmenü zeigen die neuen Werte.
+- 14.10.2026 (Claude, auf Wunsch gebaut): **Shop nach Ausrüstung**: Der Shop im Run zeigt nur, was das Schiff hat –
+  Ship, je ausgerüstete Waffe ein eigener Abschnitt (*Gun (LMB)*, *Cannon (RMB)* … in ihrer Farbe), Dash, Rocket und
+  Watchtower erst, wenn freigeschaltet (statt „locked“). Die Waffen-Upgrades wirken nur auf die Waffe ihres Slots und
+  haben je eigene Preise (`WeaponCard.for_slot`, `Shop.sections`). Karten aus dem Karten-Shop wirken weiter auf alle
+  Waffen, weil sich das Loadout zwischen Runs ändern kann.
+- 14.10.2026 (Claude, auf Wunsch gebaut): **Jedes Waffen-Upgrade gilt nur für eine Waffe** – jetzt auch die Karten:
+  `damage`, `attack_speed`, `wall_push`, `shot_speed` gibt es einmal pro Waffe (`damage:gun`, `damage:cannon` …,
+  `WeaponCard`, `cards.make_cards`), mit dem Waffennamen im Band und ihrer Farbe. Eine aktive Karte wirkt nur, solange
+  ihre Waffe in einem Slot ist (die Zeile unter den Karten sagt es sonst). Der Karten-Shop bietet sie für jede
+  freigeschaltete Waffe an. Die Zahl auf der Karte ist, was sie dieser Waffe wirklich gibt (`card_amount` ×
+  `upgrade_factor`, Laser-Schaden also +0,04). Die Zahlen in `upgrades.json` bleiben pro Wert, für alle Waffen gleich.
+  Alte Spielstände: Waffenkarten von früher (für alle Waffen) werden zur Karte der Waffe in Slot 1 (`cards.saved_key`).

@@ -13,4 +13,4 @@ class Critter(Enemy):
     melee = True
     skin = CritterSkin()
     drops_loot = False
-    stats = {"max_hp": 1, "speed": 175, "size": 12, "contact_damage": 25}    # fallback – see data/enemies.json
+    stats = {"base_hp": 1, "speed": 175, "size": 12, "contact_damage": 25}    # fallback – see data/enemies.json

@@ -3,11 +3,11 @@ Base class for weapons. A weapon sits in one of the ship's weapon slots (chosen 
 decides everything about its shots: damage, attack speed, projectile speed and size, wall push, colour – and how much
 of the ship's energy a shot uses. Each weapon has its own cooldown; the energy is shared (Ship.fire checks it).
 
-Its values come from data/weapons.json (STATS[key], see data.py). They are changed three ways:
-  - the skill tree: apply_tree(name, levels) adds that many levels of its "tree" amount,
+Its values come from data/weapons.json (STATS[key], see data.py). They are changed two ways:
+  - the skill tree: upgrade(name, amount) adds amount to a value, never below its minimum (how much: the node's
+    "per_level" in data/skilltree.json × its level – skill_tree.build_weapon),
   - shop upgrades and cards: they set the attributes directly – upgrade_factors says how strongly they work on this
-    weapon (game/cards/card.py),
-  - upgrade(name, amount) underneath both: adds amount to a value, never below its minimum.
+    weapon (game/cards/card.py).
 Names are the ones in the data file ("attack_speed"); ATTRIBUTES says which attribute each one is ("fire_rate").
 
 New weapon = subclass with its own key, name and colour (see gun.py); override fire() / make_projectile() for
@@ -38,15 +38,6 @@ class Weapon:
         self.cooldown = 0.0                 # seconds until the next shot is possible
 
     # --- upgrades ---
-
-    @classmethod
-    def tree_amount(cls, name):
-        """How much one level of the skill tree upgrade name adds (from the data file)."""
-        return data.STATS[cls.key]["tree"][name]
-
-    def apply_tree(self, name, levels):
-        """levels levels of the skill tree upgrade name (e.g. "damage")."""
-        self.upgrade(name, self.tree_amount(name) * levels)
 
     def upgrade(self, name, amount):
         attribute = self.ATTRIBUTES[name]

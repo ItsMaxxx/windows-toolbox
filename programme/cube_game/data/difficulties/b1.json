@@ -6,8 +6,8 @@
   "core_chance": 0.045,
   "unlock": { "requires": "a6" },
   "hints": ["First evolutions: Fat Guy and Cannoneer", "Cannon balls are slow, but hit very hard", "Everything from A6"],
-  "arena": { "start_size": [800, 560], "shrink_speed": 12, "shrink_growth": 2, "max_shrink_speed": 24, "armor": 5 },
-  "spawning": { "first_spawn": 2, "start_interval": 2.5, "min_interval": 0.95, "interval_drop": 0.011 },
+  "arena": { "start_size": [800, 560], "shrink_speed": 12, "shrink_growth": 2.5, "max_shrink_speed": 26, "armor": 10 },
+  "spawning": { "first_spawn": 2, "start_interval": 2.8, "min_interval": 1.2, "interval_drop": 0.009 },
   "enemies": [
     { "type": "basic",     "weight": 50, "after": 0 },
     { "type": "shooter",   "weight": 20, "after": 10, "growth": 4 },
@@ -23,8 +23,8 @@
   "swarms": [
     {
       "type": "basic", "after": 40,
-      "start_chance": 0.02, "chance_growth": 0.0008, "max_chance": 0.15,
-      "start_size": 6, "growth_time": 12, "max_size": 30, "min_gap": 6
+      "start_chance": 0.02, "chance_growth": 0.0007, "max_chance": 0.11,
+      "start_size": 6, "growth_time": 12, "max_size": 28, "min_gap": 8
     },
     {
       "type": "charger", "after": 90,
@@ -33,16 +33,21 @@
     }
   ],
   "phases": [
-    { "from": 60, "to": 90, "weights": { "shooter": "x3" }, "announce": "Shooters incoming!" },
-    { "from": 100, "enemy_stats": { "all": { "contact_damage": "x1.25", "shot_damage": "x1.25", "blast_damage": "x1.25" } }, "announce": "Enemies hit harder!" },
+    { "from": 60, "to": 90, "weights": { "shooter": "x3" }, "spawn": { "shooter": 4, "cannoneer": 1 }, "spawn_interval": "x0.85",
+      "announce": "Shooters incoming!" },
+    { "from": 120, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
     { "from": 150, "arena": { "armor": "+15" }, "announce": "The walls harden!" },
-    { "from": 180, "enemy_stats": { "all": { "max_hp": "+1" } } },
-    { "from": 210, "to": 240, "weights": { "sniper": "x2", "artillery": "x2" }, "announce": "Long range incoming!" },
+    { "from": 180, "enemy_stats": { "all": { "base_hp": "+1" } } },
+    { "from": 210, "to": 240, "weights": { "sniper": "x2", "artillery": "x2" }, "spawn": { "sniper": 2, "artillery": 2 },
+      "spawn_interval": "x0.85", "announce": "Long range incoming!" },
+    { "from": 240, "arena": { "armor": "+10" }, "announce": "The walls harden!" },
     { "from": 250, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
-    { "from": 330, "enemy_stats": { "all": { "max_hp": "+1" } } },
+    { "from": 265, "to": 300, "weights": { "fat": "+15", "cannoneer": "+10" }, "spawn": { "fat": 2, "cannoneer": 1 }, "spawn_interval": "x0.7", "announce": "Final wave!" },
+    { "from": 285, "to": 300, "spawn": { "shooter": 3, "cannoneer": 1 }, "spawn_interval": "x0.8", "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Hold on!" },
+    { "from": 330, "enemy_stats": { "all": { "base_hp": "+1" } } },
     { "from": 360, "arena": { "armor": "+15" }, "announce": "The walls harden!" }
   ],
   "enemy_stats": {
-    "all": { "max_hp": "+1" }
+    "all": { "base_hp": "+1" }
   }
 }

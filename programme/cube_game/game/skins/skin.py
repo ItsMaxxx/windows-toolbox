@@ -44,7 +44,7 @@ class Skin:
         if enemy.tier == 2:
             draw_tier_frame(surface, rect, self.color)
         self.draw_above(surface, enemy, rect)
-        max_hp = max(1, round(enemy.stat("max_hp")))
+        max_hp = max(1, round(enemy.stat("base_hp")))
         if enemy.hp < max_hp:
             self.draw_health(surface, enemy, rect, max_hp)
 

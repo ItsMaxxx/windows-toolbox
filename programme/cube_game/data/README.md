@@ -6,12 +6,86 @@ Werte) zeigt das Spielmenü rot an; das Spiel nimmt dann den Standardwert, statt
 
 | Datei | Inhalt |
 |---|---|
+| `ships.json` | Grundwerte des Schiffs – und künftiger Schiffe (siehe unten) |
+| `skilltree.json` | jeder Skilltree-Knoten: was er kostet und was eine Stufe bringt (siehe unten) |
 | `enemies.json` | Standardwerte jedes Gegnertyps (diese Seite) |
 | `upgrades.json` | Shop im Run (Sterne) und Karten-Shop im Spielmenü (Cores) – siehe unten |
-| `weapons.json` | Waffen, Energie und Rakete: Grundwerte und was jede Skilltree-Stufe bringt – siehe unten |
+| `weapons.json` | Grundwerte der Waffen – siehe unten |
+| `abilities.json` | Grundwerte der Fähigkeiten: Dash und Rakete (siehe unten) |
 | `buildings.json` | Gebäude, die man im Run setzt – bisher der Wachturm (siehe unten) |
-| `radar.json` | der Radar aus dem Skilltree (siehe unten) |
+| `radar.json` | Grundwerte des Radars aus dem Skilltree (siehe unten) |
 | `difficulties/*.json` | eine Datei pro Level (A1 … B6, Survival) – Ziel, Arena, Cores, Spawns, Evolutionen und eigene Gegnerwerte (`difficulties/README.md`) |
+
+## `ships.json`
+
+Unter `ships` steht ein Eintrag pro Schiff, `ship` sagt, welches geflogen wird (eine Auswahl im Spielmenü gibt es noch
+nicht). Ein neues Schiff ist einfach ein neuer Eintrag – Werte, die er weglässt, nimmt er vom eingebauten Standard
+(`DEFAULTS` in `game/ship_data.py`):
+
+```json
+"ships": {
+  "standard": { … },
+  "tank": { "name": "Tank", "size": 40, "speed": 200, "max_energy": 160, "color": [60, 200, 90] }
+}
+```
+
+Das sind die Grundwerte zu Beginn eines Runs – Skilltree, Shop und Karten kommen obendrauf.
+
+| Wert | Bedeutung |
+|---|---|
+| `name` | Name des Schiffs |
+| `size` | Kantenlänge (auch die Hitbox, ein Quadrat). Die Arena wird höchstens so klein – dann ist das Schiff zerquetscht |
+| `speed` | Flugtempo in Pixeln pro Sekunde |
+| `max_energy` | so viel Energie hat es (voll zu Beginn) – beide Waffen teilen sie, jeder Schuss kostet `energy_use` |
+| `energy_regen` | so viel Energie kommt pro Sekunde zurück |
+| `invulnerable_time` | nach einem Treffer so viele Sekunden unverwundbar (es blinkt) – höchstens `MAX_INVULNERABLE_TIME` (3 s, `settings.py`) |
+| `armor` | Panzerung des Schiffs in Prozent: jeder Treffer quetscht die Arena so viel weniger (25 Schaden bei 20 → 20 px). Höchstens `MAX_SHIP_ARMOR` (60 %, `settings.py`). Nicht dasselbe wie die Panzerung der Wände im Level |
+| `magnet_radius` | so nah müssen Sterne und Cores sein, damit sie zum Schiff gezogen werden |
+| `color` | Farbe als `[Rot, Grün, Blau]`, je 0 … 255 |
+
+## `skilltree.json`
+
+Ein Eintrag pro Knoten, alles an einer Stelle: was er kostet und was er bewirkt. Die anderen Dateien enthalten nur die
+Grundwerte (ohne Upgrades).
+
+```json
+"gun_damage":     { "costs": [2, 3, 5], "per_level": 0.4 },
+"burning_ground": { "costs": [15], "duration": 3, "damage_per_second": 1.5, "radius": 0.8 },
+```
+
+**`costs`** – die Cores für jede Stufe, als Liste. Die Länge der Liste ist die Zahl der Stufen: `[2, 3, 5]` = drei
+Stufen für 2, 3 und 5 Cores, `[4]` = ein Knoten ohne Stufen. Ganze Zahlen, 0 = gratis.
+
+**`per_level`** – so viel bringt **eine** Stufe; mit drei Stufen also das Dreifache. Negativ = weniger (z. B.
+Energieverbrauch, Cooldown). Fehlt ein Wert oder ein ganzer Knoten, gilt der eingebaute.
+
+| Knoten | `per_level` wirkt auf |
+|---|---|
+| `head_start` | Sterne zu Beginn jedes Runs |
+| `bigger_arena` | `[breiter, höher]` in Pixeln |
+| `core_luck` | Chance auf einen Core pro Kill (0.005 = +0,5 %) |
+| `max_energy` / `energy_regen` | Energie des Schiffs / Energie pro Sekunde (Grundwerte in `ships.json`) |
+| `armor` / `recovery` | den gleichnamigen Wert des Schiffs in `ships.json`: `armor` (%), `invulnerable_time` (s) |
+| `gun_…`, `mg_…`, `cannon_…`, `laser_…` | den gleichnamigen Wert der Waffe in `weapons.json`: `damage`, `attack_speed`, `energy_use` (`…_energy`), `wall_push`, `projectile_speed` (`…_shot_speed`), `spread` (`mg_precision`), `piercing` (`cannon_piercing`) |
+| `mg_attack_speed` / `mg_damage` | dazu `spread_per_level`: so viel Grad mehr Streuung pro Stufe |
+| `rocket_cooldown` / `rocket_radius` / `rocket_damage` / `rocket_wall_push` | `cooldown` (s), `blast_radius` (px), `damage`, `wall_push` der Rakete (Grundwerte in `abilities.json`) |
+| `watchtower` | so viele Türme mehr gleichzeitig |
+| `radar_size` / `radar_cooldown` / `radar_duration` | Fenstergröße (px) / Zeit zwischen Scans (s, negativ = öfter) / Dauer eines Scans (s) |
+
+Knoten, die nur etwas freischalten (`shop`, `card_shop`, `dash`, `rocket`, `machine_gun`, `cannon`, `laser`, `radar`),
+haben nur `costs`. **`burning_ground`** hat statt `per_level` die Werte des brennenden Bodens:
+
+| Wert | Bedeutung |
+|---|---|
+| `duration` | so viele Sekunden brennt er |
+| `damage_per_second` | Schaden pro Sekunde an jedem Gegner darin (in Stößen alle 0,5 s) |
+| `radius` | sein Radius als Anteil des Explosionsradius (0.8 = 80 %) |
+
+Die Beschreibungen von *Head start*, *Bigger arena*, *Core luck* und *Watchtower* und die Tooltips der Upgrades zeigen
+die Werte aus dieser Datei.
+
+Weniger Stufen als vorher: Ein Spielstand mit mehr gekauften Stufen zählt nur so viele, wie der Knoten jetzt hat –
+gespeichert bleibt die alte Zahl, mit mehr Stufen ist sie wieder da. Ausgegebene Cores gibt es nicht zurück.
 
 ## Woher ein Gegnerwert kommt
 
@@ -45,7 +119,7 @@ handeln nur nach vorne. Wer schnell genug um sie herumfliegt, entkommt ihnen.
 
 | Wert | Bedeutung |
 |---|---|
-| `max_hp` | Lebenspunkte (ein Kästchen über dem Gegner pro Punkt) |
+| `base_hp` | Lebenspunkte (ein Kästchen über dem Gegner pro Punkt) |
 | `speed` | Lauftempo |
 | `size` | Kantenlänge des Würfels (auch die Hitbox; Größere schieben Kleinere weg) |
 | `contact_damage` | Schaden in Pixeln bei Berührung (0 = harmlos) |
@@ -145,9 +219,14 @@ stärkerer Charger.
 
 ## `upgrades.json`
 
-**`upgrades`** – ein Eintrag pro Wert, den man verbessern kann (`move_speed`, `max_energy`, `energy_regen`, `damage`, `attack_speed`, `wall_push`,
+**`upgrades`** – ein Eintrag pro Wert, den man verbessern kann (`move_speed`, `max_energy`, `energy_regen`, `armor`,
+`recovery`, `magnet`, `damage`, `attack_speed`, `wall_push`,
 `shot_speed` (Projectile speed), `dash_distance`, `dash_cooldown`, `rocket_damage`, `blast_radius`, `rocket_wall_push`,
 `rocket_cooldown`, `vision`). Gilt für beides: eine Stufe im Shop während des Runs und eine Karte im Karten-Shop.
+Die Waffenwerte (`damage`, `attack_speed`, `wall_push`, `shot_speed`) gelten immer nur für eine Waffe: Im Shop stehen
+sie einmal pro ausgerüsteter Waffe (jede mit eigenem Preis), im Karten-Shop gibt es sie als Karte pro Waffe
+(*Cannon: Damage*) – sie wirkt nur, solange diese Waffe in einem Slot ist. Die Zahlen hier gelten für alle Waffen
+gleich, mal deren `upgrade_factor` (`weapons.json`).
 
 | Wert | Bedeutung |
 |---|---|
@@ -156,8 +235,8 @@ stärkerer Charger.
 | `price` | Sterne für die erste Stufe in einem Run … |
 | `price_step` | … und so viele mehr für jede weitere Stufe desselben Werts (10, 15, 20, …) |
 
-**`card_shop`** – der Karten-Shop im Spielmenü (Reiter *Cards*), bezahlt mit Cores. Ganze Zahlen. Erst
-nutzbar, wenn der Skilltree-Knoten *Card shop* gekauft ist – vorher wirken auch aktive Karten nicht.
+**`card_shop`** – der Karten-Shop im Spielmenü (Reiter *Cards*), bezahlt mit Cores. Ganze Zahlen. Den Reiter gibt
+es erst, wenn der Skilltree-Knoten *Card shop* gekauft ist – vorher wirken auch aktive Karten nicht.
 
 | Wert | Bedeutung |
 |---|---|
@@ -171,17 +250,12 @@ nutzbar, wenn der Skilltree-Knoten *Card shop* gekauft ist – vorher wirken auc
 
 ## `weapons.json`
 
-Ein Abschnitt pro Waffe (`gun`, `machine_gun`, `cannon`, `laser`), dazu `energy` und `rocket`. Welche Waffe in welchem
-Slot liegt, wählt man im Spielmenü (Reiter *Loadout*); freigeschaltet werden sie im Skilltree (die Gun ist immer da).
+Ein Abschnitt pro Waffe (`gun`, `machine_gun`, `cannon`, `laser`) – die Grundwerte; was die
+Skilltree-Upgrades dazugeben, steht in `skilltree.json`. Welche Waffe in welchem Slot liegt, wählt man im Spielmenü
+(Reiter *Loadout*); freigeschaltet werden sie im Skilltree (die Gun ist immer da).
 
-**`energy`** – beide Waffen teilen sich die Energie des Schiffs. Jeder Schuss kostet Energie, sie lädt ständig nach.
-Ist sie leer, schießen die Waffen nur noch so schnell, wie sie nachlädt (keine Sperre).
-
-| Wert | Bedeutung |
-|---|---|
-| `max` | so viel Energie hat das Schiff (voll zu Beginn) |
-| `regen` | so viel kommt pro Sekunde zurück |
-| `tree` | was eine Stufe der Skilltree-Knoten *Max energy* (`max`) und *Energy regen* (`regen`) dazugibt |
+Beide Waffen teilen sich die Energie des Schiffs (`max_energy`, `energy_regen` in `ships.json`). Jeder Schuss kostet
+`energy_use`, sie lädt ständig nach. Ist sie leer, schießen die Waffen nur noch so schnell, wie sie nachlädt.
 
 **Jede Waffe**
 
@@ -192,27 +266,44 @@ Ist sie leer, schießen die Waffen nur noch so schnell, wie sie nachlädt (keine
 | `projectile_speed` / `projectile_size` | Tempo (px/s) und Durchmesser (px) der Schüsse |
 | `wall_push` | so viele Pixel schiebt ein Schuss die Wand, die er trifft |
 | `energy_use` | Energie pro Schuss |
-| `tree` | was eine Stufe ihrer Skilltree-Upgrades dazugibt (negativ = weniger, z. B. `energy_use`) |
 | `upgrade_factor` | wie stark Shop-Stufen und Karten bei dieser Waffe wirken, pro Karte (`damage`, `attack_speed`, `wall_push`, `projectile_speed`; fehlt einer, gilt 1). Die Karten geben jeder Waffe denselben Wert – eine Waffe mit vielen winzigen Schüssen braucht daher einen kleinen Faktor. |
 
 **Eigene Werte**
 
 | Waffe | Wert | Bedeutung |
 |---|---|---|
-| `machine_gun` | `spread` | Streuung in Grad (ganzer Kegel); `tree.spread` ist das Upgrade *Precision* (negativ) |
-| `machine_gun` | `spread_per_upgrade` | so viel Streuung kommt mit jeder Skilltree-Stufe *Damage* und *Attack speed* dazu |
+| `machine_gun` | `spread` | Streuung in Grad (ganzer Kegel) |
 | `cannon` | `piercing` | durch so viele Gegner fliegt ein Schuss (voller Schaden), am nächsten bleibt er hängen |
 | `cannon` | `pierced_push` | erreicht er danach die Wand, schiebt er nur noch so viel davon – pro durchbohrtem Gegner (0.5: halb, dann ein Viertel …) |
 | `laser` | – | sieht aus wie ein Dauerstrahl, sind aber `attack_speed` winzige Schüsse pro Sekunde; alle Werte gelten pro Schuss (Inventar und Loadout zeigen sie pro Sekunde) |
 
-**`rocket`** – `cooldown`, `damage`, `blast_radius`, `wall_push` wie oben; `tree` für die vier Raketen-Upgrades im
-Skilltree. `burning` ist der Knoten *Burning ground*: Die Explosion hinterlässt brennenden Boden.
+## `abilities.json`
+
+Die Fähigkeiten in den beiden Slots: `dash` (Shift) und `rocket` (Leertaste). Beide schaltet man im Skilltree frei; was
+dessen Upgrades dazugeben, steht in `skilltree.json`, was Shop-Stufen und Karten bringen, in `upgrades.json`.
 
 | Wert | Bedeutung |
 |---|---|
-| `burning.duration` | so viele Sekunden brennt er |
-| `burning.damage_per_second` | Schaden pro Sekunde an jedem Gegner darin (in Stößen alle 0,5 s) |
-| `burning.radius` | sein Radius als Anteil des Explosionsradius (0.8 = 80 %) |
+| `cooldown` | Sekunden, bis die Fähigkeit wieder bereit ist … |
+| `min_cooldown` | … nie kürzer als das, egal wie viele Upgrades und Karten |
+
+**`dash`** – ein kurzer Sprung in Laufrichtung (im Stand: zur Maus). Durch Wände kommt man nicht.
+
+| Wert | Bedeutung |
+|---|---|
+| `distance` | so viele Pixel weit |
+| `duration` | so viele Sekunden dauert der Sprung (kleiner = schneller) |
+
+**`rocket`** – fliegt dorthin, wo die Maus beim Abschuss war, und explodiert dort. Der brennende Boden (*Burning
+ground*) steht in `skilltree.json`.
+
+| Wert | Bedeutung |
+|---|---|
+| `damage` | Schaden an jedem Gegner im Explosionsradius |
+| `blast_radius` | Radius der Explosion in Pixeln |
+| `wall_push` | so weit schiebt die Explosion jede Kante in ihrem Radius |
+| `speed` / `acceleration` | Tempo beim Abschuss (px/s), plus so viel pro Sekunde Flugzeit |
+| `size` | Durchmesser der Rakete in Pixeln |
 
 ## `buildings.json`
 
@@ -222,7 +313,7 @@ kleines Fenster, das diese Stelle dauerhaft zeigt. Gegner können ihn zerstören
 
 | Wert | Bedeutung |
 |---|---|
-| `max_hp` | Lebenspunkte – in derselben Einheit wie der Schaden der Gegner (Pixel): 150 = sechs Berührungen eines Basic (je 25). Über dem Turm ein Lebensbalken |
+| `base_hp` | Lebenspunkte – in derselben Einheit wie der Schaden der Gegner (Pixel): 150 = sechs Berührungen eines Basic (je 25). Über dem Turm ein Lebensbalken |
 | `size` | Kantenlänge des Turms (auch die Hitbox; Gegner werden aus ihm herausgeschoben, er selbst bewegt sich nie) |
 | `vision` | Kantenlänge seines Fensters in Pixeln (Upgrade *Vision* im Shop und als Karte macht es größer) |
 | `throw_range` | so weit fliegt er vom Schiff weg |
@@ -250,10 +341,9 @@ draußen kein Gegner, schaut er jede Sekunde wieder. Solange es offen ist, flieg
 
 | Wert | Bedeutung |
 |---|---|
-| `size` | Kantenlänge des Fensters in Pixeln … |
-| `size_per_level` | … plus so viel pro Stufe *Scan size* |
+| `size` | Kantenlänge des Fensters in Pixeln |
 | `cooldown` | Sekunden vom Ende eines Scans bis zum nächsten … |
-| `cooldown_per_level` | … plus so viel pro Stufe *Scan rate* (negativ = öfter) … |
-| `min_cooldown` | … aber nie kürzer als das |
-| `duration` | Sekunden, die ein Scan offen bleibt … |
-| `duration_per_level` | … plus so viel pro Stufe *Scan time* |
+| `min_cooldown` | … nie kürzer als das, auch mit *Scan rate* |
+| `duration` | Sekunden, die ein Scan offen bleibt |
+
+Was *Scan size*, *Scan rate* und *Scan time* pro Stufe dazugeben, steht in `skilltree.json`.

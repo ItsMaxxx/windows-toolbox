@@ -16,7 +16,7 @@ import re
 from dataclasses import dataclass, field, fields, replace
 from pathlib import Path
 
-from game import buildings, cards, radar
+from game import ability_data, buildings, cards, radar, ship_data, skill_tree
 from game.enemies import roster
 from game.enemies.roster import ENEMY_TYPES, EVOLUTIONS, EnemyRoster, stat_names
 from game.weapons import data as weapon_data
@@ -88,6 +88,8 @@ class Phase:
     enemy_stats: tuple = ()         # (target, stat, operation, number) – buffs while it lasts: add or multiply only
     announce: str | None = None     # shown on screen when it starts
     arena: tuple = ()               # (value, operation, number) – the arena's ARENA_CHANGES while it lasts
+    spawn: tuple = ()               # (type, count) – extra enemies once, when it starts
+    spawn_interval: tuple = ()      # (operation, number) – on the seconds between enemies while it lasts (or empty)
 
 
 @dataclass(frozen=True)
@@ -258,7 +260,8 @@ def read_phases(data, file):
         if not isinstance(entry, dict):
             WARNINGS.append(f"{file} {where}: should be {{ … }} – skipped")
             continue
-        for key in entry.keys() - {"from", "to", "weights", "enemy_stats", "announce", "arena"}:
+        for key in entry.keys() - {"from", "to", "weights", "enemy_stats", "announce", "arena", "spawn",
+                                   "spawn_interval"}:
             WARNINGS.append(f"{file} {where}: unknown key \"{key}\" – ignored")
         start, end = entry.get("from", 0), entry.get("to")
         if not valid("from", start, 0.0):
@@ -278,9 +281,34 @@ def read_phases(data, file):
                                 f"\"x1.5\" in a phase – ignored")
             else:
                 stats.append(change)
+        interval = ()
+        if "spawn_interval" in entry:
+            interval = parse_change(entry["spawn_interval"]) or ()
+            if not interval or (interval[0] != "add" and interval[1] <= 0):
+                WARNINGS.append(f"{file} {where}.spawn_interval: {json.dumps(entry['spawn_interval'])} is not valid "
+                                f"– ignored (seconds, \"-1\", \"+1\" or \"x0.5\")")
+                interval = ()
         phases.append(Phase(start, end, read_weights(entry.get("weights", {}), file, f"{where}.weights"),
-                            tuple(stats), announce, read_arena_changes(entry.get("arena", {}), file, f"{where}.arena")))
+                            tuple(stats), announce, read_arena_changes(entry.get("arena", {}), file, f"{where}.arena"),
+                            read_spawn(entry.get("spawn", {}), file, f"{where}.spawn"), interval))
     return tuple(phases)
+
+
+def read_spawn(section, file, where):
+    """ {"shooter": 4, "basic": 2} as (type, count) – enemies that come once, when the phase starts."""
+    if not isinstance(section, dict):
+        WARNINGS.append(f"{file} {where}: should be {{ … }} – ignored")
+        return ()
+    spawn = []
+    for key, count in section.items():
+        if key not in ENEMY_TYPES:
+            WARNINGS.append(f"{file} {where}: unknown enemy type \"{key}\" – ignored")
+        elif isinstance(count, bool) or not isinstance(count, int) or count < 1:
+            WARNINGS.append(f"{file} {where}.{key}: {json.dumps(count)} is not valid – ignored "
+                            f"(a whole number, 1 or more)")
+        else:
+            spawn.append((key, count))
+    return tuple(spawn)
 
 
 def read_arena_changes(section, file, where):
@@ -320,7 +348,7 @@ def read_weights(section, file, where):
 
 
 def read_enemy_stats(section, file, where="enemy_stats"):
-    """ {"all": {"max_hp": "+1"}, "charger": {"speed": 100, "contact_damage": "x1.5"}} (a difficulty's or a phase's
+    """ {"all": {"base_hp": "+1"}, "charger": {"speed": 100, "contact_damage": "x1.5"}} (a difficulty's or a phase's
     "enemy_stats") as a list of (target, stat, operation, number) – in file order, "all" first, so a type's own entry
     comes after it."""
     if not isinstance(section, dict):
@@ -362,14 +390,18 @@ def parse_change(value):
 
 
 def reload():
-    """Reads data/enemies.json, data/upgrades.json, data/weapons.json, data/buildings.json, data/radar.json and every
-    file in FOLDER again (DIFFICULTIES and WARNINGS are changed in place)."""
+    """Reads data/enemies.json, data/upgrades.json, data/weapons.json, data/abilities.json, data/buildings.json,
+    data/radar.json, data/ships.json, data/skilltree.json and every file in FOLDER again (DIFFICULTIES and WARNINGS are
+    changed in place)."""
     WARNINGS.clear()
     roster.reload(WARNINGS)
     cards.reload(WARNINGS)
     weapon_data.reload(WARNINGS)
+    ability_data.reload(WARNINGS)
     buildings.reload(WARNINGS)
     radar.reload(WARNINGS)
+    ship_data.reload(WARNINGS)
+    skill_tree.reload(WARNINGS)
     loaded = []
     for path in sorted(FOLDER.glob("*.json")):
         try:

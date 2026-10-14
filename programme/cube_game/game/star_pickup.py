@@ -1,6 +1,7 @@
 """
 A star dropped by a killed enemy – the shop's currency. Fly over it to collect it; close to the ship it gets pulled in
-(the closer, the faster). It stays where it fell until it's collected, also outside the window.
+(the closer, the faster – how close: the ship's magnet_radius). It stays where it fell until it's collected, also
+outside the window.
 """
 
 import math
@@ -11,8 +12,7 @@ from engine import Entity
 from game.icons import STAR_COLOR, draw_star
 
 SIZE = 16                   # hitbox
-MAGNET_RADIUS = 130         # pixels around the ship in which stars get pulled in …
-MAGNET_SPEED = 260          # … at this speed at the edge of the radius, three times as fast right at the ship
+MAGNET_SPEED = 260          # pulled in at this speed at the edge of the ship's magnet_radius, three times as fast at it
 
 
 class StarPickup(Entity):
@@ -27,8 +27,9 @@ class StarPickup(Entity):
         self.age += dt
         to_ship = pygame.Vector2(ship.rect.center) - self.rect.center
         distance = to_ship.length()
-        if 0 < distance < MAGNET_RADIUS:
-            pull = MAGNET_SPEED * (1 + 2 * (1 - distance / MAGNET_RADIUS))
+        radius = ship.magnet_radius
+        if 0 < distance < radius:
+            pull = MAGNET_SPEED * (1 + 2 * (1 - distance / radius))
             self.rect.move_ip(to_ship / distance * min(pull * dt, distance))
 
     def draw(self, surface, offset):

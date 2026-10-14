@@ -6,8 +6,8 @@
   "core_chance": 0.04,
   "unlock": { "requires": "b5" },
   "hints": ["Everything at once", "Many evolutions", "Clear it to unlock Survival"],
-  "arena": { "start_size": [800, 560], "shrink_speed": 15, "shrink_growth": 2.5, "max_shrink_speed": 30, "armor": 10 },
-  "spawning": { "first_spawn": 1.5, "start_interval": 2.0, "min_interval": 0.7, "interval_drop": 0.012 },
+  "arena": { "start_size": [800, 560], "shrink_speed": 15, "shrink_growth": 2.5, "max_shrink_speed": 32, "armor": 15 },
+  "spawning": { "first_spawn": 1.5, "start_interval": 2.1, "min_interval": 0.75, "interval_drop": 0.011 },
   "enemies": [
     { "type": "basic",     "weight": 50, "after": 0 },
     { "type": "charger",   "weight": 20, "after": 10, "growth": 5 },
@@ -35,21 +35,26 @@
     }
   ],
   "phases": [
-    { "from": 60, "enemy_stats": { "all": { "max_hp": "+1" } } },
-    { "from": 90, "to": 120, "weights": { "sniper": "x3", "artillery": "x2" }, "announce": "Long range incoming!" },
+    { "from": 60, "enemy_stats": { "all": { "base_hp": "+1" } } },
+    { "from": 90, "to": 120, "weights": { "sniper": "x3", "artillery": "x2" }, "spawn": { "sniper": 3, "artillery": 2, "laser": 1 },
+      "spawn_interval": "x0.85", "announce": "Long range incoming!" },
     { "from": 120, "enemy_stats": { "all": { "contact_damage": "x1.25", "shot_damage": "x1.25", "blast_damage": "x1.25" } }, "announce": "Enemies hit harder!" },
     { "from": 150, "arena": { "armor": "+15" }, "announce": "The walls harden!" },
-    { "from": 180, "enemy_stats": { "all": { "max_hp": "+1" } } },
-    { "from": 210, "to": 240, "weights": { "carrier": "x3" }, "announce": "Carriers incoming!" },
+    { "from": 180, "enemy_stats": { "all": { "base_hp": "+1" } } },
+    { "from": 210, "to": 240, "weights": { "carrier": "x3" }, "spawn": { "carrier": 3 }, "spawn_interval": "x0.85",
+      "announce": "Carriers incoming!" },
     { "from": 240, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
     { "from": 300, "arena": { "armor": "+15" }, "announce": "The walls harden!" },
-    { "from": 330, "to": 360, "weights": { "charger": "x3" }, "announce": "Chargers incoming!" },
-    { "from": 360, "enemy_stats": { "all": { "max_hp": "+1" } } },
+    { "from": 330, "to": 360, "weights": { "charger": "x3" }, "spawn": { "charger": 6, "shield": 2 }, "spawn_interval": "x0.85",
+      "announce": "Chargers incoming!" },
+    { "from": 360, "enemy_stats": { "all": { "base_hp": "+1" } } },
+    { "from": 380, "to": 420, "weights": { "fat": "+10", "cannoneer": "+10", "shield": "+10", "laser": "+10" }, "spawn": { "fat": 2, "cannoneer": 2, "shield": 1, "laser": 1 }, "spawn_interval": "x0.65", "announce": "Final wave!" },
     { "from": 390, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
+    { "from": 400, "to": 420, "spawn": { "laser": 2, "shield": 2, "artillery": 1 }, "spawn_interval": "x0.8", "enemy_stats": { "all": { "contact_damage": "x1.25", "shot_damage": "x1.25", "blast_damage": "x1.25" } }, "arena": { "armor": "+10" }, "announce": "Hold on!" },
     { "from": 480, "arena": { "armor": "+15" }, "announce": "The walls harden!" },
-    { "from": 510, "enemy_stats": { "all": { "max_hp": "+1" } } }
+    { "from": 510, "enemy_stats": { "all": { "base_hp": "+1" } } }
   ],
   "enemy_stats": {
-    "all": { "max_hp": "+2" }
+    "all": { "base_hp": "+2" }
   }
 }

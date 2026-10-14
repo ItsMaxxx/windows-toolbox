@@ -35,15 +35,15 @@
     }
   ],
   "phases": [
-    { "from": 180, "enemy_stats": { "all": { "max_hp": "+1" } } },
-    { "from": 240, "announce": "Evolution begins!" },
+    { "from": 180, "enemy_stats": { "all": { "base_hp": "+1" } } },
+    { "from": 240, "spawn": { "fat": 3, "cannoneer": 1 }, "announce": "Evolution begins!" },
     { "from": 240, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
     { "from": 300, "arena": { "armor": "+15" }, "announce": "The walls harden!" },
-    { "from": 360, "enemy_stats": { "all": { "max_hp": "+1" } } },
+    { "from": 360, "enemy_stats": { "all": { "base_hp": "+1" } } },
     { "from": 420, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
     { "from": 480, "arena": { "armor": "+15" }, "announce": "The walls harden!" },
-    { "from": 540, "enemy_stats": { "all": { "max_hp": "+1" } } },
+    { "from": 540, "enemy_stats": { "all": { "base_hp": "+1" } } },
     { "from": 600, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
-    { "from": 720, "enemy_stats": { "all": { "max_hp": "+2" } } }
+    { "from": 720, "enemy_stats": { "all": { "base_hp": "+2" } } }
   ]
 }

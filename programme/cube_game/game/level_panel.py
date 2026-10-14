@@ -1,7 +1,7 @@
 """
 The "Levels" tab of the game menu: every level as a button – one row per series (A1 … A6, B1 … B6, then Survival) –
-and below them the details of the level under the mouse (or the chosen one): its hints, which enemies come when, and
-its events.
+and below them the details of the level under the mouse (or the chosen one): its hints, its numbers (arena, walls,
+spawning, cores – at the start and where they go), which enemies come when, and its events.
 
 Every button already shows small indicators of what's coming: a square in each enemy type's colour (evolutions with
 their dark frame) and one icon per kind of event (swarms, waves of one type, harder hits, more HP, harder walls).
@@ -19,9 +19,9 @@ from dataclasses import dataclass
 import pygame
 
 from engine.ui import draw_text, font, wrap
-from game import settings
+from game import settings, skill_tree
 from game.difficulty import DIFFICULTIES, evolution_chance
-from game.enemies.roster import ENEMY_TYPES, EVOLUTIONS
+from game.enemies.roster import ENEMY_TYPES, EVOLUTIONS, apply
 from game.game_over_scene import format_time
 from game.icons import (CORE_COLOR, draw_check, draw_damage_icon, draw_hp_icon, draw_notice_icon, draw_swarm_icon,
                         draw_wall_icon, draw_wave_icon)
@@ -38,6 +38,7 @@ EVENT_ICON_GAP = 7
 DETAIL_ICON = 15                    # icons in the details
 LINE_HEIGHT = 22
 TIME_WIDTH = 104                    # the events' times ("01:30, 03:00")
+LABEL_WIDTH = 70                    # the numbers' labels ("Walls")
 HINT_WIDTH = 250                    # the details' columns: hints, enemies, events (the rest)
 ENEMY_WIDTH = 330
 COLUMN_GAP = 20
@@ -78,6 +79,35 @@ def plural(key):
     return f"{ENEMY_TYPES[key].name}s"
 
 
+def change_text(operation, number, unit=""):
+    """A phase's change as a short text: "×0.8", "+2 px/s", "= 3 s"."""
+    if operation == "multiply":
+        return f"×{number:g}"
+    if operation == "add":
+        return f"{number:+g}{unit}"
+    return f"= {number:g}{unit}"
+
+
+def numbers(level, profile):
+    """[(label, value)] – the level's numbers at the start and where they go over time. Arena size and cores with the
+    player's skill tree ("Bigger arena", "Core luck"), as the run gets them."""
+    arena, spawning = level.arena, level.spawning
+    arena_size = skill_tree.start_arena_size(profile, level)
+    walls = f"{arena.shrink_speed:g} px/s"
+    if arena.shrink_growth and arena.max_shrink_speed > arena.shrink_speed:
+        reached = (arena.max_shrink_speed - arena.shrink_speed) / arena.shrink_growth * 60
+        walls = f"{arena.shrink_speed:g} to {arena.max_shrink_speed:g} px/s by {format_time(reached)}"
+    gap = f"every {spawning.start_interval:g} s"
+    if spawning.interval_drop and spawning.min_interval < spawning.start_interval:
+        reached = (spawning.start_interval - spawning.min_interval) / spawning.interval_drop
+        gap = f"{spawning.start_interval:g} to {spawning.min_interval:g} s by {format_time(reached)}"
+    return [("Arena", f"{arena_size[0]:g} × {arena_size[1]:g} px"),
+            ("Walls", walls),
+            ("Spawns", gap),
+            ("First", f"after {spawning.first_spawn:g} s"),
+            ("Cores", f"{percent(skill_tree.core_chance(profile, level))} per kill")]
+
+
 def enemy_rows(level):
     """[(type key, first second it can come, note)] for every type that can come on level – in order of appearance.
     Evolutions only if their tier 1 type comes; their note says how likely ("8–20 % of Basics")."""
@@ -105,7 +135,7 @@ def events(level):
     if level.arena.armor:
         found.append(Event(0, None, "walls", f"Armored walls ({level.arena.armor:g} %)", WALL_COLOR))
     start_hp = sum(number for target, stat, operation, number in level.enemy_stats
-                   if target == "all" and stat == "max_hp" and operation == "add")
+                   if target == "all" and stat == "base_hp" and operation == "add")
     if start_hp:
         found.append(Event(0, None, "hp", f"All enemies {start_hp:+g} HP", HP_COLOR))
     for swarms in level.swarms:
@@ -127,15 +157,22 @@ def phase_changes(phase):
     changes = []
     raised = [key for key, operation, number in phase.weights
               if operation == "set" or (operation == "multiply" and number > 1) or (operation == "add" and number > 0)]
+    raised += [key for key, _ in phase.spawn if key not in raised]
+    faster = phase.spawn_interval and apply(1.0, *phase.spawn_interval) < 1     # shorter gaps than now
+    gap = change_text(*phase.spawn_interval, " s") if phase.spawn_interval else ""     # on the time between enemies
     if raised:
-        changes.append(("wave", "More " + " and ".join(plural(key) for key in raised),
-                        ENEMY_TYPES[raised[0]].skin.color))
-    if phase.arena:
-        armor = any(name == "armor" for name, _, _ in phase.arena)
-        changes.append(("walls", "The walls harden" if armor else "The walls close in faster", WALL_COLOR))
+        changes.append(("wave", "More " + " and ".join(plural(key) for key in raised)
+                        + (f", spawns {gap}" if gap else ""), ENEMY_TYPES[raised[0]].skin.color))
+    elif gap:
+        changes.append(("wave", f"{'Faster' if faster else 'Slower'} spawns ({gap})", NOTICE_COLOR))
+    for name, operation, number in phase.arena:
+        if name == "armor":
+            changes.append(("walls", f"Walls harden ({change_text(operation, number, ' %')})", WALL_COLOR))
+        else:
+            changes.append(("walls", f"Walls close in {change_text(operation, number, ' px/s')}", WALL_COLOR))
     if any(stat in DAMAGE_STATS for _, stat, _, _ in phase.enemy_stats):
         changes.append(("damage", "Enemies hit harder", DAMAGE_COLOR))
-    hp = sum(number for _, stat, operation, number in phase.enemy_stats if stat == "max_hp" and operation == "add")
+    hp = sum(number for _, stat, operation, number in phase.enemy_stats if stat == "base_hp" and operation == "add")
     if hp:
         changes.append(("hp", f"New enemies {hp:+g} HP", HP_COLOR))
     return changes
@@ -237,7 +274,8 @@ class LevelPanel:
         enemies_left = hints_left + HINT_WIDTH + COLUMN_GAP
         events_left = enemies_left + ENEMY_WIDTH + COLUMN_GAP
         bottom = self.rect.bottom
-        self.draw_hints(surface, level, hints_left, top, HINT_WIDTH, bottom)
+        below = self.draw_hints(surface, level, hints_left, top, HINT_WIDTH, bottom)
+        self.draw_numbers(surface, level, hints_left, below + 12, bottom)
         self.draw_enemies(surface, level, enemies_left, top, bottom)
         self.draw_events(surface, level, events_left, top, right - events_left, bottom)
 
@@ -260,16 +298,28 @@ class LevelPanel:
         return top + 24
 
     def draw_hints(self, surface, level, left, top, width, bottom):
+        """Returns where the next thing below can go."""
         y = self.heading(surface, "WHAT TO EXPECT", left, top)
         for hint in level.hints:
             for index, line in enumerate(wrap(hint, 21, width - 14)):
                 if y + LINE_HEIGHT > bottom:
-                    return
+                    return y
                 if index == 0:
                     pygame.draw.circle(surface, settings.TEXT, (left + 4, y + 8), 3)
                 draw_text(surface, line, 21, settings.TEXT, topleft=(left + 14, y))
                 y += LINE_HEIGHT - 2
             y += 4
+        return y
+
+    def draw_numbers(self, surface, level, left, top, bottom):
+        """The level's numbers – walls: how fast each edge moves in; "by 04:10": when the last value is reached."""
+        y = self.heading(surface, "NUMBERS", left, top)
+        for label, value in numbers(level, self.profile):
+            if y + LINE_HEIGHT > bottom:
+                return
+            draw_text(surface, label, 19, settings.TEXT_MUTED, topleft=(left, y + 1))
+            draw_text(surface, value, 20, settings.TEXT, topleft=(left + LABEL_WIDTH, y))
+            y += LINE_HEIGHT - 2
 
     def draw_enemies(self, surface, level, left, top, bottom):
         y = self.heading(surface, "ENEMIES", left, top)

@@ -1,18 +1,14 @@
 """
-Damage card: More damage per shot, for every weapon.
+Damage card: More damage per shot, for every weapon (in the shop during a run: for one).
 """
 
-from game.cards.card import Card
+from game.cards.card import WeaponCard
 
 
-class DamageCard(Card):
+class DamageCard(WeaponCard):
     key = "damage"
     name = "Damage"
-    category = "Weapons"
     stat = "damage"
     amount = 0.5
     card_amount = 2
     unit = ""
-
-    def targets(self, ship):
-        return [weapon for weapon in ship.weapons if weapon]

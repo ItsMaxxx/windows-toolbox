@@ -96,6 +96,7 @@ class PlayScene(Scene):
         self.arena = Arena(self.desktop, skill_tree.start_arena_size(profile, self.difficulty), rules.shrink_speed,
                            rules.shrink_growth, rules.max_shrink_speed, rules.armor)
         self.ship = skill_tree.start_ship(profile, self.arena.rect.center)
+        self.arena.ship_size = self.ship.size
         self.shop_unlocked = profile.owns(skill_tree.SHOP)
         self.core_chance = skill_tree.core_chance(profile, self.difficulty)
         self.radar = skill_tree.start_radar(profile)            # None without the radar
@@ -492,11 +493,11 @@ class PlayScene(Scene):
         self.beams = [beam for beam in self.beams if not beam.done]
 
     def hit_ship(self, damage):
-        """The window is the ship's health: a hit squeezes the edges in by damage pixels (on average), mostly the ones
-        away from the ship – unless the ship is still invulnerable. True if the hit counted."""
+        """The window is the ship's health: a hit squeezes the edges in by damage pixels (on average, less the ship's
+        armor), mostly the ones away from the ship – unless the ship is still invulnerable. True if the hit counted."""
         if not self.ship.hit():
             return False
-        self.arena.hit(damage, self.ship.rect.center)
+        self.arena.hit(self.ship.absorb(damage), self.ship.rect.center)
         return True
 
     def explode(self, projectile):

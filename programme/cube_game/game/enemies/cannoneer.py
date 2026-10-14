@@ -30,7 +30,7 @@ class Cannoneer(Shooter):
     skin = CannoneerSkin()
     shot_color = (95, 30, 140)
     stats = {                       # fallback – see data/enemies.json
-        "max_hp": 5, "speed": 45, "size": 36, "contact_damage": 25,
+        "base_hp": 5, "speed": 45, "size": 36, "contact_damage": 25,
         "shooting_distance": 380, "fire_range": 650, "fire_interval": 4.0, "turn_speed": 60, "fire_cone": 14,
         "shot_damage": 100, "shot_speed": 140, "shot_size": 44,
     }

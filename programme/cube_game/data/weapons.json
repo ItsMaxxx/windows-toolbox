@@ -1,36 +1,21 @@
 {
-  "energy": {
-    "max": 100, "regen": 20,
-    "tree": { "max": 20, "regen": 4 }
-  },
   "gun": {
-    "damage": 1.5, "attack_speed": 0.8, "projectile_speed": 880, "projectile_size": 7, "wall_push": 18, "energy_use": 8,
-    "tree": { "damage": 0.4, "attack_speed": 0.3, "energy_use": -1 },
+    "damage": 2, "attack_speed": 1, "projectile_speed": 880, "projectile_size": 9, "wall_push": 35, "energy_use": 8,
     "upgrade_factor": {}
   },
   "machine_gun": {
-    "damage": 0.5, "attack_speed": 8, "projectile_speed": 950, "projectile_size": 5, "wall_push": 7, "energy_use": 3,
-    "spread": 30, "spread_per_upgrade": 3,
-    "tree": { "damage": 0.1, "attack_speed": 1, "energy_use": -0.4, "wall_push": 1.5, "projectile_speed": 100,
-              "spread": -6 },
+    "damage": 1, "attack_speed": 3, "projectile_speed": 800, "projectile_size": 6, "wall_push": 10, "energy_use": 3,
+    "spread": 30,
     "upgrade_factor": { "damage": 0.3, "attack_speed": 2, "wall_push": 0.5 }
   },
   "cannon": {
     "damage": 4.5, "attack_speed": 0.8, "projectile_speed": 650, "projectile_size": 14, "wall_push": 35,
     "energy_use": 22, "piercing": 1, "pierced_push": 0.5,
-    "tree": { "damage": 1, "attack_speed": 0.1, "energy_use": -2, "wall_push": 6, "projectile_speed": 80,
-              "piercing": 1 },
     "upgrade_factor": { "damage": 2, "attack_speed": 0.2, "wall_push": 2 }
   },
   "laser": {
     "damage": 0.04, "attack_speed": 30, "projectile_speed": 1500, "projectile_size": 4, "wall_push": 2,
     "energy_use": 1,
-    "tree": { "damage": 0.01, "energy_use": -0.12, "wall_push": 0.4 },
     "upgrade_factor": { "damage": 0.02, "attack_speed": 4, "wall_push": 0.15 }
-  },
-  "rocket": {
-    "cooldown": 7, "damage": 3, "blast_radius": 110, "wall_push": 120,
-    "tree": { "cooldown": -0.6, "damage": 1, "blast_radius": 15, "wall_push": 20 },
-    "burning": { "duration": 3, "damage_per_second": 1.5, "radius": 0.8 }
   }
 }

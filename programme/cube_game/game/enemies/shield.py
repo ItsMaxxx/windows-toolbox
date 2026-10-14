@@ -26,7 +26,7 @@ class ShieldBearer(Enemy):
     shielded = True
     skin = ShieldSkin()
     stats = {                       # fallback – see data/enemies.json
-        "max_hp": 4, "speed": 55, "size": 30, "contact_damage": 50,
+        "base_hp": 4, "speed": 55, "size": 30, "contact_damage": 50,
         "turn_speed": 40,           # degrees per second – very slow
         "shield_width": 54,         # pixels: how long the shield is (across, in front of the body)
         "shield_arc": 150,          # degrees: shots that hit the body from within this cone in front are blocked, too

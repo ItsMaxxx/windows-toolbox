@@ -48,7 +48,7 @@ class Enemy(Entity):
     melee = False           # only fights by touching – then a watchtower nearby can lure it away from the ship
     shielded = False        # has a shield that can block the player's shots (blocks())
     stats = {               # fallback only – the real values are in data/enemies.json
-        "max_hp": 1,
+        "base_hp": 1,
         "speed": 100,           # pixels per second
         "size": 28,             # pixels (square hitbox) – read at spawn
         "contact_damage": 25,   # pixels the edges move in when it touches the ship (0 = harmless to touch)
@@ -65,7 +65,7 @@ class Enemy(Entity):
         size = self.stat("size")
         super().__init__(0, 0, size, size, self.skin.color)     # color: for the death explosion, markers, …
         self.rect.center = position
-        self.hp = self.stat("max_hp")
+        self.hp = self.stat("base_hp")
         self.flash = 0.0
         self.seen = False       # set by the scene once it has been completely inside a window (arena or extra)
         self.spawned = []       # enemies created this tick – the scene moves them into its list

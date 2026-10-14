@@ -1,0 +1,16 @@
+{
+  "ship": "standard",
+  "ships": {
+    "standard": {
+      "name": "Standard",
+      "size": 30,
+      "speed": 280,
+      "max_energy": 100,
+      "energy_regen": 10,
+      "invulnerable_time": 0.5,
+      "armor": 0,
+      "magnet_radius": 130,
+      "color": [40, 110, 255]
+    }
+  }
+}

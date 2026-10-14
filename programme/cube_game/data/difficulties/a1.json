@@ -6,18 +6,23 @@
   "core_chance": 0.08,
   "unlock": { "requires": null },
   "hints": ["Only Basics and Shooters", "Slow walls – learn to push them back"],
-  "arena": { "start_size": [800, 560], "shrink_speed": 7, "shrink_growth": 1.5, "max_shrink_speed": 15, "armor": 0 },
-  "spawning": { "first_spawn": 3, "start_interval": 3.4, "min_interval": 1.5, "interval_drop": 0.008 },
+  "arena": { "start_size": [800, 560], "shrink_speed": 2, "shrink_growth": 1, "max_shrink_speed": 10, "armor": 0 },
+  "spawning": { "first_spawn": 3, "start_interval": 4, "min_interval": 1.5, "interval_drop": 0.01 },
   "enemies": [
     { "type": "basic",   "weight": 50, "after": 0 },
     { "type": "shooter", "weight": 20, "after": 20, "growth": 3 }
   ],
   "swarms": [],
   "phases": [
-    { "from": 60, "to": 80, "weights": { "shooter": "x3" }, "announce": "Shooters incoming!" },
-    { "from": 100, "enemy_stats": { "all": { "max_hp": "+1" } } },
+    { "from": 60, "to": 80, "weights": { "shooter": "x3" }, "spawn": { "shooter": 3 }, "spawn_interval": "x0.75",
+      "announce": "Shooters incoming!" },
+    { "from": 60, "spawn_interval": "x0.8" },
+    { "from": 80, "arena": { "shrink_speed": "x2" } },
+    { "from": 120, "enemy_stats": { "all": { "base_hp": "+1" } } },
     { "from": 150, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
-    { "from": 240, "enemy_stats": { "all": { "max_hp": "+1" } } },
+    { "from": 150, "to": 180, "weights": { "shooter": "x2" }, "spawn": { "shooter": 3 }, "spawn_interval": "x0.85", "announce": "Final wave!" },
+    { "from": 165, "to": 180, "spawn": { "basic": 3 }, "spawn_interval": "x0.9", "announce": "Hold on!" },
+    { "from": 240, "enemy_stats": { "all": { "base_hp": "+1" } } },
     { "from": 300, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" }
   ]
 }

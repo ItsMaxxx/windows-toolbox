@@ -3,23 +3,53 @@ The shop during a run (T): every stat can be upgraded directly, as often as you 
 stat costs more than the last one of that stat: price + price_step × (times bought in this run) – the numbers are in
 data/upgrades.json. A stat that can't go further (a cooldown at its minimum) is maxed.
 
-Upgrades are cards (game/cards): the shop offers every card whose part the ship has (no dash yet: no dash upgrades).
+Upgrades are cards (game/cards), in sections – only for what the ship has in this run:
+  - the ship itself,
+  - each weapon in a slot, with its own weapon cards (an upgrade of the gun's damage doesn't touch the cannon, and each
+    has its own price),
+  - each ability and the watchtower, once unlocked.
 """
 
-from game.cards import CARDS
+from dataclasses import dataclass
 
-CATEGORIES = ("Ship", "Weapons", "Dash", "Rocket", "Watchtower")
+from game import settings
+from game.cards import CARDS
+from game.cards.card import CATEGORY_COLORS, WeaponCard
+
+WEAPON_KEYS = ("LMB", "RMB")        # which mouse button fires which weapon slot
+PART_KEYS = {"Dash": settings.ABILITY_KEY_NAMES[0], "Rocket": settings.ABILITY_KEY_NAMES[1],
+             "Watchtower": settings.BUILD_KEY_NAME}
+
+
+@dataclass(frozen=True)
+class Section:
+    key: str                    # "ship", "weapon1", "weapon2", "dash", "rocket", "watchtower" – where the panel puts it
+    title: str
+    color: tuple
+    cards: tuple
 
 
 class Shop:
     def __init__(self, ship):
         self.ship = ship
         self.bought = {}            # card key -> how often it was bought in this run
+        self.sections = self.build_sections()      # the loadout doesn't change during a run
 
-    def upgrades(self, category):
-        """The cards of one category, in their order – also those the ship has no part for (the panel shows them
-        as locked)."""
-        return [card for card in CARDS.values() if card.category == category]
+    def build_sections(self):
+        cards = list(CARDS.values())
+        sections = [Section("ship", "Ship", CATEGORY_COLORS["Ship"],
+                            tuple(card for card in cards if card.category == "Ship"))]
+        for slot, weapon in enumerate(self.ship.weapons):
+            if weapon:
+                own = tuple(card for card in cards if isinstance(card, WeaponCard) and card.weapon == weapon.key)
+                sections.append(Section(f"weapon{slot + 1}", f"{weapon.name} ({WEAPON_KEYS[slot]})", weapon.color,
+                                        own))
+        for category in ("Dash", "Rocket", "Watchtower"):
+            owned = tuple(card for card in cards if card.category == category and self.has_part(card))
+            if owned:
+                sections.append(Section(category.lower(), f"{category} ({PART_KEYS[category]})",
+                                        CATEGORY_COLORS[category], owned))
+        return sections
 
     def has_part(self, card):
         return bool(card.targets(self.ship))

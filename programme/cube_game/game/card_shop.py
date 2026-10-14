@@ -13,6 +13,8 @@ import random
 
 from game import cards, skill_tree
 from game.cards import CARDS
+from game.cards.card import WeaponCard
+from game.weapons import unlocked as weapon_unlocked
 
 
 class CardShop:
@@ -41,10 +43,13 @@ class CardShop:
     # --- offers ---
 
     def candidates(self, exclude=()):
-        """Card keys worth offering: ones that would change something on the next run's ship (no dash cards without
-        the dash), without the keys in exclude."""
+        """Card keys worth offering, without the keys in exclude: weapon cards for every unlocked weapon (also one
+        that isn't in a slot right now), the others if they would change something on the next run's ship (no dash
+        cards without the dash)."""
         ship = skill_tree.start_ship(self.profile, (0, 0))
-        return [key for key, card in CARDS.items() if key not in exclude and card.available(ship)]
+        return [key for key, card in CARDS.items() if key not in exclude
+                and (weapon_unlocked(self.profile, card.weapon) if isinstance(card, WeaponCard)
+                     else card.available(ship))]
 
     def roll(self):
         """New random offers, all different (free – used for the first visit and by reroll())."""

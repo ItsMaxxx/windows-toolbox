@@ -7,9 +7,9 @@ seconds – size × size pixels, without a frame (Engine.open_view, drawn by the
 Finding the group: the enemies out of sight are sorted into a grid of size × size cells; the fullest cell wins, the
 window goes over the middle of the enemies around it (once more: everything within the window around that middle).
 
-The base values and what each level of the skill tree's "Radar size" / "Radar cooldown" / "Radar duration" adds are
-in data/radar.json (explained in data/README.md); reload() reads it again – the game menu calls it every time it opens
-(via difficulty.reload()).
+The base values are in data/radar.json (explained in data/README.md), what each level of the skill tree's "Scan
+size" / "Scan rate" / "Scan time" adds in data/skilltree.json; reload() reads radar.json again – the game menu calls it
+every time it opens (via difficulty.reload()).
 """
 
 import json
@@ -19,16 +19,12 @@ import pygame
 
 FILE = Path(__file__).resolve().parents[1] / "data" / "radar.json"
 DEFAULTS = {
-    "size": 150,                    # side length of the window (pixels) …
+    "size": 150,                    # side length of the window (pixels)
     "cooldown": 4,                  # seconds from the end of one scan to the next …
-    "duration": 2.5,                # seconds a scan stays open …
-    "size_per_level": 30,           # … plus this per level of "Scan size"
-    "cooldown_per_level": -0.75,    # … plus this per level of "Scan rate" (negative: sooner)
-    "duration_per_level": 1,        # … plus this per level of "Scan time"
-    "min_cooldown": 1,              # the cooldown never gets shorter than this
+    "duration": 2.5,                # seconds a scan stays open
+    "min_cooldown": 1,              # … never shorter than this, whatever the skill tree adds
 }
 MUST_BE_POSITIVE = {"size", "cooldown", "duration", "min_cooldown"}
-CAN_BE_NEGATIVE = {"size_per_level", "cooldown_per_level", "duration_per_level"}
 STATS = dict(DEFAULTS)
 RETRY = 1.0                         # seconds until it looks again when there was nothing to scan
 
@@ -48,19 +44,19 @@ def reload(warnings):
         if name not in DEFAULTS:
             warnings.append(f"radar.json: unknown value \"{name}\" – ignored")
         elif (isinstance(value, bool) or not isinstance(value, (int, float))
-              or (value < 0 and name not in CAN_BE_NEGATIVE) or (value == 0 and name in MUST_BE_POSITIVE)):
+              or value < 0 or (value == 0 and name in MUST_BE_POSITIVE)):
             warnings.append(f"radar.json {name}: {json.dumps(value)} is not valid – using {DEFAULTS[name]}")
         else:
             STATS[name] = value
 
 
 class Radar:
-    def __init__(self, size_level=0, cooldown_level=0, duration_level=0):
-        """The levels of the skill tree's radar upgrades."""
+    def __init__(self, more_size=0, more_cooldown=0, more_duration=0):
+        """What the skill tree's radar upgrades add to the base values (pixels, seconds, seconds)."""
         stats = STATS
-        self.size = max(1, round(stats["size"] + stats["size_per_level"] * size_level))
-        self.cooldown = max(stats["min_cooldown"], stats["cooldown"] + stats["cooldown_per_level"] * cooldown_level)
-        self.duration = max(0.1, stats["duration"] + stats["duration_per_level"] * duration_level)
+        self.size = max(1, round(stats["size"] + more_size))
+        self.cooldown = max(stats["min_cooldown"], stats["cooldown"] + more_cooldown)
+        self.duration = max(0.1, stats["duration"] + more_duration)
         self.timer = self.cooldown          # seconds until the next scan
         self.rect = None                    # the scanned area while a scan is open (screen pixels)
         self.remaining = 0.0                # seconds the open scan stays

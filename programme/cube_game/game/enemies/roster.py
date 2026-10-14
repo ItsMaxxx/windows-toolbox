@@ -36,7 +36,7 @@ ENEMY_TYPES = {"basic": BasicEnemy, "charger": Charger, "shooter": Shooter, "sni
 EVOLUTIONS = {"basic": "fat", "shooter": "cannoneer", "charger": "shield", "sniper": "laser"}
 FILE = Path(__file__).resolve().parents[2] / "data" / "enemies.json"
 # 0 would break things (division by 0, invisible enemies, …)
-MUST_BE_POSITIVE = {"max_hp", "size", "fire_interval", "reload_time", "aim_time", "spawn_interval", "blast_radius",
+MUST_BE_POSITIVE = {"base_hp", "size", "fire_interval", "reload_time", "aim_time", "spawn_interval", "blast_radius",
                     "setup_time", "pack_time", "beam_time"}
 BASE_STATS = {}                     # type key -> {stat: value}: data/enemies.json over the class fallbacks
 

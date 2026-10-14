@@ -1,7 +1,8 @@
 """
-Rocket cooldown card: The rocket is ready again sooner (not below 1.5 s).
+Rocket cooldown card: The rocket is ready again sooner (not below its min_cooldown in data/abilities.json).
 """
 
+from game import ability_data
 from game.cards.card import Card
 from game.rocket import Rocket
 
@@ -14,7 +15,10 @@ class RocketCooldownCard(Card):
     amount = -0.3
     card_amount = -1
     unit = " s"
-    minimum = 1.5
+
+    @property
+    def minimum(self):
+        return ability_data.STATS["rocket"]["min_cooldown"]
 
     def targets(self, ship):
         return [ability for ability in ship.abilities if isinstance(ability, Rocket)]

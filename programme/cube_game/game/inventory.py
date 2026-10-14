@@ -35,7 +35,10 @@ class Inventory:
         draw_ship(surface, preview.center, SHOWCASE_AIM, PREVIEW_SIZE * 0.55, ship.color)
         self.draw_rows(surface, [("Move speed", f"{ship.speed:g} px/s"),
                                  ("Energy", f"{ship.energy:.0f}/{ship.max_energy:g}"),
-                                 ("Energy regen", f"{ship.energy_regen:g}/s")],
+                                 ("Energy regen", f"{ship.energy_regen:g}/s"),
+                                 ("Armor", f"{min(ship.armor, settings.MAX_SHIP_ARMOR):g}%"),
+                                 ("Recovery", f"{ship.invulnerable_time:g} s"),
+                                 ("Magnet", f"{ship.magnet_radius:g} px")],
                        preview.left, preview.right, preview.bottom + 16)
 
         # right: 2 weapon slots, 2 ability slots

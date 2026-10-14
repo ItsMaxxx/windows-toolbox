@@ -3,8 +3,9 @@ The shop screen (T): every stat as a row – what it is now, what it becomes, an
 upgrade it; each upgrade of a stat costs more than the last. Like the inventory, the game is paused and the window
 shows only this panel (SIZE is the window size then).
 
-Two columns: Ship and Weapons on the left, Dash, Rocket and Watchtower on the right. A part the ship doesn't have yet
-(no dash unlocked) is shown as locked.
+Three columns: the ship and the watchtower on the left, the weapon in slot 1 and the dash in the middle, the weapon in
+slot 2 and the rocket on the right (COLUMNS). Only what the ship has in this run is shown – an empty slot or a part
+that isn't unlocked yet leaves its place free, and what's below moves up.
 """
 
 import pygame
@@ -13,8 +14,8 @@ from engine.ui import draw_panel, draw_text, font
 from game import settings
 from game.icons import STAR_COLOR, draw_arrow, draw_star
 
-SIZE = (720, 600)
-COLUMNS = (("Ship", "Weapons"), ("Dash", "Rocket", "Watchtower"))
+SIZE = (1000, 640)
+COLUMNS = (("ship", "watchtower"), ("weapon1", "dash"), ("weapon2", "rocket"))     # Shop section keys
 MARGIN = 24
 COLUMN_GAP = 16
 TOP = 70
@@ -24,7 +25,6 @@ ROW_GAP = 4
 ROW_FILL = (24, 24, 30)
 ROW_HOVER_FILL = (34, 34, 42)
 TOO_EXPENSIVE = (200, 70, 70)
-LOCKED = (70, 70, 80)
 MESSAGE_TIME = 1200         # milliseconds a message ("Not enough stars") stays visible
 
 
@@ -38,26 +38,27 @@ class ShopPanel:
     # --- layout (window coordinates; the panel fills the window) ---
 
     def layout(self):
-        """[(category, header position, [(card, row rect), …]), …] – where everything goes."""
-        width = (SIZE[0] - 2 * MARGIN - COLUMN_GAP) // 2
+        """[(section, header position, [(card, row rect), …]), …] – where everything goes."""
+        width = (SIZE[0] - 2 * MARGIN - (len(COLUMNS) - 1) * COLUMN_GAP) // len(COLUMNS)
+        sections = {section.key: section for section in self.shop.sections}
         placed = []
-        for column, categories in enumerate(COLUMNS):
+        for column, keys in enumerate(COLUMNS):
             x, y = MARGIN + column * (width + COLUMN_GAP), TOP
-            for category in categories:
+            for section in (sections[key] for key in keys if key in sections):
                 rows = []
                 header = (x, y)
                 y += HEADER_HEIGHT
-                for card in self.shop.upgrades(category):
+                for card in section.cards:
                     rows.append((card, pygame.Rect(x, y, width, ROW_HEIGHT)))
                     y += ROW_HEIGHT + ROW_GAP
-                placed.append((category, header, rows))
+                placed.append((section, header, rows))
                 y += 10
         return placed
 
     def card_at(self, position):
         for _, _, rows in self.layout():
             for card, rect in rows:
-                if rect.collidepoint(position) and self.shop.has_part(card):
+                if rect.collidepoint(position):
                     return card
         return None
 
@@ -89,15 +90,10 @@ class ShopPanel:
         draw_text(surface, "SHOP", 36, settings.TEXT, topleft=(MARGIN, 20))
         self.draw_price(surface, ship.stars, (panel.right - MARGIN, 34), size=32, align="right", color=settings.TEXT)
 
-        for category, (x, y), rows in self.layout():
-            locked = rows and not self.shop.has_part(rows[0][0])
-            header = draw_text(surface, category.upper(), 20, rows[0][0].color if rows and not locked else LOCKED,
-                               topleft=(x, y + 4))
-            if locked:
-                draw_text(surface, "unlock it in the game menu", 18, LOCKED,
-                          midleft=(header.right + 10, header.centery))
+        for section, (x, y), rows in self.layout():
+            draw_text(surface, section.title.upper(), 20, section.color, topleft=(x, y + 4))
             for card, rect in rows:
-                self.draw_row(surface, card, rect, locked)
+                self.draw_row(surface, card, rect, section.color)
 
         bottom = panel.bottom - 14
         if pygame.time.get_ticks() < self.message_until:
@@ -108,17 +104,15 @@ class ShopPanel:
         draw_text(surface, "T or ESC to close", 22, settings.TEXT, alpha=settings.HINT_ALPHA * 2,
                   bottomright=(panel.right - 20, bottom))
 
-    def draw_row(self, surface, card, rect, locked):
+    def draw_row(self, surface, card, rect, color):
+        """One stat: color is its section's (a weapon's own colour for its upgrades)."""
         hovered = self.hovered is card
         pygame.draw.rect(surface, ROW_HOVER_FILL if hovered else ROW_FILL, rect, border_radius=6)
         if hovered:
-            pygame.draw.rect(surface, card.color, rect, width=2, border_radius=6)
-        pygame.draw.rect(surface, LOCKED if locked else card.color, (rect.left, rect.top, 4, rect.height),
+            pygame.draw.rect(surface, color, rect, width=2, border_radius=6)
+        pygame.draw.rect(surface, color, (rect.left, rect.top, 4, rect.height),
                          border_top_left_radius=6, border_bottom_left_radius=6)
-        name = draw_text(surface, card.name, 22, LOCKED if locked else settings.TEXT,
-                         topleft=(rect.left + 14, rect.top + 7))
-        if locked:
-            return
+        name = draw_text(surface, card.name, 22, settings.TEXT, topleft=(rect.left + 14, rect.top + 7))
         level = self.shop.level(card)
         if level:
             draw_text(surface, f"×{level}", 18, settings.TEXT_MUTED, midleft=(name.right + 8, name.centery))

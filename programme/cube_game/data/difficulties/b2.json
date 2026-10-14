@@ -6,8 +6,8 @@
   "core_chance": 0.045,
   "unlock": { "requires": "b1" },
   "hints": ["Many melee units", "Shields block shots from the front – get round them or use rockets", "Charger swarms"],
-  "arena": { "start_size": [800, 560], "shrink_speed": 12, "shrink_growth": 2, "max_shrink_speed": 24, "armor": 5 },
-  "spawning": { "first_spawn": 1.8, "start_interval": 2.4, "min_interval": 0.9, "interval_drop": 0.012 },
+  "arena": { "start_size": [800, 560], "shrink_speed": 12, "shrink_growth": 2.5, "max_shrink_speed": 27, "armor": 10 },
+  "spawning": { "first_spawn": 1.8, "start_interval": 2.6, "min_interval": 1.1, "interval_drop": 0.01 },
   "enemies": [
     { "type": "basic",     "weight": 50, "after": 0 },
     { "type": "charger",   "weight": 30, "after": 10,  "growth": 5 },
@@ -24,26 +24,30 @@
   "swarms": [
     {
       "type": "basic", "after": 30,
-      "start_chance": 0.02, "chance_growth": 0.0008, "max_chance": 0.15,
-      "start_size": 6, "growth_time": 12, "max_size": 30, "min_gap": 6
+      "start_chance": 0.02, "chance_growth": 0.0007, "max_chance": 0.12,
+      "start_size": 6, "growth_time": 12, "max_size": 28, "min_gap": 8
     },
     {
       "type": "charger", "after": 60,
-      "start_chance": 0.02, "chance_growth": 0.0008, "max_chance": 0.14,
-      "start_size": 5, "growth_time": 14, "max_size": 20, "min_gap": 8
+      "start_chance": 0.02, "chance_growth": 0.0007, "max_chance": 0.12,
+      "start_size": 5, "growth_time": 15, "max_size": 18, "min_gap": 10
     }
   ],
   "phases": [
-    { "from": 80, "to": 110, "weights": { "charger": "x3" }, "announce": "Chargers incoming!" },
-    { "from": 110, "enemy_stats": { "all": { "contact_damage": "x1.25", "shot_damage": "x1.25", "blast_damage": "x1.25" } }, "announce": "Enemies hit harder!" },
+    { "from": 80, "to": 110, "weights": { "charger": "x3" }, "spawn": { "charger": 5, "shield": 1 }, "spawn_interval": "x0.85",
+      "announce": "Chargers incoming!" },
+    { "from": 120, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
     { "from": 160, "arena": { "armor": "+15" }, "announce": "The walls harden!" },
-    { "from": 200, "enemy_stats": { "all": { "max_hp": "+1" } } },
-    { "from": 230, "to": 260, "weights": { "charger": "x2", "basic": "x2" }, "announce": "Melee wave incoming!" },
+    { "from": 200, "enemy_stats": { "all": { "base_hp": "+1" } } },
+    { "from": 230, "to": 260, "weights": { "charger": "x2", "basic": "x2" }, "spawn": { "basic": 6, "charger": 4 },
+      "spawn_interval": "x0.85", "announce": "Melee wave incoming!" },
     { "from": 280, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
-    { "from": 360, "enemy_stats": { "all": { "max_hp": "+1" } } },
+    { "from": 295, "to": 330, "weights": { "shield": "+15", "fat": "+10" }, "spawn": { "shield": 2, "fat": 2 }, "spawn_interval": "x0.7", "announce": "Final wave!" },
+    { "from": 315, "to": 330, "spawn": { "charger": 4, "shield": 1 }, "spawn_interval": "x0.8", "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "arena": { "shrink_speed": "x1.3" }, "announce": "Hold on!" },
+    { "from": 360, "enemy_stats": { "all": { "base_hp": "+1" } } },
     { "from": 390, "arena": { "armor": "+15" }, "announce": "The walls harden!" }
   ],
   "enemy_stats": {
-    "all": { "max_hp": "+1" }
+    "all": { "base_hp": "+1" }
   }
 }

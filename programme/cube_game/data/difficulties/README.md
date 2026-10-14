@@ -8,6 +8,16 @@ Schlüssel: Er steht im Spielstand und in `unlock.requires` anderer Levels – d
 **Evolutionen** (Tier 2) dazu, immer wahrscheinlicher (B1 Fat Guy und Cannoneer, B2 Shield, B3 Laser, B6 alles).
 Wer B6 schafft, schaltet **Survival** frei: endlos, erst Basics, dann alle Typen, ab 4:00 die Evolutionen.
 
+**Finale:** Jedes Level mit Ziel endet mit zwei Phasen, die genau beim `goal` aufhören – *Final wave!* (30–40 s vorher:
+ein Schub Gegner, kürzere Abstände, mehr starke Typen – in A1–A6 nur Tier 1, in B1–B6 viele Evolutionen) und *Hold on!*
+(15–20 s vorher: noch ein Schub; ab A4 dazu härtere Treffer, schnellere oder härtere Wände). Danach läuft der Run
+normal weiter.
+
+**Steigerung:** Jedes Level ist schwerer als das davor – etwa ein Viertel bis ein Drittel mehr Gegnerlast (HP pro
+Sekunde, gewichtet nach Gefährlichkeit, mit Schwärmen und Phasen), dazu mehr Druck im Finale und von den Wänden. Wer
+eine Datei ändert, hält das am besten so. **Wellen-Ansagen** (*Chargers incoming!* …) holen immer gleich ein paar
+Gegner dieses Typs dazu (`spawn`) und verkürzen meist die Abstände (`spawn_interval`) – nicht nur die Gewichte.
+
 **Geschafft** ist ein Level, wenn man sein `goal` überlebt hat – das schaltet das nächste frei. Der Run läuft danach
 weiter, bis das Schiff zerquetscht wird (die Bestzeit zählt trotzdem).
 
@@ -17,8 +27,10 @@ ein Neustart ist nicht nötig. **Neues Level:** eine Datei kopieren, umbenennen,
 **Im Spielmenü** (Reiter *Levels*) steht jedes Level als Knopf. Eine neue Zeile beginnt, wenn sich die Zehnerstelle
 von `order` ändert (1–6: A, 11–16: B, 20: Survival). Die kleinen Anzeigen auf den Knöpfen und die Details darunter
 ergeben sich aus der Datei: ein Quadrat pro Gegnertyp (Evolutionen mit dunklem Rahmen), ein Symbol pro Art von
-Ereignis (Schwarm, Welle eines Typs, mehr Schaden, mehr HP, härtere Wände, sonstige Ansage). Nur `hints` schreibt man
-selbst.
+Ereignis (Schwarm, Welle eines Typs, mehr Schaden, mehr HP, härtere Wände, sonstige Ansage). Unter *Numbers* stehen
+die Grundwerte: Arena-Größe, wie schnell die Kanten einrücken und wie viel Zeit zwischen zwei Gegnern liegt (jeweils
+Anfang bis Grenze und wann die Grenze erreicht ist – ohne Phasen), erster Gegner, Core-Chance. Bei den Ereignissen
+stehen die Werte der Phasen dabei (z. B. *Faster spawns (×0.8)*). Nur `hints` schreibt man selbst.
 
 **Fehler sind kein Absturz:** Fehlt ein Wert oder ist er ungültig, gilt der Standardwert (siehe `game/difficulty.py`),
 und das Spielmenü zeigt die Probleme rot über den Knöpfen an. JSON kennt keine Kommentare – Erklärungen stehen hier.
@@ -124,12 +136,12 @@ gilt für jeden Typ, der den Wert hat.
 | Schreibweise | Wirkung | Beispiel |
 |---|---|---|
 | Zahl | ersetzt den Wert | `"speed": 100` |
-| `"+1"` / `"-1"` | addiert / zieht ab | `"max_hp": "+1"` |
+| `"+1"` / `"-1"` | addiert / zieht ab | `"base_hp": "+1"` |
 | `"x1.5"` | multipliziert | `"contact_damage": "x1.5"` |
 
 ```json
 "enemy_stats": {
-  "all":     { "max_hp": "+1" },
+  "all":     { "base_hp": "+1" },
   "charger": { "speed": 100, "charge_speed": "x1.2" }
 }
 ```
@@ -150,23 +162,32 @@ buffen und sich ansagen.
 | `enemy_stats` | Buffs auf alle Gegner, solange die Phase läuft – wie `enemy_stats` unten, aber nur `"+1"`, `"-1"`, `"x1.5"` |
 | `announce` | Text, der zu Beginn oben im Spiel eingeblendet wird – weglassen = still |
 | `arena` | Änderungen an der Arena, solange die Phase läuft: `armor` und `shrink_speed`, Schreibweise wie unten (`"+3"`, `"x1.5"`, Zahl) |
+| `spawn` | Gegner, die **einmal** zu Beginn der Phase zusätzlich kommen, jeder an einer eigenen Stelle: `{ "shooter": 3 }` (ganze Zahlen) |
+| `spawn_interval` | Zeit zwischen zwei Gegnern, solange die Phase läuft: `"x0.6"` = 40 % kürzer, `"-1"` = eine Sekunde kürzer, Zahl = genau so viele Sekunden. Darf unter `min_interval` gehen |
 
 Schreibweise bei `weights` wie bei `enemy_stats`: `"x3"` verdreifacht das Gewicht, `"+20"` addiert, eine Zahl ersetzt
 es, `0` schaltet den Typ ab. `"x3"` auf einen Typ, dessen `after` noch nicht erreicht ist, bleibt 0 – `"+20"` holt ihn
 dagegen schon früher.
 
-`max_hp` und `size` gelten nur für Gegner, die während der Phase spawnen; alle anderen Werte (Tempo, Schaden, …) wirken
+`base_hp` und `size` gelten nur für Gegner, die während der Phase spawnen; alle anderen Werte (Tempo, Schaden, …) wirken
 sofort auf alle. Eine Phase ohne `to` wirkt bis zum Ende – so steigen die HP mit der Zeit.
 
 ```json
 "phases": [
-  { "from": 150, "enemy_stats": { "all": { "max_hp": "+1" } } },
+  { "from": 150, "enemy_stats": { "all": { "base_hp": "+1" } } },
   { "from": 200, "to": 240, "weights": { "sniper": "x3" }, "announce": "Snipers incoming!" },
-  { "from": 300, "enemy_stats": { "all": { "max_hp": "+1" } } }
+  { "from": 300, "enemy_stats": { "all": { "base_hp": "+1" } } }
 ]
 ```
 
 Ab 2:30 haben alle neuen Gegner +1 HP, ab 5:00 +2. Von 3:20 bis 4:00 kommen dreimal so viele Sniper.
+
+Eine Welle mit Paukenschlag – drei Shooter sofort, danach 20 Sekunden lang mehr Shooter und kürzere Abstände (A1):
+
+```json
+{ "from": 60, "to": 80, "weights": { "shooter": "x3" }, "spawn": { "shooter": 3 }, "spawn_interval": "x0.6",
+  "announce": "Shooters incoming!" }
+```
 
 Mehr Schaden über die Zeit und härtere Wände – so stehen sie in den Dateien:
 
