@@ -169,8 +169,9 @@ class GameMenuScene(Scene):
         if profile.maxed(node):
             self.show_message("Already at its maximum", settings.TEXT_MUTED)
         elif not profile.unlocked(node):
-            missing = [skill_tree.NODES_BY_KEY[key].name for key in node.requires if not profile.owns(key)]
-            self.show_message(f"Unlock {' and '.join(missing)} first", TOO_EXPENSIVE)
+            missing = [skill_tree.NODES_BY_KEY[key].name for key in profile.missing(node)]
+            first = "Max out" if node.requires_max else "Unlock"
+            self.show_message(f"{first} {' and '.join(missing)} first", TOO_EXPENSIVE)
         elif not profile.buy(node):
             self.show_message("Not enough cores", TOO_EXPENSIVE)
         elif node.max_level > 1:

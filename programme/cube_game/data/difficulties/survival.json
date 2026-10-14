@@ -3,10 +3,10 @@
   "description": "endless – how long can you last?",
   "order": 20,
   "goal": null,
-  "core_chance": 0.035,
+  "core_chance": 1,
   "unlock": { "requires": "b6" },
   "hints": ["Endless – how long can you last?", "Starts with Basics, then every type comes in", "Evolutions from 4:00 on"],
-  "arena": { "start_size": [800, 560], "shrink_speed": 10, "shrink_growth": 2.5, "max_shrink_speed": 32, "armor": 0 },
+  "arena": { "start_size": [400, 280], "shrink_speed": 10, "shrink_growth": 2.5, "max_shrink_speed": 32, "armor": 0, "push_falloff": 0.8 },
   "spawning": { "first_spawn": 2.5, "start_interval": 3.0, "min_interval": 0.6, "interval_drop": 0.01 },
   "enemies": [
     { "type": "basic",     "weight": 50, "after": 0 },
@@ -38,13 +38,13 @@
   "phases": [
     { "from": 180, "enemy_stats": { "all": { "base_hp": "+1" } } },
     { "from": 240, "spawn": { "fat": 3, "cannoneer": 1 }, "announce": "Evolution begins!" },
-    { "from": 240, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
+    { "from": 240, "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
     { "from": 300, "arena": { "armor": "+5" }, "announce": "The walls harden!" },
     { "from": 360, "enemy_stats": { "all": { "base_hp": "+1" } } },
-    { "from": 420, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
+    { "from": 420, "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
     { "from": 480, "arena": { "armor": "+5" }, "announce": "The walls harden!" },
     { "from": 540, "enemy_stats": { "all": { "base_hp": "+1" } } },
-    { "from": 600, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
+    { "from": 600, "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
     { "from": 720, "enemy_stats": { "all": { "base_hp": "+2" } } }
   ]
 }

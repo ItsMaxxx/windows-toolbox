@@ -55,7 +55,7 @@ WALL_COLOR = (175, 175, 190)
 NOTICE_COLOR = (255, 215, 60)
 EVENT_ICONS = {"swarm": draw_swarm_icon, "wave": draw_wave_icon, "damage": draw_damage_icon, "hp": draw_hp_icon,
                "walls": draw_wall_icon, "notice": draw_notice_icon}
-DAMAGE_STATS = {"contact_damage", "shot_damage", "blast_damage"}
+DAMAGE_STATS = {"contact_damage", "projectile_damage", "blast_damage"}
 
 
 @dataclass(frozen=True)
@@ -172,6 +172,8 @@ def phase_changes(phase):
     for name, operation, number in phase.arena:
         if name == "armor":
             changes.append(("walls", f"Walls harden ({change_text(operation, number, ' px')})", WALL_COLOR))
+        elif name == "push_falloff":
+            changes.append(("walls", f"Walls get heavier ({change_text(operation, number, '')})", WALL_COLOR))
         else:
             changes.append(("walls", f"Walls close in {change_text(operation, number, ' px/s')}", WALL_COLOR))
     if any(stat in DAMAGE_STATS for _, stat, _, _ in phase.enemy_stats):

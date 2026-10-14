@@ -1,19 +1,28 @@
 {
   "dash": {
     "cooldown": 3,
-    "min_cooldown": 1,
     "distance": 100,
     "duration": 0.1,
     "charges": 1
   },
   "rocket": {
     "cooldown": 10,
-    "min_cooldown": 2,
     "damage": 2,
-    "blast_radius": 80,
+    "blast_radius": 40,
     "wall_push": 80,
     "speed": 60,
     "acceleration": 1600,
     "size": 10
+  },
+  "mine": {
+    "damage": 3,
+    "blast_radius": 30,
+    "wall_push": 100,
+    "size": 8
+  },
+  "slow_field": {
+    "slow": 20,
+    "size": 60,
+    "duration": 3
   }
 }

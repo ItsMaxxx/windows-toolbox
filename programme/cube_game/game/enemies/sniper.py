@@ -25,7 +25,7 @@ class Sniper(Enemy):
         "reload_time": 2.2,
         "turn_speed": 70,           # degrees per second the laser turns towards the ship
         "fire_cone": 30,            # degrees: starts aiming only while the ship is within this cone in front of it
-        "shot_damage": 50, "shot_speed": 1400, "shot_size": 6,
+        "projectile_damage": 50, "projectile_speed": 1400, "projectile_size": 6,
     }
 
     def __init__(self, position, roster=None):

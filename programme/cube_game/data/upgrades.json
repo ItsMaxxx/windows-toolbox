@@ -10,7 +10,7 @@
     "damage":           { "card_amount": 2 },
     "attack_speed":     { "card_amount": 1.5 },
     "wall_push":        { "card_amount": 10 },
-    "shot_speed":       { "card_amount": 150 },
+    "projectile_speed": { "card_amount": 150 },
 
     "dash_distance":    { "card_amount": 80 },
     "dash_cooldown":    { "card_amount": -0.3 },

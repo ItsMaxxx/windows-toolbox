@@ -9,8 +9,12 @@ max_shrink_speed (all three from the difficulty).
 
 Armor: every push of an edge is armor pixels shorter – flat, so many small pushes (machine gun, laser) lose far more
 than a few big ones (cannon); at least settings.MIN_PUSH_SHARE of a push is always left (game/armor.py). The difficulty
-sets where it starts; its phases can change it – and the shrink speed – for a while or for good (changes, set by the
-scene from the active phases).
+sets where it starts; its phases can change it – and the shrink speed and push falloff – for a while or for good
+(changes, set by the scene from the active phases).
+
+Push falloff: the further the arena is out already, the less a push does – per axis, so a wide arena is hard to widen
+but still easy to make taller. A push is multiplied by (start size ÷ size now) ^ push_falloff on the edge's axis: with
+falloff 1 it does half at twice the start width, and double while the arena is half as wide as at the start. 0 = off.
 
 Getting hit squeezes the arena (hit()) – mostly from the side away from the ship, so it can't be dragged along by
 just moving one way.
@@ -27,15 +31,17 @@ ROOM_STEPS = 20             # how exactly the free room in front of an edge is f
 
 
 class Arena:
-    def __init__(self, desktop, size, shrink_speed, shrink_growth=0.0, max_shrink_speed=None, armor=0.0):
+    def __init__(self, desktop, size, shrink_speed, shrink_growth=0.0, max_shrink_speed=None, armor=0.0,
+                 push_falloff=0.0):
         """desktop: where the window may be (engine/desktop.py). It starts in the middle of the main monitor. size: at
         the start. shrink_speed: pixels per second each edge moves in at the start, plus shrink_growth per minute, up
-        to max_shrink_speed (None: no limit). armor: at the start (see above)."""
+        to max_shrink_speed (None: no limit). armor and push_falloff: at the start (see above)."""
         self.desktop = desktop
         self.start_shrink_speed = shrink_speed
         self.shrink_growth = shrink_growth
         self.max_shrink_speed = max_shrink_speed
         self.base_armor = armor
+        self.base_push_falloff = push_falloff
         self.changes = []                   # (value, operation, number) from the active phases – set by the scene
         self.fixed_speed = False
         self.ship_size = ship_data.current()["size"]   # the edges stop there – set by the scene from its ship
@@ -44,6 +50,7 @@ class Arena:
         self.rect.center = desktop.main.center
         if not desktop.covers(self.rect):
             self.rect = self.rect.clip(desktop.main)       # bigger than the main monitor
+        self.start_size = self.rect.size                    # pushes are measured against it (push falloff)
         self.pending = dict.fromkeys(SIDES, 0.0)     # how far each edge still has to move out after hits
 
     def window_rect(self):
@@ -77,6 +84,17 @@ class Arena:
     def armor(self):
         """Pixels every push of an edge is shorter right now."""
         return max(0.0, self.changed("armor", self.base_armor))
+
+    @property
+    def push_falloff(self):
+        """How much harder pushes get the further the arena is out already (see above)."""
+        return max(0.0, self.changed("push_falloff", self.base_push_falloff))
+
+    def push_factor(self, side):
+        """What a push on side is multiplied by: (start size ÷ size now) ^ push_falloff on that side's axis – below 1
+        while the arena is bigger than at the start, above 1 while it's smaller."""
+        axis = 0 if side in ("left", "right") else 1
+        return (self.start_size[axis] / max(1.0, self.rect.size[axis])) ** self.push_falloff
 
     def update(self, dt):
         self.elapsed += dt
@@ -141,8 +159,10 @@ class Arena:
         return fits
 
     def push(self, side, distance):
-        """Hit on an edge: it moves out by distance minus the armor (smoothly, over the next ticks)."""
+        """Hit on an edge: it moves out by distance times the push factor, minus the armor (smoothly, over the next
+        ticks)."""
         if distance > 0:
+            distance *= self.push_factor(side)
             self.pending[side] += armor.reduce(distance, self.armor, settings.MIN_PUSH_SHARE)
 
     def side_hit(self, point):

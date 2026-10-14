@@ -20,7 +20,7 @@ from game import settings
 from game.icons import CORE_COLOR, draw_core
 from game.skill_tree import BRANCHES, NODES, NODES_BY_KEY, effect_text
 
-UNIT = (78, 72)                     # pixels per grid unit (x, y) – node positions are in grid units
+UNIT = (70, 72)                     # pixels per grid unit (x, y) – node positions are in grid units
 RADIUS = 18                         # a node's circle …
 BIG_RADIUS = 24                     # … and of the first node of a branch (an unlock: a weapon, an ability, …)
 HIT_REACH = 6                       # the mouse counts as on a node this many pixels outside its circle, too
@@ -97,7 +97,7 @@ class SkillTreePanel:
 
     def draw_line(self, surface, parent, node):
         start, end = self.center(parent), self.center(node)
-        if self.profile.owns(parent.key):
+        if self.profile.maxed(parent) if node.requires_max else self.profile.owns(parent.key):
             color = dimmed(BRANCHES[node.branch].color, 0.9 if self.profile.owns(node.key) else 0.45)
         else:
             color = LINE
@@ -138,8 +138,10 @@ class SkillTreePanel:
         effect = wrap(effect_text(node) or "", 20, width)
         level = profile.level(node.key)
         cost = profile.next_cost(node)
-        missing = [full_name(NODES_BY_KEY[key]) for key in node.requires if not profile.owns(key)]
-        height = TOOLTIP_PADDING * 2 + 26 + 22 + (len(lines) + len(effect)) * 19 + 8 + 22
+        missing = [full_name(NODES_BY_KEY[key]) + (" (max)" if node.requires_max else "")
+                   for key in profile.missing(node)]
+        needs = wrap("needs " + ", ".join(missing), 20, width) if missing and cost is not None else []
+        height = TOOLTIP_PADDING * 2 + 26 + 22 + (len(lines) + len(effect)) * 19 + 8 + 22 + max(0, len(needs) - 1) * 19
 
         center, radius = self.center(node), self.radius(node)
         box = pygame.Rect(0, 0, TOOLTIP_WIDTH, height)
@@ -167,8 +169,10 @@ class SkillTreePanel:
         y += 8
         if cost is None:
             draw_text(surface, "OWNED" if node.max_level == 1 else "MAX", 20, CORE_COLOR, topleft=(left, y))
-        elif missing:
-            draw_text(surface, "needs " + ", ".join(missing), 20, TOO_EXPENSIVE, topleft=(left, y))
+        elif needs:
+            for line in needs:
+                draw_text(surface, line, 20, TOO_EXPENSIVE, topleft=(left, y))
+                y += 19
         else:
             draw_core(surface, (left + 7, y + 8), 8)
             color = settings.TEXT if profile.cores >= cost else TOO_EXPENSIVE

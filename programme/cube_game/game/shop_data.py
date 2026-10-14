@@ -14,7 +14,7 @@ from game.cards.card import WeaponCard
 from game.weapons import data as weapon_data
 
 FILE = Path(__file__).resolve().parents[1] / "data" / "shop.json"
-TOWER_DEFAULTS = {"price": 15, "price_step": 10}    # stars for the first watchtower of a run, and more for each further
+TOWER_DEFAULTS = {"price": 15, "price_step": 0}     # stars for the first watchtower of a run, and more for each further
 TOWER = dict(TOWER_DEFAULTS)
 
 

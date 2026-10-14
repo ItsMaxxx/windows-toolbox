@@ -19,7 +19,7 @@ class Laser(Sniper):
         "base_hp": 2, "speed": 70, "size": 26, "contact_damage": 25,
         "preferred_distance": 650, "back_off": 150, "close_in": 80,
         "fire_range": 900, "aim_time": 1.5, "lock_time": 0.4, "reload_time": 3.0, "turn_speed": 60, "fire_cone": 30,
-        "shot_damage": 50,          # pixels, when the ship touches the beam (once per beam)
+        "projectile_damage": 50,          # pixels, when the ship touches the beam (once per beam)
         "beam_time": 0.5,           # seconds the beam is on
         "beam_width": 16,           # pixels
     }
@@ -39,6 +39,6 @@ class Laser(Sniper):
         return super().act(dt, ship)
 
     def fire(self):
-        self.beam = LaserBeam(self, self.stat("beam_width"), self.stat("beam_time"), self.stat("shot_damage"),
+        self.beam = LaserBeam(self, self.stat("beam_width"), self.stat("beam_time"), self.stat("projectile_damage"),
                               self.skin.beam_color)
         return self.beam

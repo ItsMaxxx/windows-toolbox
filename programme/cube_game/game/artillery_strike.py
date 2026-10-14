@@ -1,7 +1,7 @@
 """
 An artillery strike: a shell lobbed from the artillery's catapult onto a spot on the ground. It flies on an arc (Arc)
 for delay seconds; meanwhile a red circle at the spot fills up (game/effects/target_marker.py). When it lands, update()
-returns True once – the scene then hurts the ship and watchtowers in the circle and shows the blast
+returns True once – the scene then hurts the ship if it's in the circle and shows the blast
 (game/effects/artillery_blast.py).
 
 The view is from straight above, so a shell's height is shown by drawing it higher up on the screen than the spot it's

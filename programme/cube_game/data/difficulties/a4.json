@@ -3,16 +3,16 @@
   "description": "from above: Artillery and drone Carriers",
   "order": 4,
   "goal": 240,
-  "core_chance": 0.06,
+  "core_chance": 0.08,
   "unlock": { "requires": "a3" },
   "hints": ["Artillery and drone carriers", "Keep moving – artillery aims where you stand", "Kill carriers before their drones swarm you"],
-  "arena": { "start_size": [800, 560], "shrink_speed": 8, "shrink_growth": 2, "max_shrink_speed": 22, "armor": 1.5 },
+  "arena": { "start_size": [400, 280], "shrink_speed": 8, "shrink_growth": 2, "max_shrink_speed": 22, "armor": 1.5, "push_falloff": 0.8 },
   "spawning": { "first_spawn": 2.5, "start_interval": 2.8, "min_interval": 1.05, "interval_drop": 0.009 },
   "enemies": [
     { "type": "basic",     "weight": 40, "after": 0 },
     { "type": "shooter",   "weight": 15, "after": 0,  "growth": 3 },
     { "type": "artillery", "weight": 15, "after": 20, "growth": 3 },
-    { "type": "carrier",   "weight": 10, "after": 50, "growth": 3 }
+    { "type": "carrier",   "weight": 10, "after": 45, "growth": 2 }
   ],
   "swarms": {
     "type": "basic", "after": 50,
@@ -25,10 +25,10 @@
     { "from": 100, "enemy_stats": { "all": { "base_hp": "+1" } } },
     { "from": 140, "to": 170, "weights": { "carrier": "x3" }, "spawn": { "carrier": 2 }, "spawn_interval": "x0.8",
       "announce": "Carriers incoming!" },
-    { "from": 180, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
+    { "from": 180, "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
     { "from": 210, "to": 240, "weights": { "artillery": "x2" }, "spawn": { "artillery": 3, "carrier": 1 }, "spawn_interval": "x0.65", "announce": "Final wave!" },
     { "from": 225, "to": 240, "spawn": { "basic": 5, "carrier": 1 }, "spawn_interval": "x0.8", "arena": { "shrink_speed": "x1.3" }, "announce": "Hold on!" },
     { "from": 270, "enemy_stats": { "all": { "base_hp": "+1" } } },
-    { "from": 330, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" }
+    { "from": 330, "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" }
   ]
 }

@@ -18,7 +18,7 @@ from dataclasses import dataclass
 
 @dataclass
 class Buff:
-    stat: str                       # e.g. "speed", "base_hp", "shot_damage" – a key in the enemy's stats
+    stat: str                       # e.g. "speed", "base_hp", "projectile_damage" – a key in the enemy's stats
     add: float = 0                  # flat: added to the value
     factor: float = 1               # multiplied with (value + adds)
     duration: float | None = None   # seconds – None: until it's removed

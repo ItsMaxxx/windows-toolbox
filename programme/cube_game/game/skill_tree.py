@@ -22,6 +22,7 @@ import json
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
+from game import ability_data
 from game.buildings.watchtower import WatchtowerKit
 from game.cards import CARDS
 from game.dash import Dash
@@ -36,6 +37,8 @@ SHOP, DASH, ROCKET, HEAD_START, BIGGER_ARENA, CORE_LUCK, WATCHTOWER = (
     "shop", "dash", "rocket", "head_start", "bigger_arena", "core_luck", "watchtower")
 RADAR, RADAR_SIZE, RADAR_COOLDOWN, RADAR_DURATION = "radar", "radar_size", "radar_cooldown", "radar_duration"
 BURNING_GROUND = "burning_ground"
+MINES = "mines"                 # the dash leaves a mine where it started …
+SLOW_FIELD = "slow_field"       # … and its blast a field that slows enemies
 ARMOR, RECOVERY = "armor", "recovery"        # the ship's hull
 CARD_SHOP = "card_shop"         # the Cards tab of the game menu – without it, no cards (and active ones don't apply)
 CARD_SLOTS = "card_slots"       # more cards active at once (on top of max_active in data/upgrades.json)
@@ -71,6 +74,7 @@ class Node:
     branch: str                 # key in BRANCHES: its colour
     position: tuple             # (x, y) in grid units from the middle of the tree – y grows downwards
     values: dict = field(default_factory=dict, compare=False)   # what it does (DEFAULT_VALUES, data/skilltree.json)
+    requires_max: bool = False  # True: the required nodes have to be at their maximum level, not just bought
 
     @property
     def max_level(self):
@@ -127,19 +131,20 @@ DEFAULT_NODES = [
          "machine_gun", (-3.6, -3.4)),
     Node("mg_wall_push", "Wall push", "Pushes the walls further.", (2, 4, 6), ("mg_damage",),
          "machine_gun", (-5.45, -2.65)),
-    Node("mg_shot_speed", "Projectile speed", "Faster projectiles.", (2, 4, 6), ("mg_energy",),
+    Node("mg_projectile_speed", "Projectile speed", "Faster projectiles.", (2, 4, 6), ("mg_energy",),
          "machine_gun", (-5.6, -1.3)),
 
     Node("cannon", "Cannon", "A weapon: slow heavy shots that pierce – great against armor and walls, wasted on weak "
          "enemies.", (5,), ("gun_damage",), "cannon", (-3.4, 1.45)),
-    Node("cannon_damage", "Damage", "More damage.", (2, 4, 6), ("cannon",), "cannon", (-3.0, 2.55)),
+    Node("cannon_damage", "Damage", "More damage – and uses more energy.", (2, 4, 6), ("cannon",), "cannon",
+         (-3.0, 2.55)),
     Node("cannon_attack_speed", "Attack speed", "Shoots faster.", (2, 4, 6), ("cannon",), "cannon",
          (-4.35, 2.05)),
     Node("cannon_energy", "Energy use", "Uses less energy.", (2, 4, 6), ("cannon",), "cannon",
          (-4.6, 0.95)),
     Node("cannon_piercing", "Piercing", "Each shot pierces one more enemy.", (6, 10), ("cannon_damage",),
          "cannon", (-3.6, 3.4)),
-    Node("cannon_shot_speed", "Projectile speed", "Faster projectiles.", (2, 4, 6),
+    Node("cannon_projectile_speed", "Projectile speed", "Faster projectiles.", (2, 4, 6),
          ("cannon_attack_speed",), "cannon", (-5.45, 2.65)),
     Node("cannon_wall_push", "Wall push", "Pushes the walls further.", (2, 4, 6), ("cannon_energy",),
          "cannon", (-5.6, 1.3)),
@@ -149,6 +154,17 @@ DEFAULT_NODES = [
     Node("dash_distance", "Distance", "Dashes further.", (3, 5, 8), (DASH,), "dash", (2.75, 0)),
     Node("dash_charges", "Charges", "One more dash stored: dash again right away, each refills on its own.", (5, 10),
          ("dash_distance",), "dash", (3.85, -0.35)),
+    Node(MINES, "Mines", "Every dash leaves a mine where it started. It blows up when an enemy or the wall touches "
+         "it.", (25,), ("dash_charges",), "dash", (5.0, -0.35)),
+    Node("mine_power", "Power", "Mines do more damage and blow up wider.", (6, 12, 20), (MINES,), "dash",
+         (4.5, -1.05)),
+    Node(SLOW_FIELD, "Slow field", "A mine's blast leaves a field behind that slows the enemies in it.", (30,),
+         (MINES,), "dash", (6.0, 0.35)),
+    Node("slow_strength", "Strength", "The slow field slows more.", (6, 12, 20), (SLOW_FIELD,), "dash",
+         (6.1, -0.75)),
+    Node("slow_size", "Size", "The slow field gets bigger.", (6, 12, 20), (SLOW_FIELD,), "dash", (6.15, 1.35)),
+    Node("slow_duration", "Duration", "The slow field lasts longer.", (6, 12, 20), (SLOW_FIELD,), "dash",
+         (5.3, 1.0)),
 
     Node(ROCKET, "Rocket", "SPACE: a rocket that explodes at the mouse and pushes the walls out.", (4,), (SHOP,),
          "rocket", (2.6, 1.25)),
@@ -160,11 +176,12 @@ DEFAULT_NODES = [
     Node("rocket_wall_push", "Wall push", "Pushes the walls further.", (2, 4, 6), (ROCKET,), "rocket",
          (2.0, 2.7)),
     Node(BURNING_GROUND, "Burning ground", "The blast leaves burning ground behind that hurts enemies.",
-         (15,), ("rocket_cooldown", "rocket_radius", "rocket_damage"), "rocket", (5.35, 2.35)),
+         (15,), ("rocket_cooldown", "rocket_radius", "rocket_damage"), "rocket", (5.35, 2.35), requires_max=True),
 
     # watchtower and radar – up and to the right
     Node(WATCHTOWER, "Watchtower",
-         "B: throw a tower (stars) – its own window keeps watching there. +{per_level:g} tower per level.", (3, 5, 8),
+         "B: throw a tower (stars) – for a while its own window watches there, and enemies in it take more damage. "
+         "+{per_level:g} tower per level.", (3, 5, 8),
          (SHOP,), "scouting", (2.6, -1.25)),
     Node(RADAR, "Radar", "Every now and then a light blue window shows the biggest enemy group out of sight.", (4,),
          (WATCHTOWER,), "scouting", (3.8, -1.95)),
@@ -192,18 +209,22 @@ DEFAULT_VALUES = {
     "mg_energy": {"per_level": -0.4},
     "mg_precision": {"per_level": -6},
     "mg_wall_push": {"per_level": 1.5},
-    "mg_shot_speed": {"per_level": 100},
-    "cannon_damage": {"per_level": 1},
+    "mg_projectile_speed": {"per_level": 100},
+    "cannon_damage": {"per_level": 1, "energy_per_level": 1},
     "cannon_attack_speed": {"per_level": 0.1},
     "cannon_energy": {"per_level": -2},
     "cannon_piercing": {"per_level": 1},
-    "cannon_shot_speed": {"per_level": 80},
+    "cannon_projectile_speed": {"per_level": 80},
     "cannon_wall_push": {"per_level": 6},
     "laser_damage": {"per_level": 0.01},
     "laser_energy": {"per_level": -0.12},
     "laser_wall_push": {"per_level": 0.4},
     "dash_distance": {"per_level": 25},             # pixels
     "dash_charges": {"per_level": 1},               # dashes stored at once
+    "mine_power": {"per_level": 1, "blast_radius_per_level": 10},   # damage, blast radius (pixels)
+    "slow_strength": {"per_level": 5},              # percent slower
+    "slow_size": {"per_level": 15},                 # pixels (diameter)
+    "slow_duration": {"per_level": 1},              # seconds
     "rocket_cooldown": {"per_level": -0.6},
     "rocket_radius": {"per_level": 15},
     "rocket_damage": {"per_level": 1},
@@ -215,7 +236,8 @@ DEFAULT_VALUES = {
     RADAR_DURATION: {"per_level": 1},               # seconds
 }
 MUST_NOT_BE_NEGATIVE = {HEAD_START, BIGGER_ARENA, CORE_LUCK, WATCHTOWER, BURNING_GROUND, ARMOR, RECOVERY, CARD_SLOTS}
-DESCRIBED = {HEAD_START, BIGGER_ARENA, CORE_LUCK, WATCHTOWER, CARD_SLOTS}      # descriptions with their values in them
+# descriptions with their values in them
+DESCRIBED = {HEAD_START, BIGGER_ARENA, CORE_LUCK, WATCHTOWER, CARD_SLOTS}
 NODES = []                      # the tree as it is now (filled by reload(), changed in place)
 NODES_BY_KEY = {}
 
@@ -240,7 +262,7 @@ def reload(warnings):
         costs, values = read_node(node, entry, warnings)
         description = node.description
         if node.key in DESCRIBED:
-            per_level = values["per_level"]
+            per_level = values.get("per_level")
             texts = dict(width=per_level[0], height=per_level[1]) if isinstance(per_level, tuple) else values
             description = description.format(**texts)
         NODES.append(replace(node, costs=costs, values=values, description=description))
@@ -304,27 +326,35 @@ EFFECTS = {
     "mg_energy": ("machine_gun", "energy_use"),
     "mg_precision": ("machine_gun", "spread"),
     "mg_wall_push": ("machine_gun", "wall_push"),
-    "mg_shot_speed": ("machine_gun", "projectile_speed"),
+    "mg_projectile_speed": ("machine_gun", "projectile_speed"),
     "cannon_damage": ("cannon", "damage"),
     "cannon_attack_speed": ("cannon", "attack_speed"),
     "cannon_energy": ("cannon", "energy_use"),
     "cannon_piercing": ("cannon", "piercing"),
-    "cannon_shot_speed": ("cannon", "projectile_speed"),
+    "cannon_projectile_speed": ("cannon", "projectile_speed"),
     "cannon_wall_push": ("cannon", "wall_push"),
     "laser_damage": ("laser", "damage"),
     "laser_energy": ("laser", "energy_use"),
     "laser_wall_push": ("laser", "wall_push"),
     "dash_distance": ("dash", "distance"),
     "dash_charges": ("dash", "charges"),
+    "mine_power": ("mine", "damage"),
+    "slow_strength": ("slow_field", "slow"),
+    "slow_size": ("slow_field", "size"),
+    "slow_duration": ("slow_field", "duration"),
     "rocket_cooldown": ("rocket", "cooldown"),
     "rocket_radius": ("rocket", "blast_radius"),
     "rocket_damage": ("rocket", "damage"),
     "rocket_wall_push": ("rocket", "wall_push"),
 }
+# what some nodes change on top of their EFFECTS value (downsides of weapon nodes, the mine's blast radius): their value
+# in data/skilltree.json -> the part's value it changes per level
+SIDE_EFFECTS = {"spread_per_level": "spread", "energy_per_level": "energy_use", "blast_radius_per_level": "blast_radius"}
 EFFECT_UNITS = {"damage": " damage", "attack_speed": " shots/s", "energy_use": " energy per shot",
                 "wall_push": " px wall push", "projectile_speed": " px/s projectile speed", "spread": "° spread",
                 "piercing": " enemy pierced", "max": " max energy", "regen": " energy/s", "cooldown": " s cooldown",
                 "blast_radius": " px blast radius", "distance": " px dash distance", "charges": " dash stored",
+                "slow": " % slower", "size": " px slow field size", "duration": " s slow field",
                 "armor": " px less damage per hit", "invulnerable_time": " s invulnerable after a hit"}
 PER_SECOND = {"damage": " damage/s", "energy_use": " energy/s", "wall_push": " px/s wall push"}    # the laser's
 
@@ -339,8 +369,9 @@ def effect_text(node):
         text = f"{per_level * data.STATS[part]['attack_speed']:+.3g}{PER_SECOND[value]}"
     else:
         text = f"{per_level:+g}{EFFECT_UNITS[value]}"
-    if "spread_per_level" in node.values:
-        text += f", {node.values['spread_per_level']:+g}° spread"
+    for name, side_value in SIDE_EFFECTS.items():
+        if name in node.values:
+            text += f", {node.values[name]:+g}{EFFECT_UNITS[side_value]}"
     return text + " per level"
 
 
@@ -374,8 +405,9 @@ def build_weapon(profile, key):
     for node_key, (part, value) in EFFECTS.items():
         if part == key and profile.owns(node_key):
             weapon.upgrade(value, amount(profile, node_key))
-            if "spread_per_level" in NODES_BY_KEY[node_key].values:      # the machine gun spreads more
-                weapon.upgrade("spread", amount(profile, node_key, "spread_per_level"))
+            for name, side_value in SIDE_EFFECTS.items():      # MG: more spread, cannon: more energy
+                if name in NODES_BY_KEY[node_key].values:
+                    weapon.upgrade(side_value, amount(profile, node_key, name))
     return weapon
 
 
@@ -385,7 +417,24 @@ def build_dash(profile):
     for node_key, (part, value) in EFFECTS.items():
         if part == "dash" and profile.owns(node_key):
             dash.upgrade(value, amount(profile, node_key))
+    if profile.owns(MINES):
+        dash.mines = upgraded(profile, "mine", ability_data.STATS["mine"])
+    if profile.owns(SLOW_FIELD):
+        dash.slow_field = upgraded(profile, "slow_field", ability_data.STATS["slow_field"])
     return dash
+
+
+def upgraded(profile, part, values):
+    """A copy of values (a dict, e.g. the mine's from data/abilities.json) with the bought upgrades of part added – the
+    nodes' per_level and SIDE_EFFECTS –, never below 0."""
+    values = dict(values)
+    for node_key, (node_part, value) in EFFECTS.items():
+        if node_part == part and profile.owns(node_key):
+            values[value] += amount(profile, node_key)
+            for name, side_value in SIDE_EFFECTS.items():
+                if name in NODES_BY_KEY[node_key].values:
+                    values[side_value] += amount(profile, node_key, name)
+    return {name: max(0, round(value, 6)) for name, value in values.items()}
 
 
 def build_rocket(profile):

@@ -1,5 +1,5 @@
 """
-The abilities' base values (dash, rocket): data/abilities.json (every value explained in data/README.md). reload()
+The abilities' base values (dash, rocket, and the dash's mine and slow field from the skill tree): data/abilities.json (every value explained in data/README.md). reload()
 reads it again into STATS – the game menu calls it every time it opens (via difficulty.reload()). What's missing or
 invalid in the file keeps the value in DEFAULTS, and a warning goes to the game menu.
 
@@ -29,6 +29,17 @@ DEFAULTS = {
         "speed": 120,               # pixels per second at launch …
         "acceleration": 2200,       # … getting faster by this much every second
         "size": 12,                 # diameter of the rocket (pixels)
+    },
+    "mine": {                       # left by every dash once the skill tree's Mines is bought
+        "damage": 3,
+        "blast_radius": 40,
+        "wall_push": 100,
+        "size": 8,                  # diameter of the mine (pixels)
+    },
+    "slow_field": {                 # left by an exploding mine once the skill tree's Slow field is bought
+        "slow": 20,                 # percent slower for enemies in it
+        "size": 60,                 # diameter (pixels)
+        "duration": 3,              # seconds
     },
 }
 MUST_BE_POSITIVE = {"cooldown", "duration", "speed", "size", "charges"}

@@ -3,12 +3,16 @@ Dash (Shift): a quick burst in the direction you're moving – or towards the mo
 The arena still keeps the ship inside, so you can't dash through a wall. Leaves a short trail of afterimages.
 Its values come from data/abilities.json ("dash"); distance and cooldown are on the ability, so cards can change them.
 With more than one charge (skill tree "Charges") it can dash again right away – once the dash before is over.
+The skill tree's "Mines" (mines: "mine" from data/abilities.json, None without it): every dash leaves a mine where it
+started (game/mine.py). "Slow field" (slow_field: its values with the upgrades, None without it): the mine's blast
+slows the enemies in it for a while.
 """
 
 import pygame
 
 from game import ability_data
 from game.ability import Ability
+from game.mine import Mine
 from game.ship_shape import draw_ship
 
 TRAIL_TIME = 0.25           # seconds an afterimage stays visible
@@ -30,6 +34,8 @@ class Dash(Ability):
         self.time_left = 0.0                # > 0 while dashing
         self.direction = pygame.Vector2()
         self.trail = []                     # afterimages: [position, aim, age]
+        self.mines = None                   # {"damage", "blast_radius", "wall_push", "size"} once "Mines" is bought
+        self.slow_field = None              # {"slow", "size", "duration"} once "Slow field" is bought
 
     @property
     def ready(self):
@@ -46,7 +52,7 @@ class Dash(Ability):
         moving = ship.move_direction()          # read now, so Shift together with a direction key goes that way
         self.direction = moving if moving.length_squared() else pygame.Vector2(ship.aim)
         self.time_left = self.duration
-        return []
+        return [Mine(ship.rect.center, self.mines, self.slow_field)] if self.mines else []
 
     def update(self, dt, ship):
         super().update(dt, ship)
@@ -66,4 +72,7 @@ class Dash(Ability):
             draw_ship(surface, position - offset, aim, ship.rect.width, color)
 
     def stat_lines(self):
-        return [("Distance", f"{self.distance:g} px"), ("Charges", str(self.max_charges))] + super().stat_lines()
+        return ([("Distance", f"{self.distance:g} px"), ("Charges", str(self.max_charges))] + super().stat_lines()
+                + ([("Mines", f"{self.mines['damage']:g} damage")] if self.mines else [])
+                + ([("Slow field", f"{self.slow_field['slow']:g} % · {self.slow_field['size']:g} px · "
+                                   f"{self.slow_field['duration']:g} s")] if self.mines and self.slow_field else []))

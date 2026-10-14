@@ -3,10 +3,10 @@
   "description": "the horde: huge swarms, many of them evolved",
   "order": 15,
   "goal": 360,
-  "core_chance": 0.04,
+  "core_chance": 1,
   "unlock": { "requires": "b4" },
   "hints": ["Huge swarms", "Fat Guys and Shields in the swarms", "Blasts and piercing shots pay off"],
-  "arena": { "start_size": [800, 560], "shrink_speed": 14, "shrink_growth": 2.5, "max_shrink_speed": 29, "armor": 5 },
+  "arena": { "start_size": [400, 280], "shrink_speed": 14, "shrink_growth": 2.5, "max_shrink_speed": 29, "armor": 5, "push_falloff": 0.8 },
   "spawning": { "first_spawn": 2, "start_interval": 2.4, "min_interval": 0.9, "interval_drop": 0.011 },
   "enemies": [
     { "type": "basic",     "weight": 50, "after": 0 },
@@ -38,17 +38,17 @@
   "phases": [
     { "from": 80, "to": 110, "weights": { "basic": "x2", "charger": "x2" }, "spawn": { "basic": 10, "charger": 4 },
       "spawn_interval": "x0.85", "announce": "The horde is coming!" },
-    { "from": 110, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
+    { "from": 110, "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
     { "from": 160, "arena": { "armor": "+5" }, "announce": "The walls harden!" },
     { "from": 200, "enemy_stats": { "all": { "base_hp": "+1" } } },
     { "from": 240, "to": 270, "weights": { "basic": "x2", "charger": "x2" }, "spawn": { "basic": 12, "charger": 5, "fat": 2 },
       "spawn_interval": "x0.85", "announce": "The horde is coming!" },
     { "from": 280, "arena": { "armor": "+3.5" }, "announce": "The walls harden!" },
-    { "from": 300, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
+    { "from": 300, "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
     { "from": 325, "to": 360, "weights": { "fat": "+15", "shield": "+15" }, "spawn": { "basic": 6, "fat": 2, "shield": 1 }, "spawn_interval": "x0.65", "announce": "Final wave!" },
-    { "from": 345, "to": 360, "spawn": { "charger": 4, "shield": 2 }, "spawn_interval": "x0.8", "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "arena": { "shrink_speed": "x1.2" }, "announce": "Hold on!" },
+    { "from": 345, "to": 360, "spawn": { "charger": 4, "shield": 2 }, "spawn_interval": "x0.8", "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "arena": { "shrink_speed": "x1.2" }, "announce": "Hold on!" },
     { "from": 390, "enemy_stats": { "all": { "base_hp": "+1" } } },
-    { "from": 420, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" }
+    { "from": 420, "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" }
   ],
   "enemy_stats": {
     "all": { "base_hp": "+2" }

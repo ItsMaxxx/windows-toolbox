@@ -1,7 +1,7 @@
 """
 A laser beam: fired by the Laser enemy along the line it aimed. It starts at the Laser (and stays with it), goes in a
 fixed direction far beyond the screen and is on for a moment (duration). Everything touching it in that time gets hurt
-once: the ship (if the hit counts – it may still be invulnerable) and each watchtower. The scene asks hits() every
+once: the ship (if the hit counts – it may still be invulnerable). The scene asks hits() every
 tick; the beam remembers who it already hurt. If the Laser dies, the beam goes out.
 """
 
@@ -22,7 +22,7 @@ class LaserBeam:
         self.damage = damage
         self.color = color
         self.age = 0.0
-        self.hurt = []              # what it has already hurt (the ship, watchtowers)
+        self.hurt = []              # what it has already hurt (the ship)
 
     @property
     def done(self):

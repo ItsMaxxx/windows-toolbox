@@ -52,7 +52,7 @@ class Card:
     maximum = None
     shop_name = None            # its name in data/shop.json if not its key
     price = 10                  # stars for the first upgrade in a run …
-    price_step = 5              # … and this many more for every further one
+    price_step = 0              # … and this many more for every further one (none unless data/shop.json says so)
 
     @property
     def color(self):

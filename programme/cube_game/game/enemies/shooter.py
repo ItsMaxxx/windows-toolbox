@@ -22,7 +22,7 @@ class Shooter(Enemy):
         "fire_interval": 1.5,       # seconds between shots
         "turn_speed": 140,          # degrees per second its barrel turns towards the ship
         "fire_cone": 20,            # degrees: fires only while the ship is within this cone in front of it
-        "shot_damage": 25, "shot_speed": 380, "shot_size": 10,
+        "projectile_damage": 25, "projectile_speed": 380, "projectile_size": 10,
     }
 
     def __init__(self, position, roster=None):

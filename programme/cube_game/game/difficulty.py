@@ -38,6 +38,7 @@ class Arena:
     shrink_growth: float = 0        # … plus this much per minute played …
     max_shrink_speed: float = 60    # … up to this
     armor: float = 0                # pixels every push of an edge is shorter (phases can change it)
+    push_falloff: float = 0         # pushes get weaker the further the arena is out already – 0: off (game/arena.py)
 
 
 @dataclass(frozen=True)
@@ -116,7 +117,7 @@ class Difficulty:
 
 
 SECTIONS = {"unlock": Unlock, "arena": Arena, "spawning": Spawning}
-ARENA_CHANGES = ("shrink_speed", "armor")       # arena values a phase can change
+ARENA_CHANGES = ("shrink_speed", "armor", "push_falloff")       # arena values a phase can change
 DIFFICULTIES = {}                   # key -> Difficulty, in menu order (filled by reload())
 WARNINGS = []                       # what went wrong while loading, for the game menu
 
@@ -367,7 +368,7 @@ def read_enemy_stats(section, file, where="enemy_stats"):
         for name, value in values.items():
             change = parse_change(value)
             if name not in known:
-                WARNINGS.append(f"{file} {where}.{target}: unknown stat \"{name}\" – ignored")
+                WARNINGS.append(f"{file} {where}.{target}: unknown stat \"{name}\" – {roster.unknown_stat(name)}")
             elif change is None:
                 WARNINGS.append(f"{file} {where}.{target}.{name}: {json.dumps(value)} is not valid – ignored "
                                 f"(a number, \"+1\", \"-1\" or \"x1.5\")")

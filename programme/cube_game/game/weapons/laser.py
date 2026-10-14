@@ -40,7 +40,7 @@ class Laser(Weapon):
     description = "A beam: barely hurts enemies, pushes walls hard."
 
     def make_projectile(self, origin, direction):
-        gap = self.shot_speed / self.fire_rate          # how far apart two bolts fly
+        gap = self.projectile_speed / self.fire_rate          # how far apart two bolts fly
         return LaserBolt(origin, direction, self.shot_stats(), trail=gap * 1.1)
 
     def stat_lines(self):
@@ -48,6 +48,6 @@ class Laser(Weapon):
         return [
             ("Damage", f"{self.damage * rate:.3g}/s"),
             ("Wall push", f"{self.wall_push * rate:.3g} px/s"),
-            ("Beam speed", f"{self.shot_speed:g} px/s"),
+            ("Beam speed", f"{self.projectile_speed:g} px/s"),
             ("Energy use", f"{self.energy_cost * rate:.3g}/s"),
         ]

@@ -67,16 +67,19 @@ Energieverbrauch, Cooldown). Fehlt ein Wert oder ein ganzer Knoten, gilt der ein
 | `core_luck` | Chance auf einen Core pro Kill (0.005 = +0,5 %) |
 | `max_energy` / `energy_regen` | Energie des Schiffs / Energie pro Sekunde (Grundwerte in `ships.json`) |
 | `armor` / `recovery` | den gleichnamigen Wert des Schiffs in `ships.json`: `armor` (px), `invulnerable_time` (s) |
-| `gun_…`, `mg_…`, `cannon_…`, `laser_…` | den gleichnamigen Wert der Waffe in `weapons.json`: `damage`, `attack_speed`, `energy_use` (`…_energy`), `wall_push`, `projectile_speed` (`…_shot_speed`), `spread` (`mg_precision`), `piercing` (`cannon_piercing`) |
+| `gun_…`, `mg_…`, `cannon_…`, `laser_…` | den gleichnamigen Wert der Waffe in `weapons.json`: `damage`, `attack_speed`, `energy_use` (`…_energy`), `wall_push`, `projectile_speed`, `spread` (`mg_precision`), `piercing` (`cannon_piercing`) |
 | `mg_attack_speed` / `mg_damage` | dazu `spread_per_level`: so viel Grad mehr Streuung pro Stufe |
+| `cannon_damage` | dazu `energy_per_level`: so viel mehr Energie pro Schuss pro Stufe |
 | `dash_distance` / `dash_charges` | `distance` (px) / `charges` (Dashes auf Vorrat) des Dash (Grundwerte in `abilities.json`) |
+| `mine_power` | `damage` der Mine, dazu `blast_radius_per_level`: so viele px mehr Explosionsradius pro Stufe (Grundwerte in `abilities.json`) |
+| `slow_strength` / `slow_size` / `slow_duration` | `slow` (% langsamer), `size` (px) und `duration` (s) des Slow fields (Grundwerte in `abilities.json`) |
 | `rocket_cooldown` / `rocket_radius` / `rocket_damage` / `rocket_wall_push` | `cooldown` (s), `blast_radius` (px), `damage`, `wall_push` der Rakete (Grundwerte in `abilities.json`) |
 | `watchtower` | so viele Türme mehr gleichzeitig |
 | `card_slots` | so viele Karten mehr gleichzeitig aktiv (dazu `max_active` in `upgrades.json`) |
 | `radar_size` / `radar_cooldown` / `radar_duration` | Fenstergröße (px) / Zeit zwischen Scans (s, negativ = öfter) / Dauer eines Scans (s) |
 
-Knoten, die nur etwas freischalten (`shop`, `card_shop`, `dash`, `rocket`, `machine_gun`, `cannon`, `laser`, `radar`),
-haben nur `costs`. **`burning_ground`** hat statt `per_level` die Werte des brennenden Bodens:
+Knoten, die nur etwas freischalten (`shop`, `card_shop`, `dash`, `rocket`, `machine_gun`, `cannon`, `laser`, `radar`,
+`mines`, `slow_field`), haben nur `costs`. **`burning_ground`** hat statt `per_level` die Werte des brennenden Bodens:
 
 | Wert | Bedeutung |
 |---|---|
@@ -84,8 +87,9 @@ haben nur `costs`. **`burning_ground`** hat statt `per_level` die Werte des bren
 | `damage_per_second` | Schaden pro Sekunde an jedem Gegner darin (in Stößen alle 0,5 s) |
 | `radius` | sein Radius als Anteil des Explosionsradius (0.8 = 80 %) |
 
-Die Beschreibungen von *Head start*, *Bigger arena*, *Core luck* und *Watchtower* und die Tooltips der Upgrades zeigen
-die Werte aus dieser Datei.
+Die Beschreibungen von *Head start*, *Bigger arena*, *Core luck* und *Watchtower* und die Tooltips der Upgrades
+zeigen die Werte aus dieser Datei. *Burning ground* lässt sich erst kaufen, wenn *Cooldown*, *Blast radius* und
+*Damage* der Rakete voll ausgebaut sind (`requires_max` im Code, `game/skill_tree.py`).
 
 Weniger Stufen als vorher: Ein Spielstand mit mehr gekauften Stufen zählt nur so viele, wie der Knoten jetzt hat –
 gespeichert bleibt die alte Zahl, mit mehr Stufen ist sie wieder da. Ausgegebene Cores gibt es nicht zurück.
@@ -106,8 +110,8 @@ Charger), `laser` (aus Sniper), `cluster` (aus Artillery). Wann eine Evolution s
 (`evolutions`).
 Zeiten in Sekunden, Strecken und Größen in Pixeln, Tempo in Pixeln pro Sekunde, Winkel in Grad.
 
-**Schaden ans Schiff ist in Pixeln** (`contact_damage`, `shot_damage`, `blast_damage`): So weit rücken die Kanten der
-Arena bei einem Treffer im Schnitt ein – Breite und Höhe werden je um das Doppelte kleiner. Die Kanten weit weg vom
+**Schaden ans Schiff ist in Pixeln** (`contact_damage`, `projectile_damage`, `blast_damage`): So weit rücken die Kanten
+der Arena bei einem Treffer im Schnitt ein – Breite und Höhe werden je um das Doppelte kleiner. Die Kanten weit weg vom
 Schiff rücken mehr ein, die nahen weniger (`HIT_SIDE_BIAS` in `settings.py`). Zum Vergleich: ein Basic macht 25, die
 Grundkanone schiebt eine Kante pro Schuss um 18 zurück. Wachtürme verlieren dieselbe Zahl an Lebenspunkten.
 
@@ -147,7 +151,7 @@ handeln nur nach vorne. Wer schnell genug um sie herumfliegt, entkommt ihnen.
 | `fire_range` | schießt, wenn das Schiff höchstens so weit weg ist |
 | `fire_interval` | Sekunden zwischen zwei Schüssen |
 | `turn_speed` / `fire_cone` | siehe oben |
-| `shot_damage` / `shot_speed` / `shot_size` | der Schuss: Schaden in Pixeln, Tempo, Durchmesser |
+| `projectile_damage` / `projectile_speed` / `projectile_size` | der Schuss: Schaden in Pixeln, Tempo, Durchmesser |
 
 **Sniper**
 
@@ -160,7 +164,7 @@ handeln nur nach vorne. Wer schnell genug um sie herumfliegt, entkommt ihnen.
 | `aim_time` | so lange ist der Laser sichtbar … |
 | `lock_time` | … davon die letzten Sekunden folgt er nicht mehr (der Moment zum Ausweichen) |
 | `reload_time` | Pause nach dem Schuss |
-| `shot_damage` / `shot_speed` / `shot_size` | der Schuss: Schaden in Pixeln, Tempo, Durchmesser |
+| `projectile_damage` / `projectile_speed` / `projectile_size` | der Schuss: Schaden in Pixeln, Tempo, Durchmesser |
 
 **Carrier**
 
@@ -218,15 +222,15 @@ eigenen kleinen roten Kreis, der sich füllt, solange er fliegt. `blast_radius` 
 
 **Cannoneer** – die Evolution des Shooters: verhält sich wie ein Shooter, aber sehr langsam und mit einer riesigen
 Kanonenkugel, die langsam fliegt und massiv Schaden macht. Dieselben Werte wie beim Shooter (`shooting_distance`,
-`fire_range`, `fire_interval`, `turn_speed`, `fire_cone`, `shot_damage`, `shot_speed`, `shot_size`).
+`fire_range`, `fire_interval`, `turn_speed`, `fire_cone`, `projectile_damage`, `projectile_speed`, `projectile_size`).
 
-**Laser** – die Evolution des Snipers: zielt wie ein Sniper (dieselben Werte außer `shot_speed`/`shot_size`), die
-Linie ist dicker. Statt einer Kugel feuert er einen Strahl entlang der Linie; wer ihn berührt, solange er an ist, nimmt
+**Laser** – die Evolution des Snipers: zielt wie ein Sniper (dieselben Werte außer `projectile_speed`/
+`projectile_size`), die Linie ist dicker. Statt einer Kugel feuert er einen Strahl entlang der Linie; wer ihn berührt, solange er an ist, nimmt
 Schaden (einmal pro Strahl). Solange der Strahl an ist, bewegt und dreht er sich nicht. Stirbt er, erlischt der Strahl.
 
 | Wert | Bedeutung |
 |---|---|
-| `shot_damage` | Schaden in Pixeln, wenn der Strahl das Schiff (oder einen Wachturm) berührt |
+| `projectile_damage` | Schaden in Pixeln, wenn der Strahl das Schiff (oder einen Wachturm) berührt |
 | `beam_time` | so viele Sekunden ist der Strahl an |
 | `beam_width` | Dicke des Strahls in Pixeln |
 
@@ -256,7 +260,7 @@ Alles, was man während eines Runs mit Sternen kauft.
 | Abschnitt | Einträge |
 |---|---|
 | Ship | `move_speed`, `max_energy`, `energy_regen`, `armor`, `recovery`, `magnet` |
-| jede Waffe | `gun_…`, `mg_…`, `cannon_…`, `laser_…` mit `damage`, `attack_speed`, `wall_push`, `shot_speed` (Projectile speed), z. B. `mg_damage` |
+| jede Waffe | `gun_…`, `mg_…`, `cannon_…`, `laser_…` mit `damage`, `attack_speed`, `wall_push`, `projectile_speed` (Projectile speed), z. B. `mg_damage` |
 | Dash | `dash_distance`, `dash_cooldown` |
 | Rocket | `rocket_damage`, `rocket_blast_radius`, `rocket_wall_push`, `rocket_cooldown` |
 | Watchtower | `watchtower_vision` |
@@ -267,9 +271,10 @@ Eine Waffe steht nur im Shop, wenn sie ausgerüstet ist, Dash, Rocket und Watcht
 |---|---|
 | `amount` | genau so viel ändert eine Stufe (negativ bei Cooldowns) – bei Waffen ohne `upgrade_factor` |
 | `price` | Sterne für die erste Stufe in einem Run … |
-| `price_step` | … und so viele mehr für jede weitere Stufe desselben Werts (10, 15, 20, …) |
+| `price_step` | … und so viele mehr für jede weitere Stufe desselben Werts (10, 15, 20, …) – fehlt er, 0 |
 
-Fehlt ein Eintrag, gilt der eingebaute Wert (bei Waffen der allgemeine mal ihr `upgrade_factor`). Alte Namen wie
+Fehlt ein Eintrag, gilt der eingebaute Wert (bei Waffen der allgemeine mal ihr `upgrade_factor`) – nur `price_step`
+ist dann immer 0, damit nichts heimlich teurer wird. Alte Namen wie
 `damage` oder `blast_radius` ignoriert das Spiel – das Spielmenü sagt, wie sie jetzt heißen.
 
 **`watchtower`** – die Wachtürme (B):
@@ -277,7 +282,7 @@ Fehlt ein Eintrag, gilt der eingebaute Wert (bei Waffen der allgemeine mal ihr `
 | Wert | Bedeutung |
 |---|---|
 | `price` | Sterne für den ersten Turm eines Runs … |
-| `price_step` | … und so viele mehr für jeden weiteren |
+| `price_step` | … und so viele mehr für jeden weiteren – fehlt er, 0 (jeder Turm kostet gleich viel) |
 
 ## `upgrades.json`
 
@@ -294,7 +299,7 @@ es erst, wenn der Skilltree-Knoten *Card shop* gekauft ist – vorher wirken auc
 |---|---|
 | `offers` | so viele Karten werden gleichzeitig angeboten |
 | `first_price` | Cores für eine Karte, solange die Sammlung leer ist … |
-| `price_step` | … und so viele mehr für jede Karte, die schon in der Sammlung ist |
+| `price_step` | … und so viele mehr für jede Karte, die schon in der Sammlung ist – fehlt er, 0 |
 | `reroll_price` | Cores für neue Angebote |
 | `sell_refund` | Cores zurück beim Verkaufen (Rechtsklick auf eine Karte der Sammlung → *Sell*) |
 | `max_owned` | so viele Karten passen in die Sammlung |
@@ -331,7 +336,8 @@ Beide Waffen teilen sich die Energie des Schiffs (`max_energy`, `energy_regen` i
 
 ## `abilities.json`
 
-Die Fähigkeiten in den beiden Slots: `dash` (Shift) und `rocket` (Leertaste). Beide schaltet man im Skilltree frei; was
+Die Fähigkeiten in den beiden Slots: `dash` (Shift) und `rocket` (Leertaste), dazu `mine` und `slow_field` des Dash.
+Alle schaltet man im Skilltree frei; was
 dessen Upgrades dazugeben, steht in `skilltree.json`, was Shop-Stufen bringen, in `shop.json`, was Karten bringen, in `upgrades.json`.
 
 | Wert | Bedeutung |
@@ -358,21 +364,45 @@ ground*) steht in `skilltree.json`.
 | `speed` / `acceleration` | Tempo beim Abschuss (px/s), plus so viel pro Sekunde Flugzeit |
 | `size` | Durchmesser der Rakete in Pixeln |
 
+**`mine`** – Skilltree *Mines* (hinter *Charges*): Jeder Dash lässt dort, wo er begann, eine Mine liegen. Sie geht hoch,
+wenn ein Gegner sie berührt oder die schrumpfende Wand sie erreicht, und verschwindet sonst nie. Der Skilltree-Knoten
+*Power* gibt pro Stufe mehr Schaden und Explosionsradius dazu, Karten ändern nichts.
+
+| Wert | Bedeutung |
+|---|---|
+| `damage` | Schaden an jedem Gegner im Explosionsradius |
+| `blast_radius` | Radius der Explosion in Pixeln – erreicht er die Wand, wird sie weggeschoben |
+| `wall_push` | so weit schiebt die Explosion jede Kante in ihrem Radius |
+| `size` | Durchmesser der Mine in Pixeln |
+
+**`slow_field`** – Skilltree *Slow field* (hinter *Mines*): Die Explosion einer Mine lässt ein Feld zurück, in dem
+Gegner langsamer sind (jede Bewegung, auch Anstürmen). Liegen Felder übereinander, zählt das stärkste. Die
+Skilltree-Knoten *Strength*, *Size* und *Duration* geben pro Stufe mehr dazu.
+
+| Wert | Bedeutung |
+|---|---|
+| `slow` | so viel Prozent langsamer (20 = 20 %, 100 = stehen still) |
+| `size` | Durchmesser des Felds in Pixeln |
+| `duration` | so viele Sekunden bleibt es |
+
 ## `buildings.json`
 
 **`watchtower`** – der Wachturm. Im Skilltree freischalten (*Watchtower*, jede Stufe +1 Turm gleichzeitig), im Run
 mit **B** werfen: Er fliegt vom Schiff aus in Mausrichtung, auch aus dem Spielfeld hinaus, und öffnet dort ein eigenes
-kleines Fenster, das diese Stelle dauerhaft zeigt. Gegner können ihn zerstören, dann schließt sich das Fenster.
+kleines Fenster, das diese Stelle zeigt. Er ist unverwundbar (Gegnerschüsse fliegen durch ihn hindurch), steht aber
+nur `lifetime` Sekunden – danach verschwindet er und sein Fenster schließt sich; ein Balken über ihm zeigt die
+restliche Zeit, in den letzten 2 Sekunden blinkt er. Sein Fenster ist auch sein Bereich (dünn umrandet): Gegner darin
+nehmen `damage_bonus` Prozent mehr Schaden von allem, was der Spieler macht. Mehrere Türme addieren sich nicht.
 
 | Wert | Bedeutung |
 |---|---|
-| `base_hp` | Lebenspunkte – in derselben Einheit wie der Schaden der Gegner (Pixel): 150 = sechs Berührungen eines Basic (je 25). Über dem Turm ein Lebensbalken |
+| `lifetime` | so viele Sekunden steht er nach der Landung |
+| `damage_bonus` | so viel Prozent mehr Schaden nehmen Gegner in seinem Bereich (20 = +20 %) |
 | `size` | Kantenlänge des Turms (auch die Hitbox; Gegner werden aus ihm herausgeschoben, er selbst bewegt sich nie) |
-| `vision` | Kantenlänge seines Fensters in Pixeln (Upgrade *Vision* im Shop und als Karte macht es größer) |
+| `vision` | Kantenlänge seines Fensters (und Bereichs) in Pixeln (Upgrade *Vision* im Shop und als Karte macht es größer) |
 | `throw_range` | so weit fliegt er vom Schiff weg |
 | `throw_time` | Sekunden in der Luft |
-| `hit_cooldown` | nach einem Treffer so viele Sekunden unverwundbar |
-| `lure_range` | Nahkampf-Gegner (Basic, Charger, Critter) in diesem Umkreis, die näher am Turm als am Schiff sind, greifen den Turm an |
+| `lure_range` | Nahkampf-Gegner (Basic, Charger, Critter) in diesem Umkreis, die näher am Turm als am Schiff sind, laufen zum Turm statt zum Schiff |
 
 Was ihm schadet: berührende Gegner (ihr `contact_damage`), gegnerische Schüsse, Artillerie-Einschläge.
 

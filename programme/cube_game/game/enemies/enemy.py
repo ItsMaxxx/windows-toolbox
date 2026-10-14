@@ -3,8 +3,8 @@ Base class for all enemies. Every enemy type is a subclass (class Charger(Enemy)
 and only changes what's different: its key, stats, behaviour (act()) and skin. How it looks is entirely in its skin
 (game/skins/) – this file and the subclasses only decide what it does.
 
-Damage to the ship (contact_damage, shot_damage, blast_damage) is in pixels: how far the arena's edges move in on
-average (Arena.hit). Watchtowers take the same numbers off their HP.
+Damage to the ship (contact_damage, projectile_damage, blast_damage) is in pixels: how far the arena's edges move in on
+average (Arena.hit).
 
 Stats (HP, speed, size, contact damage and every number of the behaviour) are read with self.stat("speed"): the value
 for this run (data/enemies.json and the difficulty's enemy_stats, put together by the roster – see roster.py) with the
@@ -25,6 +25,10 @@ enough and they can't keep up. They spawn facing the ship, so they don't waste t
 
 Armor (stat "armor", 0 for most): every hit from the player does that much less damage – flat, so many weak shots
 (machine gun) barely scratch an armored enemy, a few heavy ones (cannon) hardly notice it (game/armor.py).
+
+Slowing (a mine's slow field): slow(factor) for the current tick only – every move() this tick is that much slower.
+The scene calls it every tick for each enemy in the field, before update(); the strongest slow counts, they don't
+stack.
 
 Shots of the player first ask blocks(): an enemy can stop a shot without being hurt (the shield enemy's shield).
 
@@ -76,6 +80,8 @@ class Enemy(Entity):
         self.lure = None        # a watchtower it goes for instead of the ship (set by the scene, melee enemies only)
         self.aim = pygame.Vector2(1, 0)     # the direction it faces (length 1) – towards the ship from its first update
         self.oriented = False
+        self.speed_factor = 1.0     # 1 = normal speed; slow() lowers it for one tick
+        self.damage_factor = 1.0    # damage it takes × this – more in a watchtower's area (set by the scene every tick)
 
     def stat(self, name):
         """The value for this run with every active buff: (value + adds) × factors."""
@@ -107,8 +113,9 @@ class Enemy(Entity):
         return pygame.Vector2(self.rect.center)
 
     def take_damage(self, amount):
-        """A hit from the player: amount minus the armor (flat), at least settings.MIN_DAMAGE_SHARE of it."""
-        self.hp -= armor.reduce(amount, self.stat("armor"), settings.MIN_DAMAGE_SHARE)
+        """A hit from the player: amount minus the armor (flat), at least settings.MIN_DAMAGE_SHARE of it – times
+        damage_factor (a watchtower's area)."""
+        self.hp -= armor.reduce(amount, self.stat("armor"), settings.MIN_DAMAGE_SHARE) * self.damage_factor
         self.flash = HIT_FLASH
 
     # --- helpers for subclasses ---
@@ -121,8 +128,12 @@ class Enemy(Entity):
         offset = pygame.Vector2(point) - self.center
         return offset.normalize() if offset.length_squared() > 0 else pygame.Vector2()
 
+    def slow(self, factor):
+        """Slower for this tick, e.g. factor 0.8 = 20 % slower. Only the strongest slow counts."""
+        self.speed_factor = min(self.speed_factor, factor)
+
     def move(self, direction, speed, dt):
-        self.rect.move_ip(pygame.Vector2(direction) * speed * dt)
+        self.rect.move_ip(pygame.Vector2(direction) * speed * self.speed_factor * dt)
 
     def turn_towards(self, point, dt):
         """Turns aim towards point by at most turn_speed degrees per second."""
@@ -163,9 +174,9 @@ class Enemy(Entity):
             self.move(-direction, self.stat("speed"), dt)
 
     def shot_stats(self, color):
-        """The values of its shots: shot_damage, shot_speed, shot_size."""
-        return ShotStats(damage=self.stat("shot_damage"), speed=self.stat("shot_speed"), wall_push=0,
-                         size=self.stat("shot_size"), color=color)
+        """The values of its shots: projectile_damage, projectile_speed, projectile_size."""
+        return ShotStats(damage=self.stat("projectile_damage"), speed=self.stat("projectile_speed"), wall_push=0,
+                         size=self.stat("projectile_size"), color=color)
 
     def shoot(self, target, stats):
         """A projectile from the centre towards target, with the snapshot stats."""
@@ -182,7 +193,9 @@ class Enemy(Entity):
         for buff in self.buffs:
             buff.update(dt)
         self.buffs = [buff for buff in self.buffs if not buff.expired]
-        return self.act(dt, ship)
+        attacks = self.act(dt, ship)
+        self.speed_factor = 1.0             # slows have to be applied again next tick
+        return attacks
 
     def act(self, dt, ship):
         """Behaviour. Default: run straight at the ship (or the watchtower luring it), never shoot."""

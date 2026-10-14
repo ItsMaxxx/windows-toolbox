@@ -9,7 +9,7 @@
     "upgrade_factor": { "damage": 0.3, "attack_speed": 2, "wall_push": 0.5 }
   },
   "cannon": {
-    "damage": 6, "attack_speed": 0.5, "projectile_speed": 650, "projectile_size": 16, "wall_push": 90,
+    "damage": 6, "attack_speed": 0.5, "projectile_speed": 650, "projectile_size": 16, "wall_push": 80,
     "energy_use": 25, "piercing": 1, "pierced_push": 0.5,
     "upgrade_factor": { "damage": 2, "attack_speed": 0.2, "wall_push": 2 }
   },

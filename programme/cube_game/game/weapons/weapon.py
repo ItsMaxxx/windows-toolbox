@@ -26,9 +26,9 @@ class Weapon:
     name = "Weapon"
     color = (255, 255, 255)
     description = ""               # one short line for the loadout
-    ATTRIBUTES = {"damage": "damage", "attack_speed": "fire_rate", "projectile_speed": "shot_speed",
-                  "projectile_size": "shot_size", "wall_push": "wall_push", "energy_use": "energy_cost"}
-    MINIMUMS = {"fire_rate": 0.1, "shot_speed": 50, "energy_cost": 0.0}       # never below these (else 0)
+    ATTRIBUTES = {"damage": "damage", "attack_speed": "fire_rate", "projectile_speed": "projectile_speed",
+                  "projectile_size": "projectile_size", "wall_push": "wall_push", "energy_use": "energy_cost"}
+    MINIMUMS = {"fire_rate": 0.1, "projectile_speed": 50, "energy_cost": 0.0}       # never below these (else 0)
 
     def __init__(self):
         stats = data.STATS[self.key]
@@ -57,8 +57,8 @@ class Weapon:
 
     def shot_stats(self):
         """Snapshot of the current values – every shot gets its own copy when it's fired."""
-        return ShotStats(damage=self.damage, speed=self.shot_speed, wall_push=self.wall_push, size=self.shot_size,
-                         color=self.color)
+        return ShotStats(damage=self.damage, speed=self.projectile_speed, wall_push=self.wall_push,
+                         size=self.projectile_size, color=self.color)
 
     def fire(self, origin, direction):
         """New projectiles (a list, so weapons can fire several at once) – empty while cooling down. The ship has
@@ -77,6 +77,6 @@ class Weapon:
             ("Damage", f"{self.damage:g}"),
             ("Attack speed", f"{self.fire_rate:g}/s"),
             ("Wall push", f"{self.wall_push:g} px"),
-            ("Projectile speed", f"{self.shot_speed:g} px/s"),
+            ("Projectile speed", f"{self.projectile_speed:g} px/s"),
             ("Energy use", f"{self.energy_cost:g} per shot"),
         ]

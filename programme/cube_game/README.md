@@ -263,7 +263,7 @@ Notizen / offene Fragen:
 
 **Rand schrumpft mit der Zeit schneller, Projectile speed.**
 - `arena` in der Schwierigkeitsdatei: `shrink_growth` (px/s mehr pro Minute) und `max_shrink_speed` (Obergrenze).
-- Karte *Shot speed* heißt jetzt *Projectile speed* (Schlüssel bleibt `shot_speed`, steht in Spielständen). Grundkanone
+- Karte *Shot speed* heißt jetzt *Projectile speed* (Schlüssel `shot_speed` erst am 15.10.2026 umbenannt). Grundkanone
   880 statt 950 px/s. Karten wieder stärker als Shop-Stufen, außer Projectile speed (+150).
 
 **Wachturm (erstes Gebäude).**
@@ -330,8 +330,8 @@ Notizen / offene Fragen:
 **Schaden über die Zeit, Panzerung, Treffer von der abgewandten Seite.**
 - Phasen können jetzt auch die Arena ändern (`"arena": {"armor": "+3", "shrink_speed": "x1.5"}`), solange sie laufen.
   `armor` (Startwert unter `arena`): jeder Wand-Push ist so viele Pixel kürzer, mindestens `MIN_PUSH` (0,5 px).
-- In allen Schwierigkeiten: Phasen mit mehr Gegner-Schaden (`contact_damage`/`shot_damage`/`blast_damage` x1.25, x1.2)
-  und härteren Wänden, jeweils mit Ansage.
+- In allen Schwierigkeiten: Phasen mit mehr Gegner-Schaden (`contact_damage`/`projectile_damage`/`blast_damage`
+  x1.25, x1.2) und härteren Wänden, jeweils mit Ansage.
 - Treffer (`Arena.hit`): die Gesamtschrumpfung bleibt, verteilt sich aber nach der Schiffsposition – die Kanten weit
   vom Schiff rücken mehr ein (`HIT_SIDE_BIAS` in settings.py: 0 = gleichmäßig wie früher, 1 = am Rand alles von
   gegenüber).
@@ -386,8 +386,8 @@ Notizen / offene Fragen:
   Anzeigen (Farbquadrat pro Gegnertyp, Symbol pro Art von Ereignis, Haken = geschafft), darunter Details zum Level unter
   der Maus: `hints` aus der Datei, Gegner ab wann (Evolutionen mit Chance), Ereignisse mit Zeit. Symbole in
   `game/icons.py`.
-- **Gegnerschaden in Pixeln** (`contact_damage`, `shot_damage`, `blast_damage`): so weit rücken die Kanten bei einem
-  Treffer im Schnitt ein (`Arena.hit`). Vorher Punkte × `HIT_SHRINK` (25) – die Werte sind umgerechnet (Basic 25,
+- **Gegnerschaden in Pixeln** (`contact_damage`, `projectile_damage`, `blast_damage`): so weit rücken die Kanten bei
+  einem Treffer im Schnitt ein (`Arena.hit`). Vorher Punkte × `HIT_SHRINK` (25) – die Werte sind umgerechnet (Basic 25,
   Sniper 50, Kanonenkugel 100), im Spiel ändert sich nichts. Wachtürme: 150 HP statt 6, Lebensbalken statt Kästchen.
 - Ziele verlängert: A1 3:00, A2/A3 3:30, A4/A5 4:00, A6/B1 5:00, B2/B3 5:30, B4/B5 6:00, B6 7:00. Die Phasen (mehr
   HP, mehr Schaden, härtere Wände, Wellen) sind über das Level verteilt, die letzte kurz vor dem Ziel; zwei weitere
@@ -446,7 +446,7 @@ Notizen / offene Fragen:
   haben je eigene Preise (`WeaponCard.for_slot`, `Shop.sections`). Karten aus dem Karten-Shop wirken weiter auf alle
   Waffen, weil sich das Loadout zwischen Runs ändern kann.
 - 14.10.2026 (Claude, auf Wunsch gebaut): **Jedes Waffen-Upgrade gilt nur für eine Waffe** – jetzt auch die Karten:
-  `damage`, `attack_speed`, `wall_push`, `shot_speed` gibt es einmal pro Waffe (`damage:gun`, `damage:cannon` …,
+  `damage`, `attack_speed`, `wall_push`, `projectile_speed` gibt es einmal pro Waffe (`damage:gun`, `damage:cannon` …,
   `WeaponCard`, `cards.make_cards`), mit dem Waffennamen im Band und ihrer Farbe. Eine aktive Karte wirkt nur, solange
   ihre Waffe in einem Slot ist (die Zeile unter den Karten sagt es sonst). Der Karten-Shop bietet sie für jede
   freigeschaltete Waffe an. Die Zahl auf der Karte ist, was sie dieser Waffe wirklich gibt (`card_amount` ×
@@ -480,7 +480,7 @@ Notizen / offene Fragen:
   der Turmpreis (bisher in `buildings.json`). `upgrades.json` hat nur noch `card_amount` und die Regeln des
   Karten-Shops; liegt ein Wert in der falschen Datei, warnt das Spielmenü (`cards.read_numbers`).
 - 14.10.2026 (Claude, auf Wunsch gebaut): **`shop.json` mit einem Eintrag pro Shop-Zeile**: jede Waffe hat ihre eigenen
-  (`gun_damage`, `mg_damage`, `cannon_wall_push`, `laser_shot_speed` …), dazu `rocket_blast_radius` und
+  (`gun_damage`, `mg_damage`, `cannon_wall_push`, `laser_projectile_speed` …), dazu `rocket_blast_radius` und
   `watchtower_vision` (`card.shop_key`, `shop_data.read_upgrades`). `amount` ist genau, was eine Stufe der Waffe gibt –
   der `upgrade_factor` gilt nur noch für Karten; die Werte sind umgerechnet (z. B. `mg_damage` 0,15), im Spiel ändert
   sich nichts. Alte Namen meldet das Spielmenü mit dem neuen.
@@ -489,3 +489,35 @@ Notizen / offene Fragen:
   (`Ability.max_charges`, `charges`): jede Nutzung nimmt eine, der Cooldown füllt eine nach der anderen auf – mit einer
   Ladung wie bisher. Grundwert `charges` des Dash in `abilities.json` (1). Die Fähigkeitenanzeige unten links zeigt
   z. B. „SHIFT  Dash  2/3  1.4s“, Inventar und Spielmenü die Zahl der Ladungen.
+- 15.10.2026 (Claude, auf Wunsch): **Shot speed heißt überall Projectile speed** – auch die Schlüssel: Karte
+  `projectile_speed` (`game/cards/projectile_speed.py`), Shop `gun_projectile_speed` …, Skilltree
+  `mg_projectile_speed` / `cannon_projectile_speed`, Gegnerwert `projectile_speed` in `enemies.json`, Waffen-Attribut
+  `Weapon.projectile_speed`. Alte Spielstände werden beim Laden umbenannt (`cards.RENAMED`, `profile.RENAMED_NODES`).
+- 15.10.2026 (Claude, auf Wunsch): **Auch `shot_damage` und `shot_size` heißen jetzt `projectile_damage` /
+  `projectile_size`** (Gegnerwerte in `enemies.json` und den Level-Dateien, Waffen-Attribut). Alte Namen in
+  Datendateien meldet das Spielmenü mit dem neuen (`roster.RENAMED`).
+- 15.10.2026 (Claude, auf Wunsch): **Cannon *Damage* kostet Energie**: jede Stufe +1 Energie pro Schuss
+  (`energy_per_level` in `skilltree.json`). Nebenwirkungen von Knoten stehen jetzt allgemein in
+  `skill_tree.SIDE_EFFECTS` (auch die Streuung der MG, `spread_per_level`).
+- 15.10.2026 (Claude, auf Wunsch gebaut): **Minen** – Skilltree-Knoten *Mines* hinter *Charges* (Dash-Zweig,
+  25 Cores): Jeder Dash lässt dort, wo er begann, eine Mine liegen (`game/mine.py`, `Dash.mines`). Sie geht hoch,
+  wenn ein Gegner sie berührt oder die schrumpfende Wand sie erreicht – 3 Schaden, Explosionsradius 40 px,
+  100 px Wall push, Größe 8 px (`mines` in `skilltree.json`, keine Upgrades). Für die Spielszene ist sie ein
+  Spielerschuss, der sich nicht bewegt, und explodiert wie die Rakete (`PlayScene.explode`).
+- 15.10.2026 (Claude, auf Wunsch gebaut): **Slow field** – Skilltree-Knoten hinter *Mines* (30 Cores): Die
+  Explosion einer Mine lässt ein Feld zurück, in dem Gegner langsamer sind (20 %, 60 px Durchmesser, 3 s;
+  `game/effects/slow_field.py`, `Enemy.slow` – gilt für jede Bewegung, das stärkste Feld zählt). Upgrades
+  *Strength* (+5 %), *Size* (+15 px), *Duration* (+1 s), je 3 Stufen. Die Grundwerte von Mine und Slow field
+  stehen jetzt in `abilities.json` (`mine`, `slow_field`), im Skilltree nur noch die Kosten. Der Skilltree ist
+  etwas schmaler gesetzt (`UNIT` 70 statt 78 px), damit rechts Platz für die neuen Knoten ist.
+- 15.10.2026 (Claude, auf Wunsch gebaut): **Burning ground** braucht jetzt *Cooldown*, *Blast radius* und *Damage*
+  der Rakete **voll ausgebaut** (`Node.requires_max`, `Profile.missing`; Tooltip: „needs … (max)“). Schon gekauft
+  bleibt gekauft. Neuer Knoten **Power** hinter *Mines* (3 Stufen, 6/12/20 Cores): +1 Schaden und +10 px
+  Explosionsradius pro Stufe (`mine_power` in `skilltree.json`, `skill_tree.upgraded`; `SIDE_EFFECTS` kann jetzt
+  auch `blast_radius_per_level`).
+- 15.10.2026 (Claude, auf Wunsch gebaut): **Wachturm umgebaut**: unverwundbar statt Lebenspunkte (Gegnerschüsse,
+  Strahlen und Artillerie gehen durch bzw. treffen ihn nicht), dafür **10 s Lebenszeit** nach der Landung
+  (`lifetime`, Zeitbalken über ihm, blinkt in den letzten 2 s). Gegner in seinem Fenster (dünn umrandet) nehmen
+  **+20 % Schaden** (`damage_bonus` in `buildings.json`, `PlayScene.expose_enemies`, `Enemy.damage_factor` – nach
+  der Panzerung, Türme addieren sich nicht). Sichtfenster und Anlocken bleiben. `base_hp` und `hit_cooldown`
+  sind weg (das Spielmenü meldet sie, falls sie noch in der Datei stehen).

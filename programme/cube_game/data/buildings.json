@@ -1,11 +1,11 @@
 {
   "watchtower": {
-    "base_hp": 150,
+    "lifetime": 10,
+    "damage_bonus": 20,
     "size": 24,
     "vision": 320,
     "throw_range": 420,
     "throw_time": 0.5,
-    "hit_cooldown": 0.4,
     "lure_range": 220
   }
 }

@@ -43,6 +43,15 @@ BASE_STATS = {}                     # type key -> {stat: value}: data/enemies.js
 COMMON_STATS = {"armor": 0}         # fallbacks every type has (on top of its class's stats)
 
 
+# old stat names (older enemies.json and level files may still have them) -> their names now
+RENAMED = {"shot_damage": "projectile_damage", "shot_speed": "projectile_speed", "shot_size": "projectile_size"}
+
+
+def unknown_stat(name):
+    """The end of the warning about a stat that doesn't exist – with its new name if it was renamed (RENAMED)."""
+    return f"it's \"{RENAMED[name]}\" now – ignored" if name in RENAMED else "ignored"
+
+
 def fallbacks(key):
     return {**COMMON_STATS, **ENEMY_TYPES[key].stats}
 
@@ -75,7 +84,7 @@ def reload(warnings):
             entry = {}
         for name, value in entry.items():
             if name not in values:
-                warnings.append(f"enemies.json {key}: unknown stat \"{name}\" – ignored")
+                warnings.append(f"enemies.json {key}: unknown stat \"{name}\" – {unknown_stat(name)}")
             elif valid_value(name, value):
                 values[name] = value
             else:

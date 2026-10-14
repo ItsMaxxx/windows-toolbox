@@ -63,12 +63,17 @@ Zeiten in Sekunden, Größen in Pixeln, Chancen von 0 bis 1 (0.01 = 1 %).
 | `shrink_growth` | … plus so viel pro Minute Spielzeit … (optional, Standard 0) |
 | `max_shrink_speed` | … höchstens so viel (Standard 60) |
 | `armor` | Panzerung am Anfang in Pixeln (Standard 0), flach: jeder Stoß gegen eine Kante schiebt sie so viele Pixel weniger weit, mindestens `MIN_PUSH_SHARE` (10 %, `settings.py`) bleibt. Phasen können sie erhöhen |
+| `push_falloff` | je weiter die Arena schon draußen ist, desto weniger bringt ein Stoß – pro Achse: links/rechts zählt die Breite, oben/unten die Höhe. Ein Stoß wird mal (Startgröße ÷ jetzige Größe) ^ `push_falloff` genommen, danach kommt die Panzerung ab. Bei 1: doppelt so breit wie am Start → halber Stoß, halb so breit → doppelter. 0 = aus (fehlt der Wert, ist er 0). Phasen können ihn ändern |
 
 Beispiel A5: 10 px/s am Anfang, + 2 pro Minute – nach 5 Minuten 20 px/s, das ist auch die Obergrenze.
 Fehlen `shrink_growth` und `max_shrink_speed`, schrumpft die Arena immer gleich schnell.
 
 Panzerung ist flach: bei `armor` 7 schiebt die Gun 35 → 28 px, die Cannon 90 → 83, die Machine gun nur noch 6 → 0,6
 (das Minimum) – viele kleine Stöße (Machine gun, Laser) verlieren viel, wenige große (Cannon, Rakete) kaum etwas.
+
+`push_falloff` bei 800 px Startbreite, Gun-Stoß 35 px: bei 400 px Breite 70 px, bei 1600 px 17,5 px – bei
+`push_falloff` 2 schon 140 bzw. 8,75 px. Die Startgröße ist die mit *Bigger arena*, so macht der Knoten den Anfang nicht
+schwerer.
 
 ## `spawning` – wie oft Gegner kommen
 
@@ -162,7 +167,7 @@ buffen und sich ansagen.
 | `weights` | Änderungen an den Gewichten aus `enemies`, solange die Phase läuft |
 | `enemy_stats` | Buffs auf alle Gegner, solange die Phase läuft – wie `enemy_stats` unten, aber nur `"+1"`, `"-1"`, `"x1.5"` |
 | `announce` | Text, der zu Beginn oben im Spiel eingeblendet wird – weglassen = still |
-| `arena` | Änderungen an der Arena, solange die Phase läuft: `armor` und `shrink_speed`, Schreibweise wie unten (`"+3"`, `"x1.5"`, Zahl) |
+| `arena` | Änderungen an der Arena, solange die Phase läuft: `armor`, `shrink_speed` und `push_falloff`, Schreibweise wie unten (`"+3"`, `"x1.5"`, Zahl) |
 | `spawn` | Gegner, die **einmal** zu Beginn der Phase zusätzlich kommen, jeder an einer eigenen Stelle: `{ "shooter": 3 }` (ganze Zahlen) |
 | `spawn_interval` | Zeit zwischen zwei Gegnern, solange die Phase läuft: `"x0.6"` = 40 % kürzer, `"-1"` = eine Sekunde kürzer, Zahl = genau so viele Sekunden. Darf unter `min_interval` gehen |
 
@@ -193,7 +198,7 @@ Eine Welle mit Paukenschlag – drei Shooter sofort, danach 20 Sekunden lang meh
 Mehr Schaden über die Zeit und härtere Wände – so stehen sie in den Dateien:
 
 ```json
-{ "from": 180, "enemy_stats": { "all": { "contact_damage": "x1.25", "shot_damage": "x1.25", "blast_damage": "x1.25" } },
+{ "from": 180, "enemy_stats": { "all": { "contact_damage": "x1.25", "projectile_damage": "x1.25", "blast_damage": "x1.25" } },
   "announce": "Enemies hit harder!" },
 { "from": 240, "arena": { "armor": "+5" }, "announce": "The walls harden!" }
 ```

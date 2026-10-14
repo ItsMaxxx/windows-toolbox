@@ -20,7 +20,7 @@ from game.cards.move_speed import MoveSpeedCard
 from game.cards.damage import DamageCard
 from game.cards.attack_speed import AttackSpeedCard
 from game.cards.wall_push import WallPushCard
-from game.cards.shot_speed import ShotSpeedCard
+from game.cards.projectile_speed import ProjectileSpeedCard
 from game.cards.dash_distance import DashDistanceCard
 from game.cards.dash_cooldown import DashCooldownCard
 from game.cards.rocket_damage import RocketDamageCard
@@ -44,7 +44,7 @@ ALL_CARDS = [
     DamageCard,
     AttackSpeedCard,
     WallPushCard,
-    ShotSpeedCard,
+    ProjectileSpeedCard,
     DashDistanceCard,
     DashCooldownCard,
     RocketDamageCard,
@@ -71,16 +71,24 @@ def make_cards():
 CARDS = {card.key: card for card in make_cards()}      # key -> the card (cards have no state)
 
 
+RENAMED = {"shot_speed": "projectile_speed"}     # old card type key (in save files) -> its key now
+
+
 def saved_key(key, weapon):
     """A card key from a save file as it is now: weapon cards used to work on every weapon ("damage") – those become
-    the card of weapon (the one in the first slot). None if there's no such card any more."""
+    the card of weapon (the one in the first slot); renamed card types get their new key (RENAMED). None if there's no
+    such card any more."""
     if not isinstance(key, str):
         return None
+    kind, colon, rest = key.partition(":")
+    key = RENAMED.get(kind, kind) + colon + rest
     if key in CARDS:
         return key
     if key in CARD_TYPES and issubclass(CARD_TYPES[key], WeaponCard):
         return f"{key}:{weapon}"
     return None
+
+
 FILE = Path(__file__).resolve().parents[2] / "data" / "upgrades.json"
 SHOP_NUMBERS = ("amount", "price", "price_step")       # in data/shop.json – the shop during a run
 CARD_NUMBERS = ("card_amount",)                         # in data/upgrades.json – the card shop
@@ -92,7 +100,7 @@ DEFAULTS = {card_type: {name: getattr(card_type, name) for name in NUMBERS} for 
 class CardShopRules:
     offers: int = 3             # cards offered at once
     first_price: int = 2        # cores for a card while the collection is empty …
-    price_step: int = 1         # … and this many more for each card already in it
+    price_step: int = 0         # … and this many more for each card already in it (none unless upgrades.json says so)
     reroll_price: int = 1       # cores for new offers
     sell_refund: int = 1        # cores back for selling a card
     max_owned: int = 12

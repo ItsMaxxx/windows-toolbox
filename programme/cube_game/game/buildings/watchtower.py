@@ -1,11 +1,12 @@
 """
 The watchtower: thrown from the ship (B) in the mouse's direction, throw_range far – out of the arena, too. Where it
-lands it opens its own small window (vision × vision pixels, see engine/view_window.py) that keeps showing that spot
-for the rest of the run: you see snipers, artillery and swarms coming before they reach the arena.
+lands it opens its own small window (vision × vision pixels, see engine/view_window.py) that shows that spot: you see
+snipers, artillery and swarms coming before they reach the arena.
 
-Enemies can destroy it: touching enemies (their contact damage), enemy shots and artillery strikes hurt it – after a
-hit it can't be hurt again for hit_cooldown seconds. Melee enemies (basic, charger, critter) that get within
-lure_range of it and are closer to it than to the ship go for the tower instead. Destroyed, its window closes.
+It can't be hurt (enemy shots fly through it), but it only stands for lifetime seconds after landing – then it's gone
+and its window closes. Its window is also its area: enemies in it take damage_bonus percent more damage from
+everything the player does (PlayScene.expose_enemies). Melee enemies (basic, charger, critter) that get within
+lure_range of it and are closer to it than to the ship go for the tower instead.
 
 Two classes: WatchtowerKit is what the ship carries (skill tree "Watchtower": how many towers at once; the shop and
 cards upgrade its vision), Watchtower is one tower in the world. The values are in data/buildings.json, what a tower
@@ -47,13 +48,13 @@ class WatchtowerKit:
 
 class Watchtower(Entity):
     stats = {                   # fallback only – the real values are in data/buildings.json
-        "base_hp": 150,          # takes enemy damage in pixels like the ship (a Basic touching it: 25)
+        "lifetime": 10,         # seconds it stands after landing
+        "damage_bonus": 20,     # percent more damage to enemies in its area (its window)
         "size": 24,             # pixels (square)
         "vision": 320,          # side length of its window
         "throw_range": 420,     # how far it's thrown from the ship
         "throw_time": 0.5,      # seconds in the air
-        "hit_cooldown": 0.4,    # seconds after a hit in which it can't be hurt again
-        "lure_range": 220,      # melee enemies this close (and closer to it than to the ship) attack it
+        "lure_range": 220,      # melee enemies this close (and closer to it than to the ship) go for it
     }
     skin = WatchtowerSkin()
 
@@ -68,11 +69,10 @@ class Watchtower(Entity):
         self.target = pygame.Vector2(target)
         self.rect.center = self.start
         self.flight = 0.0                       # seconds in the air so far
-        self.hp = self.values["base_hp"]
-        self.hit_timer = 0.0
-        self.flash = 0.0
+        self.standing = 0.0                     # seconds since it landed
         self.age = 0.0                          # seconds since it was thrown (for the skin's animation)
         self.view = None                        # its window (Engine.open_view) – None until it lands / if none
+        self.area = None                        # its area on the screen once it has landed (the scene sets it)
 
     @property
     def landed(self):
@@ -89,8 +89,13 @@ class Watchtower(Entity):
         return math.sin(math.pi * self.progress)
 
     @property
+    def time_left(self):
+        """Seconds until it's gone (counting from landing)."""
+        return max(0.0, self.values["lifetime"] - self.standing)
+
+    @property
     def alive(self):
-        return self.hp > 0
+        return self.time_left > 0
 
     @property
     def center(self):
@@ -99,9 +104,8 @@ class Watchtower(Entity):
     def update(self, dt):
         """True once, in the tick it lands."""
         self.age += dt
-        self.hit_timer = max(0.0, self.hit_timer - dt)
-        self.flash = max(0.0, self.flash - dt)
         if self.landed:
+            self.standing += dt
             return False
         self.flight += dt
         progress = self.progress
@@ -114,14 +118,6 @@ class Watchtower(Entity):
         rect = pygame.Rect(0, 0, round(self.kit.vision), round(self.kit.vision))
         rect.center = (round(self.rect.centerx), round(self.rect.centery))
         return rect.clamp(area).clip(area)
-
-    def take_damage(self, amount):
-        """Only once it has landed, and not again within hit_cooldown."""
-        if not self.landed or self.hit_timer > 0 or amount <= 0:
-            return
-        self.hp -= amount
-        self.hit_timer = self.values["hit_cooldown"]
-        self.flash = 0.1
 
     def draw(self, surface, offset):
         self.skin.draw(surface, self, self.rect.move(-offset[0], -offset[1]))

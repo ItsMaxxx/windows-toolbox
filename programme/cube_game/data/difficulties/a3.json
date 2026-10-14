@@ -3,10 +3,10 @@
   "description": "from afar: Shooters and Snipers",
   "order": 3,
   "goal": 210,
-  "core_chance": 0.06,
+  "core_chance": 0.08,
   "unlock": { "requires": "a2" },
   "hints": ["Many ranged units", "Snipers shoot from far outside – watch for their line", "Basic swarms cover the shooters behind them"],
-  "arena": { "start_size": [800, 560], "shrink_speed": 7, "shrink_growth": 2, "max_shrink_speed": 21, "armor": 0.5 },
+  "arena": { "start_size": [400, 280], "shrink_speed": 7, "shrink_growth": 2, "max_shrink_speed": 21, "armor": 0.5, "push_falloff": 0.8 },
   "spawning": { "first_spawn": 2.5, "start_interval": 2.6, "min_interval": 0.85, "interval_drop": 0.012 },
   "enemies": [
     { "type": "basic",   "weight": 30, "after": 0 },
@@ -25,10 +25,13 @@
     { "from": 100, "enemy_stats": { "all": { "base_hp": "+1" } } },
     { "from": 140, "to": 170, "weights": { "shooter": "x2", "sniper": "x2" }, "spawn": { "shooter": 3, "sniper": 2 },
       "spawn_interval": "x0.8", "announce": "Long range incoming!" },
-    { "from": 165, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
+    { "from": 165, "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
     { "from": 180, "to": 210, "weights": { "shooter": "x2", "sniper": "x1.5" }, "spawn": { "sniper": 3, "shooter": 2 }, "spawn_interval": "x0.65", "announce": "Final wave!" },
     { "from": 195, "to": 210, "spawn": { "shooter": 3, "sniper": 2 }, "spawn_interval": "x0.8", "announce": "Hold on!" },
     { "from": 250, "enemy_stats": { "all": { "base_hp": "+1" } } },
-    { "from": 300, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" }
+    { "from": 300, "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
+    { "from": 320, "spawn_interval": "x0.75"},
+    { "from": 350, "enemy_stats": { "all": { "base_hp": "+1" } } },
+    { "from": 400, "enemy_stats": { "all": { "base_hp": "+1" } } }
   ]
 }

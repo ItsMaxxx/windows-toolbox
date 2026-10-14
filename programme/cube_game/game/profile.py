@@ -21,6 +21,7 @@ from game.weapons import STARTER, WEAPON_TYPES
 
 FILE = Path(__file__).resolve().parents[3] / "daten" / "cube_game.json"
 SETTINGS = {"key_display": True}     # the toolbox page's settings and their defaults (see cube_game_gui.py)
+RENAMED_NODES = {"mg_shot_speed": "mg_projectile_speed", "cannon_shot_speed": "cannon_projectile_speed"}   # old -> now
 
 
 class Profile:
@@ -47,6 +48,7 @@ class Profile:
         if isinstance(data.get("cores"), int) and data["cores"] >= 0:
             profile.cores = data["cores"]
         for key, level in dict(data.get("levels") or {}).items():
+            key = RENAMED_NODES.get(key, key)
             if key in NODES_BY_KEY and isinstance(level, int) and level > 0:
                 profile.levels[key] = level     # more than the node has now: level() caps it
         loadout = data.get("loadout")
@@ -109,8 +111,14 @@ class Profile:
         return self.level(key) > 0
 
     def unlocked(self, node):
-        """True if every node it requires has been bought (so this one can be bought)."""
-        return all(self.owns(key) for key in node.requires)
+        """True if every node it requires has been bought – maxed, if it says so (so this one can be bought)."""
+        return not self.missing(node)
+
+    def missing(self, node):
+        """The keys of the nodes it requires that aren't bought yet (or not maxed yet, for node.requires_max)."""
+        if node.requires_max:
+            return [key for key in node.requires if not self.maxed(NODES_BY_KEY[key])]
+        return [key for key in node.requires if not self.owns(key)]
 
     def maxed(self, node):
         return self.level(node.key) >= node.max_level

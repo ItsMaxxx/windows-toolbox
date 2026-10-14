@@ -3,10 +3,10 @@
   "description": "armored: very hard walls, Charger swarms",
   "order": 5,
   "goal": 240,
-  "core_chance": 0.05,
+  "core_chance": 0.08,
   "unlock": { "requires": "a4" },
   "hints": ["Very hard walls – every push counts", "Charger swarms", "A bit of everything"],
-  "arena": { "start_size": [800, 560], "shrink_speed": 9, "shrink_growth": 2, "max_shrink_speed": 20, "armor": 7 },
+  "arena": { "start_size": [400, 280], "shrink_speed": 9, "shrink_growth": 2, "max_shrink_speed": 20, "armor": 7, "push_falloff": 0.8 },
   "spawning": { "first_spawn": 2, "start_interval": 2.7, "min_interval": 1.0, "interval_drop": 0.01 },
   "enemies": [
     { "type": "basic",     "weight": 45, "after": 0 },
@@ -19,24 +19,24 @@
   "swarms": [
     {
       "type": "basic", "after": 40,
-      "start_chance": 0.02, "chance_growth": 0.0008, "max_chance": 0.12,
-      "start_size": 5, "growth_time": 12, "max_size": 25, "min_gap": 9
+      "start_chance": 0.02, "chance_growth": 0.001, "max_chance": 0.15,
+      "start_size": 5, "growth_time": 20, "max_size": 25, "min_gap": 8
     },
     {
       "type": "charger", "after": 80,
-      "start_chance": 0.02, "chance_growth": 0.0008, "max_chance": 0.12,
-      "start_size": 4, "growth_time": 15, "max_size": 15, "min_gap": 10
+      "start_chance": 0.02, "chance_growth": 0.001, "max_chance": 0.1,
+      "start_size": 3, "growth_time": 25, "max_size": 15, "min_gap": 10
     }
   ],
   "phases": [
     { "from": 60, "arena": { "armor": "+3.5" }, "announce": "The walls harden!" },
-    { "from": 100, "enemy_stats": { "all": { "base_hp": "+1" } } },
+    { "from": 100, "enemy_stats": { "all": { "base_hp": "+1" } }, "announce": "Enemies +1hp" },
     { "from": 120, "to": 150, "weights": { "charger": "x3" }, "spawn": { "charger": 4 }, "spawn_interval": "x0.85",
       "announce": "Chargers incoming!" },
-    { "from": 160, "arena": { "armor": "+3.5" }, "announce": "The walls harden!" },
-    { "from": 180, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
+    { "from": 160, "arena": { "armor": "+1.5" }, "announce": "The walls harden!" },
+    { "from": 180, "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
     { "from": 210, "to": 240, "weights": { "charger": "x1.5", "shooter": "x1.5" }, "spawn": { "charger": 3, "shooter": 2 }, "spawn_interval": "x0.65", "arena": { "armor": "+2" }, "announce": "Final wave!" },
-    { "from": 225, "to": 240, "spawn": { "basic": 4, "shooter": 2, "sniper": 1 }, "spawn_interval": "x0.8", "enemy_stats": { "all": { "contact_damage": "x1.15", "shot_damage": "x1.15", "blast_damage": "x1.15" } }, "announce": "Hold on!" },
+    { "from": 225, "to": 240, "spawn": { "basic": 4, "shooter": 2, "sniper": 1 }, "spawn_interval": "x0.8", "enemy_stats": { "all": { "contact_damage": "x1.15", "projectile_damage": "x1.15", "blast_damage": "x1.15" } }, "announce": "Hold on!" },
     { "from": 270, "enemy_stats": { "all": { "base_hp": "+1" } } },
     { "from": 300, "arena": { "armor": "+5" }, "announce": "The walls harden!" }
   ]

@@ -10,7 +10,8 @@ the next level – saved right then, with a notice on screen; the run goes on un
 level that announce themselves ("Snipers incoming!") get a notice, too.
 
 Watchtowers (B, once unlocked): thrown out from the ship, each one gets its own window (Engine.open_view) that shows
-the world around it – draw_view() draws it. Enemies can destroy them (game/buildings/watchtower.py). The radar (once
+the world around it – draw_view() draws it. They can't be hurt but stand only for a while, and enemies in a tower's
+window take more damage (game/buildings/watchtower.py). The radar (once
 unlocked, game/radar.py) opens a window of its own over enemies out of sight now and then.
 
 The field (game/field.py): the arena plus the extra windows connected to it. Shots, blasts, the mouse, what counts
@@ -47,6 +48,7 @@ from game.laser_beam import LaserBeam
 from game.effects.artillery_blast import ArtilleryBlast
 from game.effects.burning_ground import BurningGround
 from game.effects.explosion import Explosion
+from game.effects.slow_field import SlowField
 from game.effects.spark import Spark
 from game.hud import Hud
 from game.inventory import Inventory
@@ -94,7 +96,7 @@ class PlayScene(Scene):
         self.desktop = Desktop.current(settings.ALL_MONITORS)     # every monitor's usable area
         rules = self.difficulty.arena
         self.arena = Arena(self.desktop, skill_tree.start_arena_size(profile, self.difficulty), rules.shrink_speed,
-                           rules.shrink_growth, rules.max_shrink_speed, rules.armor)
+                           rules.shrink_growth, rules.max_shrink_speed, rules.armor, rules.push_falloff)
         self.ship = skill_tree.start_ship(profile, self.arena.rect.center)
         self.arena.ship_size = self.ship.size
         self.shop_unlocked = profile.owns(skill_tree.SHOP)
@@ -109,6 +111,7 @@ class PlayScene(Scene):
         self.spawner = Spawner(self.desktop, self.difficulty, self.roster)
         self.explosions = []                    # effects: explosions, blasts (only drawn, they do nothing)
         self.burning = []                       # burning ground left by rockets – hurts the enemies in it
+        self.slow_fields = []                   # left by mines – slows the enemies in it
         self.pickups = []                       # stars and cores dropped by killed enemies
         self.towers = []                        # watchtowers – in the air or standing
         self.ui_layer = None                    # this frame's HUD etc. for the extra windows: (main window, surface)
@@ -229,6 +232,7 @@ class PlayScene(Scene):
         self.engine.confine_mouse(field.rects)          # the mouse may go anywhere in the field
         self.enemies += self.spawner.update(dt, self.arena.rect, field.sight[1:])
         self.lure_enemies()
+        self.slow_enemies(dt)
         for text in self.spawner.announcements:
             self.notices.append([text, PHASE_COLOR, NOTICE_TIME])
         self.spawner.announcements.clear()
@@ -246,6 +250,7 @@ class PlayScene(Scene):
             enemy.spawned.clear()
         self.separate_enemies()
         self.update_towers(dt)
+        self.expose_enemies()
         self.update_radar(dt)
 
         # effects on shots in flight (slowing areas, deflecting enemies, …) go here – before projectile.update()
@@ -332,25 +337,30 @@ class PlayScene(Scene):
         self.towers.append(Watchtower(kit, start, target))
 
     def update_towers(self, dt):
-        """Watchtowers fly, land (their window opens) and get hurt by touching enemies. Destroyed ones blow up and
-        their window closes."""
+        """Watchtowers fly and land (their window opens, its rect is their area). Once their lifetime is over they
+        vanish and their window closes."""
         for tower in self.towers:
             if tower.update(dt):
                 tower.view = self.engine.open_view()
             if not tower.landed:
                 continue
-            touching = tower.rect.inflate(4, 4)             # enemies are pushed out of it, so they only touch
-            for enemy in self.enemies:
-                if enemy.rect.colliderect(touching):
-                    tower.take_damage(enemy.stat("contact_damage"))
+            tower.area = tower.vision_rect(self.desktop.area_at(tower.rect.center))
             if tower.view is not None:
-                tower.view.rect = tower.vision_rect(self.desktop.area_at(tower.rect.center))
+                tower.view.rect = tower.area
         for tower in self.towers:
             if not tower.alive:
                 self.explosions.append(Explosion(tower.center, tower.rect.width * 2.5, tower.color))
                 if tower.view is not None:
                     self.engine.close_view(tower.view)
         self.towers = [tower for tower in self.towers if tower.alive]
+
+    def expose_enemies(self):
+        """Enemies in a standing watchtower's area take its damage_bonus percent more damage this tick (Enemy.
+        damage_factor) – the biggest bonus counts, towers don't stack."""
+        areas = [(tower.area, tower.values["damage_bonus"]) for tower in self.towers if tower.area is not None]
+        for enemy in self.enemies:
+            bonus = max((bonus for area, bonus in areas if area.colliderect(enemy.rect)), default=0)
+            enemy.damage_factor = 1 + bonus / 100
 
     def lure_enemies(self):
         """Melee enemies near a standing watchtower – within its lure_range and closer to it than to the ship – go for
@@ -452,33 +462,25 @@ class PlayScene(Scene):
         return min(touched, key=lambda enemy: enemy.center.distance_squared_to(projectile.previous), default=None)
 
     def update_enemy_shots(self, dt):
-        """Enemy shots fly through the window's edges (they often come from outside); they end on the ship, on a
-        watchtower or when they leave the desktop."""
+        """Enemy shots fly through the window's edges (they often come from outside) and through watchtowers; they end
+        on the ship or when they leave the desktop."""
         for projectile in self.enemy_projectiles[:]:
             projectile.update(dt)
-            tower = next((tower for tower in self.towers
-                          if tower.landed and tower.rect.colliderect(projectile.rect)), None)
             if projectile.rect.colliderect(self.ship.rect):
                 self.hit_ship(projectile.stats.damage)
-                self.enemy_projectiles.remove(projectile)
-            elif tower is not None:
-                tower.take_damage(projectile.stats.damage)
                 self.enemy_projectiles.remove(projectile)
             elif not self.desktop.bounds.collidepoint(projectile.rect.center):
                 self.enemy_projectiles.remove(projectile)
 
     def update_strikes(self, dt):
-        """Artillery shells land when their circle is full: they hurt the ship and watchtowers in the circle. A
-        splitter shell hurts nothing itself – it bursts into fragments, strikes of their own."""
+        """Artillery shells land when their circle is full: they hurt the ship if it's in the circle. A splitter
+        shell hurts nothing itself – it bursts into fragments, strikes of their own."""
         fragments = []
         for strike in self.strikes:
             if strike.update(dt):
                 if strike.damage:
                     if strike.hits(self.ship.rect):
                         self.hit_ship(strike.damage)
-                    for tower in self.towers:
-                        if strike.hits(tower.rect):
-                            tower.take_damage(strike.damage)
                     self.explosions.append(ArtilleryBlast(strike.center, strike.radius))
                 else:
                     self.explosions.append(Explosion(strike.center, strike.radius, strike.color))
@@ -486,18 +488,13 @@ class PlayScene(Scene):
         self.strikes = [strike for strike in self.strikes if not strike.landed] + fragments
 
     def update_beams(self, dt):
-        """Laser beams hurt the ship and every watchtower they touch – each once per beam – and go out after their
-        time (or when their Laser dies)."""
+        """Laser beams hurt the ship once per beam and go out after their time (or when their Laser dies)."""
         for beam in self.beams:
             beam.update(dt)
             if beam.done:
                 continue
             if self.ship not in beam.hurt and beam.hits(self.ship.rect) and self.hit_ship(beam.damage):
                 beam.hurt.append(self.ship)
-            for tower in self.towers:
-                if tower.landed and tower not in beam.hurt and beam.hits(tower.rect):
-                    tower.take_damage(beam.damage)
-                    beam.hurt.append(tower)
         self.beams = [beam for beam in self.beams if not beam.done]
 
     def hit_ship(self, damage):
@@ -523,6 +520,17 @@ class PlayScene(Scene):
         self.explosions.append(Explosion(position, stats.blast_radius, stats.color))
         if stats.burn_time:
             self.burning.append(BurningGround(position, stats.burn_radius, stats.burn_damage, stats.burn_time))
+        if stats.slow_time:
+            self.slow_fields.append(SlowField(position, stats.slow_radius, stats.slow, stats.slow_time))
+
+    def slow_enemies(self, dt):
+        """Slow fields slow every enemy in them for this tick (before the enemies move), then go out."""
+        for field in self.slow_fields:
+            field.update(dt)
+            for enemy in self.enemies:
+                if field.covers(enemy):
+                    enemy.slow(field.factor)
+        self.slow_fields = [field for field in self.slow_fields if not field.done]
 
     def update_burning(self, dt):
         """Burning ground hurts every enemy in it with each pulse, then goes out."""
@@ -583,7 +591,7 @@ class PlayScene(Scene):
     def draw_world(self, surface, offset):
         """Everything in the world, as seen from a window whose top left corner is at offset (screen pixels)."""
         area = pygame.Rect(offset, surface.get_size())
-        for ground in self.burning:                     # on the ground, under everything else
+        for ground in self.burning + self.slow_fields:      # on the ground, under everything else
             ground.draw(surface, offset)
         for strike in self.strikes:
             strike.draw(surface, offset)
@@ -594,6 +602,8 @@ class PlayScene(Scene):
         for pickup in self.pickups:
             pickup.draw(surface, offset)
         for tower in self.towers:
+            if tower.area is not None:
+                tower.skin.draw_area(surface, tower.area.move(-offset[0], -offset[1]))
             tower.draw(surface, offset)
         for enemy in self.enemies:
             if enemy.rect.colliderect(area):
