@@ -1,11 +1,12 @@
 """
 The game menu between runs (Play in the main menu leads here). Left: the ship as it will start the next run. Right:
-the difficulty, and two tabs where cores are spent (only here): the skill tree and the card shop with the card
-collection (card_panel.py). Start begins a run, Back returns to the main menu.
+the difficulty and three tabs: the loadout (which weapon in which slot, loadout_panel.py), and where cores are spent
+(only here): the skill tree (skill_tree_panel.py) and the card shop with the card collection (card_panel.py). Start
+begins a run, Back returns to the main menu.
 
 Mouse: click a difficulty, a tab, an upgrade (buys its next level), a card or a button – right click a card in the
-collection for a small menu (sell).
-Keyboard: A/D or arrow keys change the difficulty (only between unlocked ones), Tab switches the tab, Enter starts,
+collection for a small menu (sell). In the loadout, drag weapons onto the slots.
+Keyboard: A/D or arrow keys change the difficulty (only between unlocked ones), Tab goes to the next tab, Enter starts,
 Esc goes back. A locked difficulty shows what unlocks it.
 
 Every time it opens, the difficulty files are read again (so changes to them show up right away); if something in
@@ -23,7 +24,9 @@ from game import difficulty as difficulty_files
 from game import settings, skill_tree
 from game.card_panel import CardPanel
 from game.card_shop import CardShop
+from game.skill_tree_panel import SkillTreePanel
 from game.difficulty import DIFFICULTIES, WARNINGS
+from game.loadout_panel import LoadoutPanel
 from game.game_over_scene import format_time
 from game.icons import CORE_COLOR, draw_core
 from game.profile import Profile
@@ -36,16 +39,13 @@ PREVIEW_HEIGHT = 170
 DIFFICULTY_TOP = 94
 DIFFICULTY_HEIGHT = 40
 DIFFICULTY_GAP = 12
-TABS = (("tree", "Skill tree"), ("cards", "Cards"))
+TABS = (("loadout", "Loadout"), ("tree", "Skill tree"), ("cards", "Cards"))
 TAB_TOP = 168
 TAB_SIZE = (150, 32)
 TAB_GAP = 10
-TREE_TOP = 214                      # the tabs' content starts here
-NODE_SIZE = (180, 64)
-NODE_GAP = (38, 30)                 # between columns, between rows
-TREE_ROWS = max(node.row for node in skill_tree.NODES) + 1
-# description of what's under the mouse: below the tree (settings.GAME_MENU_WINDOW_SIZE leaves room for it)
-INFO_TOP = TREE_TOP + TREE_ROWS * (NODE_SIZE[1] + NODE_GAP[1]) - NODE_GAP[1] + 38
+TREE_TOP = 214                      # the tabs' content starts here …
+TREE_BOTTOM = 770                   # … and ends here (the skill tree is centred in between)
+INFO_TOP = TREE_BOTTOM              # messages, hints and warnings: below the tabs' content
 WARNING_LINES = 2                   # problems in the difficulty files shown at most (and how many more there are) …
 WARNING_LENGTH = 80                 # … each cut to this many characters, so it fits
 BACK_SIZE = (140, 44)
@@ -54,7 +54,6 @@ MESSAGE_TIME = 1500                 # milliseconds a message ("Not enough cores"
 
 FILL = (24, 24, 30)
 HOVER_FILL = (34, 34, 42)
-OWNED_FILL = (16, 40, 48)
 LOCKED = (70, 70, 80)
 TOO_EXPENSIVE = (200, 70, 70)
 SUCCESS = CORE_COLOR
@@ -77,8 +76,11 @@ class GameMenuScene(Scene):
         self.tab = "tree"
         self.card_panel = CardPanel(CardShop(self.profile), RIGHT_LEFT, TREE_TOP,
                                     self.rect.width - MARGIN - RIGHT_LEFT, self.show_message)
+        area = (RIGHT_LEFT, TREE_TOP, self.rect.width - MARGIN - RIGHT_LEFT, TREE_BOTTOM - TREE_TOP)
+        self.tree_panel = SkillTreePanel(self.profile, area)
+        self.loadout_panel = LoadoutPanel(self.profile, area, self.show_message)
         # what the mouse is on: ("difficulty", key), ("tab", key), ("node", key), ("cards", what – see CardPanel),
-        # "start", "back" or None
+        # ("loadout", what – see LoadoutPanel), "start", "back" or None
         self.hovered = None
         self.menu = None                        # the open context menu (right click on a card)
         self.message = ""
@@ -103,12 +105,6 @@ class GameMenuScene(Scene):
         return {key: pygame.Rect(RIGHT_LEFT + index * (width + TAB_GAP), TAB_TOP, width, height)
                 for index, (key, _) in enumerate(TABS)}
 
-    @staticmethod
-    def node_rect(node):
-        width, height = NODE_SIZE
-        left = RIGHT_LEFT + node.column * (width + NODE_GAP[0])
-        return pygame.Rect(left, TREE_TOP + node.row * (height + NODE_GAP[1]), width, height)
-
     def back_rect(self):
         return pygame.Rect((MARGIN, self.rect.height - MARGIN - BACK_SIZE[1]), BACK_SIZE)
 
@@ -125,9 +121,13 @@ class GameMenuScene(Scene):
             if rect.collidepoint(position):
                 return ("tab", key)
         if self.tab == "tree":
-            for node in skill_tree.NODES:
-                if self.node_rect(node).collidepoint(position):
-                    return ("node", node.key)
+            key = self.tree_panel.thing_at(position)
+            if key is not None:
+                return ("node", key)
+        elif self.tab == "loadout":
+            thing = self.loadout_panel.thing_at(position)
+            if thing is not None:
+                return ("loadout", thing)
         else:
             thing = self.card_panel.thing_at(position)
             if thing is not None:
@@ -172,7 +172,8 @@ class GameMenuScene(Scene):
         if profile.maxed(node):
             self.show_message("Already at its maximum", settings.TEXT_MUTED)
         elif not profile.unlocked(node):
-            self.show_message(f"Unlock {skill_tree.NODES_BY_KEY[node.requires].name} first", TOO_EXPENSIVE)
+            missing = [skill_tree.NODES_BY_KEY[key].name for key in node.requires if not profile.owns(key)]
+            self.show_message(f"Unlock {' and '.join(missing)} first", TOO_EXPENSIVE)
         elif not profile.buy(node):
             self.show_message("Not enough cores", TOO_EXPENSIVE)
         elif node.max_level > 1:
@@ -202,6 +203,8 @@ class GameMenuScene(Scene):
                     self.hovered = self.thing_at(event.pos)     # the card under the mouse may be gone (sold)
             if used:
                 return
+        if self.tab == "loadout" and self.loadout_panel.handle_event(event):
+            return
         if event.type == pygame.MOUSEMOTION:
             self.hovered = self.thing_at(event.pos)
         elif event.type == pygame.MOUSEBUTTONUP and event.button in (1, 3):     # 3: right click (a card's menu)
@@ -230,7 +233,8 @@ class GameMenuScene(Scene):
             elif event.key in START_KEYS:
                 self.start()
             elif event.key == pygame.K_TAB:
-                self.tab = "cards" if self.tab == "tree" else "tree"
+                keys = [key for key, _ in TABS]
+                self.tab = keys[(keys.index(self.tab) + 1) % len(keys)]
                 self.hovered = self.menu = None
             elif event.key in DIFFICULTY_LEFT_KEYS:
                 self.step_difficulty(-1)
@@ -250,7 +254,9 @@ class GameMenuScene(Scene):
         self.draw_difficulty(surface)
         self.draw_tabs(surface)
         if self.tab == "tree":
-            self.draw_tree(surface)
+            self.tree_panel.draw(surface, self.hovered[1] if self.hovered and self.hovered[0] == "node" else None)
+        elif self.tab == "loadout":
+            self.loadout_panel.draw(surface, self.hovered[1] if self.hovered and self.hovered[0] == "loadout" else None)
         else:
             self.card_panel.draw(surface, self.hovered[1] if self.hovered and self.hovered[0] == "cards" else None)
         self.draw_info(surface)
@@ -273,15 +279,15 @@ class GameMenuScene(Scene):
         aim = pygame.Vector2(pygame.mouse.get_pos()) - preview.center
         draw_ship(surface, preview.center, aim.normalize() if aim.length_squared() > 1 else (0, -1), 80, ship.color)
 
-        gun = ship.weapons[0]
         dash, rocket = ship.abilities
         radar = skill_tree.start_radar(profile)
         difficulty = DIFFICULTIES[profile.difficulty]
         width, height = skill_tree.start_arena_size(profile, difficulty)
         best = profile.best_times.get(profile.difficulty)
         rows = [
-            ("Weapon", gun.name),
-            ("Attack speed", f"{gun.fire_rate:g}/s"),
+            ("LMB", ship.weapons[0].name if ship.weapons[0] else "empty"),
+            ("RMB", ship.weapons[1].name if ship.weapons[1] else "empty"),
+            ("Energy", f"{ship.max_energy:g}  ·  +{ship.energy_regen:g}/s"),
             (settings.ABILITY_KEY_NAMES[0], dash.name if dash else None),
             (settings.ABILITY_KEY_NAMES[1], rocket.name if rocket else None),
             (settings.BUILD_KEY_NAME, f"Watchtower ×{ship.watchtower.max_count}" if ship.watchtower else None),
@@ -331,58 +337,25 @@ class GameMenuScene(Scene):
             self.draw_button(surface, self.tab_rects()[key], label, 24, key == self.tab,
                              hovered=self.hovered == ("tab", key))
 
-    def draw_tree(self, surface):
-        for node in skill_tree.NODES:               # lines first, so the boxes cover their ends
-            if node.requires:
-                parent = skill_tree.NODES_BY_KEY[node.requires]
-                color = settings.TEXT_MUTED if self.profile.owns(parent.key) else LINE
-                pygame.draw.line(surface, color, self.node_rect(parent).midbottom, self.node_rect(node).midtop, 2)
-        for node in skill_tree.NODES:
-            self.draw_node(surface, node, self.node_rect(node))
-
-    def draw_node(self, surface, node, rect):
-        profile = self.profile
-        hovered = self.hovered == ("node", node.key)
-        level, cost = profile.level(node.key), profile.next_cost(node)
-        if profile.maxed(node):
-            fill, border, text = OWNED_FILL, CORE_COLOR, settings.TEXT
-        elif not profile.unlocked(node):
-            fill, border, text = FILL, LOCKED, LOCKED
-        else:
-            fill, border, text = FILL, settings.TEXT if profile.can_buy(node) else settings.TEXT_MUTED, settings.TEXT
-        pygame.draw.rect(surface, HOVER_FILL if hovered and fill == FILL else fill, rect, border_radius=8)
-        pygame.draw.rect(surface, border, rect, width=3 if hovered else 1, border_radius=8)
-        draw_text(surface, node.name, 26, text, topleft=(rect.left + 12, rect.top + 10))
-        if node.max_level > 1:
-            draw_text(surface, f"{level}/{node.max_level}", 22, text, topright=(rect.right - 12, rect.top + 12))
-
-        bottom = (rect.left + 12, rect.bottom - 10)
-        if cost is None:
-            draw_text(surface, "OWNED" if node.max_level == 1 else "MAX", 20, CORE_COLOR, bottomleft=bottom)
-        elif not profile.unlocked(node):
-            draw_text(surface, f"needs {skill_tree.NODES_BY_KEY[node.requires].name}", 20, LOCKED, bottomleft=bottom)
-        else:
-            draw_core(surface, (bottom[0] + 7, bottom[1] - 8), 8)
-            color = settings.TEXT if profile.cores >= cost else TOO_EXPENSIVE
-            draw_text(surface, str(cost), 24, color, bottomleft=(bottom[0] + 20, bottom[1] + 1))
-
     def draw_info(self, surface):
         """The description of the upgrade under the mouse, or the last message."""
         center = (RIGHT_LEFT + self.rect.width - MARGIN) // 2
         if pygame.time.get_ticks() < self.message_until:
             draw_text(surface, self.message, 24, self.message_color, midtop=(center, INFO_TOP + 12))
-        elif self.hovered and self.hovered[0] == "node":
-            node = skill_tree.NODES_BY_KEY[self.hovered[1]]
-            draw_text(surface, node.description, 22, settings.TEXT, midtop=(center, INFO_TOP + 12))
         elif self.hovered and self.hovered[0] == "cards" and self.card_panel.info(self.hovered[1]):
             draw_text(surface, self.card_panel.info(self.hovered[1]), 22, settings.TEXT, midtop=(center, INFO_TOP + 12))
+        elif self.tab == "loadout":
+            draw_text(surface, "drag a weapon onto a slot  ·  drag it off its slot to empty it  ·  both weapons share "
+                               "the energy", 20, settings.TEXT, alpha=settings.HINT_ALPHA * 2,
+                      midtop=(center, INFO_TOP + 12))
         elif self.tab == "cards":
             rules = cards.RULES
             draw_text(surface, f"buy cards with cores  ·  up to {rules.max_active} active cards apply at the start of "
                                f"every run", 20, settings.TEXT, alpha=settings.HINT_ALPHA * 2,
                       midtop=(center, INFO_TOP + 12))
         else:
-            draw_text(surface, "click an upgrade to buy it  ·  cores drop rarely from killed enemies", 20,
+            draw_text(surface, "click an upgrade to buy it  ·  point at one for details  ·  cores drop rarely from "
+                               "killed enemies", 20,
                       settings.TEXT, alpha=settings.HINT_ALPHA * 2, midtop=(center, INFO_TOP + 12))
 
     def draw_warnings(self, surface):

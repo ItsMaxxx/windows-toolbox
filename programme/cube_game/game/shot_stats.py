@@ -18,3 +18,8 @@ class ShotStats:
     color: tuple                # (r, g, b)
     acceleration: float = 0     # pixels per second², the shot gets faster the longer it flies
     blast_radius: float = 0     # > 0: explodes at its end – damage and wall push for everything within this radius
+    pierce: int = 0             # flies on through this many enemies (hurting each), stops at the next one
+    pierce_push: float = 1      # wall push × this for every enemy it went through
+    burn_time: float = 0        # > 0 (with a blast): leaves burning ground behind for this many seconds …
+    burn_damage: float = 0      # … that does this much damage per second to enemies in it …
+    burn_radius: float = 0      # … within this radius

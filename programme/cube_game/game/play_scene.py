@@ -44,6 +44,7 @@ from game.enemies.roster import EnemyRoster
 from game.enemies.spawner import Spawner
 from game.artillery_strike import ArtilleryStrike
 from game.effects.artillery_blast import ArtilleryBlast
+from game.effects.burning_ground import BurningGround
 from game.effects.explosion import Explosion
 from game.effects.spark import Spark
 from game.hud import Hud
@@ -104,6 +105,7 @@ class PlayScene(Scene):
         self.roster = EnemyRoster(self.difficulty)          # the enemies' values on this difficulty, buffs on all
         self.spawner = Spawner(self.desktop, self.difficulty, self.roster)
         self.explosions = []                    # effects: explosions, blasts (only drawn, they do nothing)
+        self.burning = []                       # burning ground left by rockets – hurts the enemies in it
         self.pickups = []                       # stars and cores dropped by killed enemies
         self.towers = []                        # watchtowers – in the air or standing
         self.ui_layer = None                    # this frame's HUD etc. for the extra windows: (main window, surface)
@@ -239,6 +241,7 @@ class PlayScene(Scene):
         self.update_player_shots(dt)
         self.update_enemy_shots(dt)
         self.update_strikes(dt)
+        self.update_burning(dt)
         for enemy in self.enemies:
             if enemy.rect.colliderect(self.ship.rect) and enemy.stat("contact_damage"):
                 if self.hit_ship(enemy.stat("contact_damage")):
@@ -391,13 +394,23 @@ class PlayScene(Scene):
     def update_player_shots(self, dt):
         """Player shots end on an enemy (damage), on a shield (blocked: a spark, nothing else), at the field's wall
         (push the arena edge – see Field.wall_hit) or at their target. Shots with a blast radius explode at their end
-        instead – also on a shield: blasts hurt from every side. A shot always either hits, is blocked or pushes."""
+        instead – also on a shield: blasts hurt from every side. A shot always either hits, is blocked or pushes.
+
+        Piercing shots (the cannon) fly on through as many enemies as they may pierce, hurting each fully; if one
+        reaches the wall after that, it pushes less (Projectile.wall_push). Hits count along the whole way a shot flew
+        this tick, so fast shots (the laser) can't jump past small enemies."""
         field = self.field()
         shielded = [enemy for enemy in self.enemies if enemy.shielded and enemy.alive]
+        alive = [enemy for enemy in self.enemies if enemy.alive]
+        rects = [enemy.rect for enemy in alive]
         for projectile in self.projectiles[:]:          # [:] – a copy, because hits remove from the list
             projectile.update(dt)
-            shield = next((e for e in shielded if e.blocks(projectile)), None)
-            enemy = shield or next((e for e in self.enemies if e.alive and e.rect.colliderect(projectile.rect)), None)
+            shield = next((e for e in shielded if e not in projectile.pierced and e.blocks(projectile)), None)
+            enemy = shield or self.first_hit(projectile, alive, rects)
+            while enemy and not shield and not projectile.stats.blast_radius and projectile.can_pierce:
+                enemy.take_damage(projectile.stats.damage)
+                projectile.pierced.append(enemy)        # through it – flies on, maybe into the next one right away
+                enemy = self.first_hit(projectile, alive, rects)
             side = field.wall_hit(projectile)
             if not (enemy or side or projectile.arrived):
                 continue
@@ -409,7 +422,16 @@ class PlayScene(Scene):
             elif enemy:
                 enemy.take_damage(projectile.stats.damage)
             elif side:
-                self.arena.push(side, projectile.stats.wall_push)
+                self.arena.push(side, projectile.wall_push)
+
+    @staticmethod
+    def first_hit(projectile, enemies, rects):
+        """The first enemy (still alive, not pierced yet) the shot touched on this tick's way – or None. rects: the
+        enemies' rects, for a quick check of which ones are near the way at all."""
+        near = [enemies[index] for index in projectile.sweep().collidelistall(rects)]
+        touched = [enemy for enemy in near if enemy.alive and enemy not in projectile.pierced
+                   and projectile.touches(enemy.rect)]
+        return min(touched, key=lambda enemy: enemy.center.distance_squared_to(projectile.previous), default=None)
 
     def update_enemy_shots(self, dt):
         """Enemy shots fly through the window's edges (they often come from outside); they end on the ship, on a
@@ -460,6 +482,18 @@ class PlayScene(Scene):
         for side in field.walls_within(position, stats.blast_radius, projectile.beyond):
             self.arena.push(side, stats.wall_push)
         self.explosions.append(Explosion(position, stats.blast_radius, stats.color))
+        if stats.burn_time:
+            self.burning.append(BurningGround(position, stats.burn_radius, stats.burn_damage, stats.burn_time))
+
+    def update_burning(self, dt):
+        """Burning ground hurts every enemy in it with each pulse, then goes out."""
+        for ground in self.burning:
+            ground.update(dt)
+            for _ in range(ground.pulses):
+                for enemy in self.enemies:
+                    if enemy.alive and enemy.distance_to(ground.position) <= ground.radius + enemy.size / 2:
+                        enemy.take_damage(ground.damage)
+        self.burning = [ground for ground in self.burning if not ground.done]
 
     def draw(self, surface):
         self.ui_layer = None
@@ -509,7 +543,9 @@ class PlayScene(Scene):
     def draw_world(self, surface, offset):
         """Everything in the world, as seen from a window whose top left corner is at offset (screen pixels)."""
         area = pygame.Rect(offset, surface.get_size())
-        for strike in self.strikes:                     # on the ground, under everything else
+        for ground in self.burning:                     # on the ground, under everything else
+            ground.draw(surface, offset)
+        for strike in self.strikes:
             strike.draw(surface, offset)
         for explosion in self.explosions:
             explosion.draw(surface, offset)

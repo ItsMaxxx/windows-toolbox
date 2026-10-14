@@ -1,7 +1,7 @@
 """
-What stays between runs and after closing the game: cores, bought skill tree nodes, the card collection and the card
-shop's offers, the chosen difficulty and the best time on each difficulty (which also decides which difficulties are
-unlocked).
+What stays between runs and after closing the game: cores, bought skill tree nodes, the loadout (which weapon is in
+which slot), the card collection and the card shop's offers, the chosen difficulty and the best time on each
+difficulty (which also decides which difficulties are unlocked).
 
 Saved as daten\\cube_game.json in the toolbox's main folder, like every toolbox program (see toolbox\\daten.py). A
 missing or broken file simply means a fresh start; values that don't make sense are ignored.
@@ -17,6 +17,7 @@ from pathlib import Path
 from game import cards
 from game.difficulty import DIFFICULTIES, default_key
 from game.skill_tree import NODES_BY_KEY
+from game.weapons import STARTER, WEAPON_TYPES
 
 FILE = Path(__file__).resolve().parents[3] / "daten" / "cube_game.json"
 SETTINGS = {"key_display": True}     # the toolbox page's settings and their defaults (see cube_game_gui.py)
@@ -27,6 +28,7 @@ class Profile:
         self.file = Path(file)
         self.cores = 0
         self.levels = {}                # node key -> level bought
+        self.loadout = [STARTER, None]  # weapon key in each weapon slot (left / right mouse button), None: empty
         self.difficulty = default_key()
         self.best_times = {}            # difficulty key -> seconds survived
         self.cards = []                 # the card collection: [{"key": "damage", "active": True}, …]
@@ -47,6 +49,10 @@ class Profile:
         for key, level in dict(data.get("levels") or {}).items():
             if key in NODES_BY_KEY and isinstance(level, int) and level > 0:
                 profile.levels[key] = min(level, NODES_BY_KEY[key].max_level)
+        loadout = data.get("loadout")
+        if (isinstance(loadout, list) and len(loadout) == 2 and any(loadout)
+                and all(key is None or key in WEAPON_TYPES for key in loadout) and loadout[0] != loadout[1]):
+            profile.loadout = list(loadout)
         if data.get("difficulty") in DIFFICULTIES:      # a difficulty whose file is gone: back to the first
             profile.difficulty = data["difficulty"]
         for key, seconds in dict(data.get("best_times") or {}).items():
@@ -80,8 +86,9 @@ class Profile:
             data = {}
         if not isinstance(data, dict):
             data = {}
-        data.update({"cores": self.cores, "levels": self.levels, "difficulty": self.difficulty,
-                     "best_times": self.best_times, "cards": self.cards, "card_offers": self.card_offers})
+        data.update({"cores": self.cores, "levels": self.levels, "loadout": self.loadout,
+                     "difficulty": self.difficulty, "best_times": self.best_times, "cards": self.cards,
+                     "card_offers": self.card_offers})
         try:
             self.file.parent.mkdir(parents=True, exist_ok=True)
             self.file.write_text(json.dumps(data, indent=2), encoding="utf-8")
@@ -98,8 +105,8 @@ class Profile:
         return self.level(key) > 0
 
     def unlocked(self, node):
-        """True if the node it requires has been bought (so this one can be bought)."""
-        return node.requires is None or self.owns(node.requires)
+        """True if every node it requires has been bought (so this one can be bought)."""
+        return all(self.owns(key) for key in node.requires)
 
     def maxed(self, node):
         return self.level(node.key) >= node.max_level

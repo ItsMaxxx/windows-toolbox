@@ -3,7 +3,7 @@ The shop screen (T): every stat as a row – what it is now, what it becomes, an
 upgrade it; each upgrade of a stat costs more than the last. Like the inventory, the game is paused and the window
 shows only this panel (SIZE is the window size then).
 
-Two columns: Ship, Weapons and Watchtower on the left, Dash and Rocket on the right. A part the ship doesn't have yet
+Two columns: Ship and Weapons on the left, Dash, Rocket and Watchtower on the right. A part the ship doesn't have yet
 (no dash unlocked) is shown as locked.
 """
 
@@ -13,8 +13,8 @@ from engine.ui import draw_panel, draw_text, font
 from game import settings
 from game.icons import STAR_COLOR, draw_arrow, draw_star
 
-SIZE = (720, 560)
-COLUMNS = (("Ship", "Weapons", "Watchtower"), ("Dash", "Rocket"))
+SIZE = (720, 600)
+COLUMNS = (("Ship", "Weapons"), ("Dash", "Rocket", "Watchtower"))
 MARGIN = 24
 COLUMN_GAP = 16
 TOP = 70

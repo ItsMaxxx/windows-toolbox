@@ -25,10 +25,10 @@
     { "from": 150, "enemy_stats": { "all": { "max_hp": "+1" } } },
     { "from": 180, "enemy_stats": { "all": { "contact_damage": "x1.25", "shot_damage": "x1.25", "blast_damage": "x1.25" } }, "announce": "Enemies hit harder!" },
     { "from": 200, "to": 240, "weights": { "sniper": "x3" }, "announce": "Snipers incoming!" },
-    { "from": 240, "arena": { "armor": "+3" }, "announce": "The walls harden!" },
+    { "from": 240, "arena": { "armor": "+20" }, "announce": "The walls harden!" },
     { "from": 300, "enemy_stats": { "all": { "max_hp": "+1" } } },
     { "from": 360, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
-    { "from": 420, "arena": { "armor": "+2" }, "announce": "The walls harden!" }
+    { "from": 420, "arena": { "armor": "+15" }, "announce": "The walls harden!" }
   ],
   "enemy_stats": {
     "all": { "max_hp": "+1" }

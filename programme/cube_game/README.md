@@ -340,3 +340,28 @@ Notizen / offene Fragen:
 - Trifft der Ansturm des Schild-Gegners das Schiff (und der Treffer zählt), wird es `knockback` Pixel zurückgestoßen
   (schnell, dann abklingend) und `stun_time` Sekunden betäubt: keine Bewegung, keine Schüsse, keine Fähigkeiten, keine
   Türme – nur Zielen. Punkte kreisen über dem Schiff. Allgemein: `Ship.knock()`, Gegner-Hook `Enemy.on_hit_ship()`.
+
+**14.10.2026 (Claude, auf Wunsch gebaut): Skilltree als Graph, Energie, vier Waffen, Loadout.**
+- Skilltree (`game/skill_tree.py`, gezeichnet von `game/skill_tree_panel.py`): Shop in der Mitte, Äste sternförmig
+  (Ship, Energy, Gun → Machine gun / Cannon, Laser, Dash, Rocket, Scouting). Kleine Kreise, Details im Tooltip.
+  Knoten können mehrere Voraussetzungen haben (`requires` ist ein Tupel). Spielmenü jetzt 1300 × 900.
+- **Energie**: beide Waffen teilen sie (`Ship.fire`); leer = feuern nur so schnell, wie sie nachlädt.
+  Anzeige unten links. Upgrades: Skilltree *Max energy* / *Energy regen*, Shop-Karten gleichen Namens.
+- **Waffen** in `game/weapons/` (Werte: `data/weapons.json`): Gun (Start, nur 3 Upgrades), Machine gun (Streuung;
+  Damage/Attack speed erhöhen sie, Precision senkt sie), Cannon (Piercing, danach weniger Wall Push), Laser (hinter
+  beiden Energie-Knoten; viele winzige Schüsse, als Strahl gezeichnet). `upgrade_factor`: wie stark Karten pro Waffe wirken.
+  Schüsse treffen entlang ihres ganzen Wegs im Tick (`Projectile.touches`), schnelle fliegen nicht durch kleine Gegner.
+- **Rakete** startet schwächer (7 s, 3 Schaden, Radius 110), 4 Upgrades im Skilltree; *Burning ground* (15 Cores)
+  hinterlässt brennenden Boden (`game/effects/burning_ground.py`).
+- **Loadout**-Reiter im Spielmenü (`game/loadout_panel.py`): Waffen per Drag & Drop in LMB/RMB, gespeichert als
+  `loadout` im Profil. Mindestens eine Waffe bleibt drin.
+- **Panzerung jetzt in Prozent** (`armor` 20 = jeder Push 20 % kürzer, höchstens `MAX_ARMOR` 90 %), statt Pixel
+  abzuziehen – sonst traf sie den Laser mit seinen vielen kleinen Pushes viel härter. Werte umgerechnet
+  (früher +3 px ≈ jetzt +20 %, +2 px ≈ +15 %, Hard-Start 1 px ≈ 5 %).
+- Offen / Ideen: Schadens-Abfall nach dem Durchbohren (bisher nur der Wall Push).
+- Ideen für **Tauschkarten** (Vorteil + Nachteil, noch nicht gebaut – bräuchten Prozent-Werte statt fester Beträge):
+  Glass Cannon (+50 % Schaden / −30 % Wall push), Bulldozer (+60 % Wall push / −40 % Schaden), Overcharge
+  (+40 % Attack speed / +50 % Energy use), Battery (+50 Max energy / −30 % Regen), Capacitor (+50 % Regen / −40 Max
+  energy), Sniper (+100 % Projectile speed / −25 % Attack speed), Short fuse (−40 % Raketen-Cooldown / −30 % Blast
+  radius), Afterburner (+50 % Dash-Distanz / +50 % Dash-Cooldown), **Greed** (höhere Core-Chance / Arena schrumpft
+  15 % schneller), Heavy hull (Treffer quetschen 25 % weniger / −15 % Move speed).

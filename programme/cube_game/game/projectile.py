@@ -4,6 +4,9 @@ Shots with a blast radius explode at their end (see PlayScene.explode).
 
 Everything comes from the weapon or ability that fired it – nothing from settings.
 
+Fast shots can jump past a small enemy within one tick, so hits are checked along the whole way it flew this tick
+(previous -> now, touches()). Piercing shots remember who they went through (pierced) – they don't hit them again.
+
 Two kinds of values:
   - stats (ShotStats): the snapshot at the moment of firing – never changes.
   - direction, base_speed, speed_factor, target: the shot's own state in flight – effects change these.
@@ -34,6 +37,8 @@ class Projectile(Entity):
         self.target = pygame.Vector2(target) if target is not None else None
         self.arrived = False                # True once it has reached its target
         self.beyond = None                  # flying through a watchtower's window: the arena edge it crossed
+        self.previous = pygame.Vector2(self.rect.center)        # where it was before this tick's move
+        self.pierced = []                   # enemies it went through (piercing shots)
 
     @property
     def speed(self):
@@ -49,7 +54,25 @@ class Projectile(Entity):
         """Slows the shot for this tick, e.g. factor 0.5 = half speed."""
         self.speed_factor *= factor
 
+    @property
+    def can_pierce(self):
+        return len(self.pierced) < self.stats.pierce
+
+    @property
+    def wall_push(self):
+        """Its push when it reaches the wall – weaker for every enemy it went through."""
+        return self.stats.wall_push * self.stats.pierce_push ** len(self.pierced)
+
+    def sweep(self):
+        """The rectangle around this tick's whole way (previous -> now) – for a quick first check."""
+        return self.rect.union(self.rect.move(self.previous - pygame.Vector2(self.rect.center)))
+
+    def touches(self, rect):
+        """True if it touched rect anywhere on this tick's way."""
+        return bool(rect.inflate(self.rect.width, self.rect.height).clipline(self.previous, self.rect.center))
+
     def update(self, dt):
+        self.previous = pygame.Vector2(self.rect.center)
         step = self.speed * dt
         if self.target is not None and self.target.distance_to(self.rect.center) <= step:
             self.rect.center = self.target          # don't fly past the target

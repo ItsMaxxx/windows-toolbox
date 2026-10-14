@@ -17,6 +17,9 @@ A card type is a subclass that only sets class attributes:
     minimum   – the stat never goes below this (for cooldowns)
 and targets(ship): which objects have that stat (the ship, all weapons, the dash, …).
 
+A target can scale the card: a weapon's upgrade_factors (from data/weapons.json) say how strongly each card works on
+it, by card key – e.g. the laser gets only 0.02 × the damage, because it fires 30 tiny bolts a second.
+
 The numbers here are only the fallback – the real values are in data/upgrades.json.
 """
 
@@ -60,19 +63,25 @@ class Card:
     def values(self, ship, amount=None):
         """(now, after buying) as text, e.g. ("6/s", "7/s") – read from the first target. amount: what's added (None:
         a shop upgrade's amount)."""
-        now = getattr(self.targets(ship)[0], self.stat)
-        return f"{now:g}{self.unit}", f"{self.changed(now, amount):g}{self.unit}"
+        target = self.targets(ship)[0]
+        now = getattr(target, self.stat)
+        after = self.changed(now, amount, self.factor(target))
+        return f"{now:.4g}{self.unit}", f"{after:.4g}{self.unit}"
 
-    def changed(self, value, amount=None):
-        """value with amount added (None: a shop upgrade's amount), never below the minimum."""
+    def factor(self, target):
+        """How strongly this card works on target (1 unless a weapon says otherwise)."""
+        return getattr(target, "upgrade_factors", {}).get(self.key, 1)
+
+    def changed(self, value, amount=None, factor=1):
+        """value with amount × factor added (amount None: a shop upgrade's amount), never below the minimum."""
         amount = self.amount if amount is None else amount
-        value = round(value + amount, 6)                        # 1.2 - 0.15 would be 1.0499999…
+        value = round(value + amount * factor, 6)               # 1.2 - 0.15 would be 1.0499999…
         return max(self.minimum, value) if self.minimum is not None else value
 
     def apply(self, ship, amount=None):
         """Adds amount to the stat on every target (None: a shop upgrade's amount)."""
         for target in self.targets(ship):
-            setattr(target, self.stat, self.changed(getattr(target, self.stat), amount))
+            setattr(target, self.stat, self.changed(getattr(target, self.stat), amount, self.factor(target)))
 
     def apply_card(self, ship):
         """The card from the game menu: adds card_amount."""

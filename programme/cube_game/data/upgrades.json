@@ -1,6 +1,8 @@
 {
   "upgrades": {
     "move_speed":       { "amount": 20, "card_amount": 60, "price": 10, "price_step": 5 },
+    "max_energy":       { "amount": 10, "card_amount": 30, "price": 10, "price_step": 5 },
+    "energy_regen":     { "amount": 2, "card_amount": 6, "price": 10, "price_step": 5 },
     "damage":           { "amount": 0.5, "card_amount": 2, "price": 10, "price_step": 5 },
     "attack_speed":     { "amount": 0.5, "card_amount": 1.5, "price": 10, "price_step": 5 },
     "wall_push":        { "amount": 3, "card_amount": 10, "price": 10, "price_step": 5 },

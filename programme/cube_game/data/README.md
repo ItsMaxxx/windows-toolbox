@@ -8,6 +8,7 @@ Werte) zeigt das Spielmenü rot an; das Spiel nimmt dann den Standardwert, statt
 |---|---|
 | `enemies.json` | Standardwerte jedes Gegnertyps (diese Seite) |
 | `upgrades.json` | Shop im Run (Sterne) und Karten-Shop im Spielmenü (Cores) – siehe unten |
+| `weapons.json` | Waffen, Energie und Rakete: Grundwerte und was jede Skilltree-Stufe bringt – siehe unten |
 | `buildings.json` | Gebäude, die man im Run setzt – bisher der Wachturm (siehe unten) |
 | `radar.json` | der Radar aus dem Skilltree (siehe unten) |
 | `difficulties/*.json` | eine Datei pro Schwierigkeit – Arena, Cores, Spawns und eigene Gegnerwerte (`difficulties/README.md`) |
@@ -121,7 +122,7 @@ stärkerer Charger.
 
 ## `upgrades.json`
 
-**`upgrades`** – ein Eintrag pro Wert, den man verbessern kann (`move_speed`, `damage`, `attack_speed`, `wall_push`,
+**`upgrades`** – ein Eintrag pro Wert, den man verbessern kann (`move_speed`, `max_energy`, `energy_regen`, `damage`, `attack_speed`, `wall_push`,
 `shot_speed` (Projectile speed), `dash_distance`, `dash_cooldown`, `rocket_damage`, `blast_radius`, `rocket_wall_push`,
 `rocket_cooldown`, `vision`). Gilt für beides: eine Stufe im Shop während des Runs und eine Karte im Karten-Shop.
 
@@ -143,6 +144,51 @@ stärkerer Charger.
 | `sell_refund` | Cores zurück beim Verkaufen (Rechtsklick auf eine Karte der Sammlung → *Sell*) |
 | `max_owned` | so viele Karten passen in die Sammlung |
 | `max_active` | so viele davon können aktiv sein – aktive Karten wirken zu Beginn jedes Runs aufs Schiff |
+
+## `weapons.json`
+
+Ein Abschnitt pro Waffe (`gun`, `machine_gun`, `cannon`, `laser`), dazu `energy` und `rocket`. Welche Waffe in welchem
+Slot liegt, wählt man im Spielmenü (Reiter *Loadout*); freigeschaltet werden sie im Skilltree (die Gun ist immer da).
+
+**`energy`** – beide Waffen teilen sich die Energie des Schiffs. Jeder Schuss kostet Energie, sie lädt ständig nach.
+Ist sie leer, schießen die Waffen nur noch so schnell, wie sie nachlädt (keine Sperre).
+
+| Wert | Bedeutung |
+|---|---|
+| `max` | so viel Energie hat das Schiff (voll zu Beginn) |
+| `regen` | so viel kommt pro Sekunde zurück |
+| `tree` | was eine Stufe der Skilltree-Knoten *Max energy* (`max`) und *Energy regen* (`regen`) dazugibt |
+
+**Jede Waffe**
+
+| Wert | Bedeutung |
+|---|---|
+| `damage` | Schaden pro Schuss |
+| `attack_speed` | Schüsse pro Sekunde |
+| `projectile_speed` / `projectile_size` | Tempo (px/s) und Durchmesser (px) der Schüsse |
+| `wall_push` | so viele Pixel schiebt ein Schuss die Wand, die er trifft |
+| `energy_use` | Energie pro Schuss |
+| `tree` | was eine Stufe ihrer Skilltree-Upgrades dazugibt (negativ = weniger, z. B. `energy_use`) |
+| `upgrade_factor` | wie stark Shop-Stufen und Karten bei dieser Waffe wirken, pro Karte (`damage`, `attack_speed`, `wall_push`, `projectile_speed`; fehlt einer, gilt 1). Die Karten geben jeder Waffe denselben Wert – eine Waffe mit vielen winzigen Schüssen braucht daher einen kleinen Faktor. |
+
+**Eigene Werte**
+
+| Waffe | Wert | Bedeutung |
+|---|---|---|
+| `machine_gun` | `spread` | Streuung in Grad (ganzer Kegel); `tree.spread` ist das Upgrade *Precision* (negativ) |
+| `machine_gun` | `spread_per_upgrade` | so viel Streuung kommt mit jeder Skilltree-Stufe *Damage* und *Attack speed* dazu |
+| `cannon` | `piercing` | durch so viele Gegner fliegt ein Schuss (voller Schaden), am nächsten bleibt er hängen |
+| `cannon` | `pierced_push` | erreicht er danach die Wand, schiebt er nur noch so viel davon – pro durchbohrtem Gegner (0.5: halb, dann ein Viertel …) |
+| `laser` | – | sieht aus wie ein Dauerstrahl, sind aber `attack_speed` winzige Schüsse pro Sekunde; alle Werte gelten pro Schuss (Inventar und Loadout zeigen sie pro Sekunde) |
+
+**`rocket`** – `cooldown`, `damage`, `blast_radius`, `wall_push` wie oben; `tree` für die vier Raketen-Upgrades im
+Skilltree. `burning` ist der Knoten *Burning ground*: Die Explosion hinterlässt brennenden Boden.
+
+| Wert | Bedeutung |
+|---|---|
+| `burning.duration` | so viele Sekunden brennt er |
+| `burning.damage_per_second` | Schaden pro Sekunde an jedem Gegner darin (in Stößen alle 0,5 s) |
+| `burning.radius` | sein Radius als Anteil des Explosionsradius (0.8 = 80 %) |
 
 ## `buildings.json`
 

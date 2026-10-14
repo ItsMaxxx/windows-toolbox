@@ -8,13 +8,13 @@ import pygame
 
 TITLE = "Cube Game"
 MENU_WINDOW_SIZE = (640, 460)   # window of the main menu
-GAME_MENU_WINDOW_SIZE = (960, 868)      # window of the game menu (ship, difficulty, skill tree) between runs
+GAME_MENU_WINDOW_SIZE = (1300, 900)      # window of the game menu (ship, difficulty, skill tree) between runs
 
 # The window is the arena: it keeps shrinking, shots against its edges push them back out. Once it's as narrow (or as
 # low) as the ship, the ship is crushed: game over. Start size and shrinking speed: per difficulty.
 PUSH_SPEED = 600                # a hit pushes its edge out smoothly at this speed, instead of jumping
 
-# The ship itself – its weapons have their own values (game/basic_gun.py, …)
+# The ship itself – its weapons and energy have their own values (data/weapons.json)
 SHIP_SIZE = 30                  # hitbox (square) and size of the ship
 SHIP_SPEED = 320
 
@@ -24,7 +24,7 @@ HIT_SHRINK = 25
 # … but not evenly: the edges far from the ship move in more, the near ones less. 0 = every edge the same, 1 = with the
 # ship right at the left edge, the left edge doesn't move at all and the right one twice as far (the total stays)
 HIT_SIDE_BIAS = 1.0
-MIN_PUSH = 0.5                  # pixels a shot pushes an edge out at least, however strong the arena's armor
+MAX_ARMOR = 90                  # percent: the arena's armor never takes more than this off a push
 INVULNERABLE_TIME = 1.0
 ALL_MONITORS = False             # with several monitors the arena can spread over all of them (False: main monitor only)
 OFFSCREEN_MARKERS = True        # dots at the window's edge showing where enemies outside the window are

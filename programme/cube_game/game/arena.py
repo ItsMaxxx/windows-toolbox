@@ -7,8 +7,9 @@ Once it's as narrow or as low as the ship, the ship is crushed (crushed()) and t
 The edges move in faster the longer the run lasts: shrink_growth more pixels per second every minute, up to
 max_shrink_speed (all three from the difficulty).
 
-Armor (like in StarCraft): every push of an edge is armor pixels shorter – but at least MIN_PUSH. The difficulty sets
-where it starts; its phases can change it – and the shrink speed – for a while or for good (changes, set by the scene
+Armor: every push of an edge is armor percent shorter (at most MAX_ARMOR, so pushing always does something) – the
+same share for every weapon, many small pushes (the laser) lose as much as one big one. The difficulty sets where it
+starts; its phases can change it – and the shrink speed – for a while or for good (changes, set by the scene
 from the active phases).
 
 Getting hit squeezes the arena (hit()) – mostly from the side away from the ship, so it can't be dragged along by
@@ -73,7 +74,7 @@ class Arena:
 
     @property
     def armor(self):
-        """Pixels every push of an edge is shorter right now."""
+        """Percent every push of an edge is shorter right now (before the MAX_ARMOR cap)."""
         return max(0.0, self.changed("armor", self.base_armor))
 
     def update(self, dt):
@@ -139,9 +140,9 @@ class Arena:
         return fits
 
     def push(self, side, distance):
-        """Hit on an edge: it moves out by distance minus armor, at least MIN_PUSH (smoothly, over the next ticks)."""
+        """Hit on an edge: it moves out by distance minus armor percent (smoothly, over the next ticks)."""
         if distance > 0:
-            self.pending[side] += max(settings.MIN_PUSH, distance - self.armor)
+            self.pending[side] += distance * (1 - min(self.armor, settings.MAX_ARMOR) / 100)
 
     def side_hit(self, point):
         """Which edge point has crossed ("left", "right", "top", "bottom") – or None while it's inside.

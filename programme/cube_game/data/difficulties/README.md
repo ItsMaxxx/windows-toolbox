@@ -35,13 +35,13 @@ Zeiten in Sekunden, Größen in Pixeln, Chancen von 0 bis 1 (0.01 = 1 %).
 | `shrink_speed` | so viele Pixel pro Sekunde rückt **jede** Kante am Anfang nach innen. Zum Vergleich: die Grundkanone schiebt 3 × 15 = 45 px/s zurück, alle vier Kanten zusammen schrumpfen 4 × `shrink_speed` … |
 | `shrink_growth` | … plus so viel pro Minute Spielzeit … (optional, Standard 0) |
 | `max_shrink_speed` | … höchstens so viel (Standard 60) |
-| `armor` | Panzerung am Anfang (Standard 0): jeder Stoß gegen eine Kante schiebt sie so viele Pixel weniger weit, mindestens aber 0,5 px – wie Rüstung in StarCraft. Phasen können sie erhöhen |
+| `armor` | Panzerung am Anfang in Prozent (Standard 0): jeder Stoß gegen eine Kante schiebt sie so viel Prozent weniger weit, höchstens 90 % (`MAX_ARMOR` in `settings.py`). Phasen können sie erhöhen |
 
 Beispiel Normal: 14 px/s am Anfang, + 2 pro Minute – nach 5 Minuten 24 px/s, ab 6 Minuten die Obergrenze 26 px/s.
 Fehlen `shrink_growth` und `max_shrink_speed` (wie gerade auf Hard), schrumpft die Arena immer gleich schnell.
 
-Panzerung: Die Grundkanone schiebt mit 15 px; bei `armor` 3 sind es noch 12, bei 15 nur noch 0,5. Schwache, schnelle
-Schüsse leiden also mehr darunter als starke (Rakete: 120 → 117).
+Panzerung: Die Gun schiebt mit 18 px; bei `armor` 20 sind es noch 14,4, die Rakete 120 → 96. Jede Waffe verliert
+denselben Anteil – auch der Laser mit seinen vielen kleinen Stößen.
 
 ## `spawning` – wie oft Gegner kommen
 

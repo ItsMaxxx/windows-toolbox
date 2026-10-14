@@ -23,9 +23,13 @@ from game.cards.blast_radius import BlastRadiusCard
 from game.cards.rocket_wall_push import RocketWallPushCard
 from game.cards.rocket_cooldown import RocketCooldownCard
 from game.cards.vision import VisionCard
+from game.cards.max_energy import MaxEnergyCard
+from game.cards.energy_regen import EnergyRegenCard
 
 ALL_CARDS = [
     MoveSpeedCard,
+    MaxEnergyCard,
+    EnergyRegenCard,
     DamageCard,
     AttackSpeedCard,
     WallPushCard,

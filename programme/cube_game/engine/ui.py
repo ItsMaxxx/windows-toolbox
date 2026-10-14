@@ -27,6 +27,17 @@ def draw_text(surface, text, size, color, alpha=255, **anchor):
     return rect
 
 
+def wrap(text, size, width):
+    """text split into lines (at spaces) that are at most width pixels wide – a single long word stays whole."""
+    lines = []
+    for word in text.split():
+        if lines and font(size).size(f"{lines[-1]} {word}")[0] <= width:
+            lines[-1] += f" {word}"
+        else:
+            lines.append(word)
+    return lines
+
+
 def draw_panel(surface, rect, radius=8):
     """A dark box with a white outline – the background of menus and windows inside the game.
     radius=0 for square corners, e.g. when the panel fills the whole window."""

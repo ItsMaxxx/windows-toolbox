@@ -1,9 +1,13 @@
 """
 The player's ship: moves with W A S D and always points at the mouse.
 
-It has 2 weapon slots (slot 1: left mouse button, slot 2: right mouse button) and 2 ability slots (keys in
-settings.ABILITY_KEYS). A slot holds a Weapon / Ability or None (empty). Weapons and abilities decide everything
-about their shots – the ship only says where from and in which direction.
+It has 2 weapon slots (slot 1: left mouse button, slot 2: right mouse button – filled from the loadout) and 2 ability
+slots (keys in settings.ABILITY_KEYS). A slot holds a Weapon / Ability or None (empty). Weapons and abilities decide
+everything about their shots – the ship only says where from and in which direction.
+
+Energy: both weapons share it. Every shot costs its weapon's energy_cost; the ship gets energy_regen back per second,
+up to max_energy. Firing both at once empties it faster. Once it's empty, the weapons only fire as fast as it comes
+back – a shot goes off as soon as there's enough for it. Abilities don't use energy, only their cooldown.
 
 Knocked (knock()): pushed back – fast at first, then slowing down (KNOCKBACK_DECAY) – and stunned for a moment: it
 can't move, shoot, use abilities or throw towers (the scene asks stunned), only aim. Small dots circle above it then.
@@ -16,10 +20,10 @@ import pygame
 
 from engine import Entity
 from game import settings
-from game.basic_gun import BasicGun
 from game.dash import Dash
 from game.rocket import Rocket
 from game.ship_shape import draw_ship
+from game.weapons import Gun, data
 
 KNOCKBACK_DECAY = 12        # per second: how fast a knockback slows down (it covers distance in total)
 STUN_DOTS = 3
@@ -33,7 +37,11 @@ class Ship(Entity):
         self.rect.center = center
         self.aim = pygame.Vector2(0, -1)                # direction the nose points in (length 1)
         self.speed = settings.SHIP_SPEED
-        self.weapons = [BasicGun(), None]
+        self.weapons = [Gun(), None]
+        energy = data.STATS["energy"]
+        self.max_energy = energy["max"]
+        self.energy_regen = energy["regen"]                # per second
+        self.energy = self.max_energy
         self.abilities = [Dash(), Rocket()]
         self.invulnerable = 0.0                         # seconds left in which hits don't count (after a hit)
         self.stars = 0                                  # currency for the shop, dropped by killed enemies
@@ -63,8 +71,15 @@ class Ship(Entity):
         if stun > self.stun:
             self.stun, self.stun_age = stun, 0.0
 
+    def upgrade(self, name, amount):
+        """The skill tree's energy upgrades: name is "max" or "regen" (as in data/weapons.json)."""
+        attribute = {"max": "max_energy", "regen": "energy_regen"}[name]
+        setattr(self, attribute, round(getattr(self, attribute) + amount, 6))
+        self.energy = self.max_energy
+
     def update(self, dt, target):
         """target: the point to aim at (the mouse, in world coordinates)."""
+        self.energy = min(self.max_energy, self.energy + self.energy_regen * dt)
         self.stun = max(0.0, self.stun - dt)
         self.stun_age += dt
         if not self.stunned:
@@ -100,11 +115,12 @@ class Ship(Entity):
         return pygame.Vector2(self.rect.center) + self.aim * settings.SHIP_SIZE * 0.6
 
     def fire(self, slot):
-        """Fires the weapon in slot (0 or 1) from the nose. Returns the new projectiles – empty if the slot is empty
-        or the weapon is still cooling down."""
+        """Fires the weapon in slot (0 or 1) from the nose. Returns the new projectiles – empty if the slot is empty,
+        the weapon is still cooling down or there isn't enough energy for a shot."""
         weapon = self.weapons[slot]
-        if weapon is None:
+        if weapon is None or not weapon.ready or self.energy < weapon.energy_cost:
             return []
+        self.energy -= weapon.energy_cost
         return weapon.fire(self.nose(), self.aim)
 
     def use_ability(self, slot, target):
