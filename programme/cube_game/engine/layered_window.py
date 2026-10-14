@@ -4,16 +4,24 @@ of the window change in ONE step. With SDL's own functions that takes three (mov
 and if Windows redraws the screen in between, the window visibly jumps – e.g. first to the left, then growing back to
 the right when a shot pushes the left wall.
 
+The game draws straight into the bitmap that's shown (canvas()): no copying, and the memory is only made anew when the
+window gets bigger than ever before – important when the window spans several monitors.
+
 SDL keeps handling keyboard and mouse; it just never shows anything itself (no flip()). Two things SDL doesn't
 notice when the window is moved this way, so they're done here, too:
   - SDL's idea of the window size is kept up to date (the mouse coordinates rely on it),
-  - locking the mouse into the window (ClipCursor) – SDL would keep it locked to the old spot.
+  - locking the mouse into the window (ClipCursor) – SDL would keep it locked to the old spot. The lock can also be a
+    set of rectangles (mouse_area, e.g. the arena and the extra windows connected to it): Windows can only lock the
+    cursor into one rectangle, so it's locked into the box around them, and put back onto the nearest rectangle
+    whenever it gets into a gap between them.
 
 Windows only: everything goes through ctypes (user32/gdi32), no extra packages.
 """
 
 import ctypes
 from ctypes import wintypes
+
+import pygame
 
 user32 = ctypes.windll.user32
 gdi32 = ctypes.windll.gdi32
@@ -46,6 +54,8 @@ user32.UpdateLayeredWindow.argtypes = [wintypes.HWND, wintypes.HDC, ctypes.POINT
                                        wintypes.HDC, ctypes.POINTER(wintypes.POINT), wintypes.DWORD, ctypes.c_void_p,
                                        wintypes.DWORD]
 user32.ClipCursor.argtypes = [ctypes.POINTER(wintypes.RECT)]
+user32.GetCursorPos.argtypes = [ctypes.POINTER(wintypes.POINT)]
+user32.SetCursorPos.argtypes = [ctypes.c_int, ctypes.c_int]
 gdi32.CreateCompatibleDC.restype = wintypes.HDC
 gdi32.CreateCompatibleDC.argtypes = [wintypes.HDC]
 gdi32.DeleteDC.argtypes = [wintypes.HDC]
@@ -57,11 +67,20 @@ gdi32.SelectObject.argtypes = [wintypes.HDC, wintypes.HGDIOBJ]
 gdi32.DeleteObject.argtypes = [wintypes.HGDIOBJ]
 
 
+def cursor_position():
+    """Where the mouse cursor is on the screen (screen pixels) – no matter over which window."""
+    point = wintypes.POINT()
+    user32.GetCursorPos(ctypes.byref(point))
+    return point.x, point.y
+
+
 class LayeredWindow:
-    def __init__(self, window):
+    def __init__(self, window, manage_mouse=True):
         """window: the pygame.Window. Raises OSError if Windows doesn't play along – the engine then falls back to
-        SDL's own (flickering) way."""
+        SDL's own (flickering) way. manage_mouse: False for extra windows (view_window.py) – only the game's main
+        window locks the mouse, and an extra one must never let it go."""
         self.window = window
+        self.manage_mouse = manage_mouse
         self.hwnd = window.handle
         style = user32.GetWindowLongPtrW(self.hwnd, GWL_EXSTYLE)
         user32.SetWindowLongPtrW(self.hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED)
@@ -71,23 +90,25 @@ class LayeredWindow:
             raise OSError("no device context")
         self.bitmap = None
         self.bits = ctypes.c_void_p()           # where the bitmap's pixels are in memory
-        self.size = None
+        self.pixels = None                      # the same memory for Python …
+        self.surface = None                     # … and as a pygame surface the size of the whole bitmap
+        self.size = (0, 0)                      # the bitmap's size: as big as the biggest window so far
         self.mouse_locked = False
+        self.mouse_area = None                  # rectangles the locked mouse may move in – None: just the window
         self.rect = None                        # where the window is now (screen pixels)
 
-    def show(self, surface, topleft):
-        """Puts surface on the screen as the window's content, with the window's top left corner at topleft.
-        surface must be 32 bits per pixel (see Engine.present)."""
-        size = surface.get_size()
-        if size != self.size:
-            self._make_bitmap(size)
+    def canvas(self, size):
+        """Where to draw the next picture: a surface of size that lies directly in the bitmap show() puts on the
+        screen. Only valid until the next canvas() call."""
         width, height = size
-        if surface.get_pitch() == width * 4:
-            ctypes.memmove(self.bits, surface._pixels_address, width * height * 4)
-        else:                                   # rows with padding: copy one by one
-            pitch = surface.get_pitch()
-            for row in range(height):
-                ctypes.memmove(self.bits.value + row * width * 4, surface._pixels_address + row * pitch, width * 4)
+        if width > self.size[0] or height > self.size[1]:
+            self._make_bitmap((max(width, self.size[0]), max(height, self.size[1])))
+        return self.surface.subsurface((0, 0, width, height))
+
+    def show(self, size, topleft):
+        """Puts what was drawn on the canvas (size) on the screen as the window's content, with the window's top left
+        corner at topleft."""
+        width, height = size
         ok = user32.UpdateLayeredWindow(self.hwnd, self.screen_dc, ctypes.byref(wintypes.POINT(*topleft)),
                                         ctypes.byref(SIZE(width, height)), self.memory_dc,
                                         ctypes.byref(wintypes.POINT(0, 0)), 0, None, ULW_OPAQUE)
@@ -104,10 +125,21 @@ class LayeredWindow:
         self._apply_mouse_lock()
 
     def _apply_mouse_lock(self):
-        if self.mouse_locked and self.rect:
-            user32.ClipCursor(ctypes.byref(wintypes.RECT(*self.rect)))
-        else:
+        if not self.manage_mouse:
+            return
+        if not (self.mouse_locked and self.rect):
             user32.ClipCursor(None)
+            return
+        left, top, right, bottom = self.rect
+        area = self.mouse_area or [pygame.Rect(left, top, right - left, bottom - top)]
+        box = area[0].unionall(area[1:])
+        user32.ClipCursor(ctypes.byref(wintypes.RECT(box.left, box.top, box.right, box.bottom)))
+        x, y = cursor_position()
+        if len(area) > 1 and not any(rect.collidepoint(x, y) for rect in area):
+            # in a gap between the rectangles: onto the nearest one
+            nearest = [(min(max(x, rect.left), rect.right - 1), min(max(y, rect.top), rect.bottom - 1))
+                       for rect in area]
+            user32.SetCursorPos(*min(nearest, key=lambda point: (point[0] - x) ** 2 + (point[1] - y) ** 2))
 
     def _make_bitmap(self, size):
         width, height = size
@@ -117,13 +149,18 @@ class LayeredWindow:
         if not bitmap:
             raise OSError("CreateDIBSection failed")
         gdi32.SelectObject(self.memory_dc, bitmap)
+        self.surface = None                     # the old surface pointed into the old bitmap's memory
         if self.bitmap:
             gdi32.DeleteObject(self.bitmap)
         self.bitmap = bitmap
         self.size = size
+        # the pixels in memory are blue, green, red, (unused) – row after row, top row first
+        self.pixels = (ctypes.c_char * (width * height * 4)).from_address(self.bits.value)
+        self.surface = pygame.image.frombuffer(self.pixels, size, "BGRA")
 
     def close(self):
-        user32.ClipCursor(None)
+        if self.manage_mouse:
+            user32.ClipCursor(None)
         if self.bitmap:
             gdi32.DeleteObject(self.bitmap)
         gdi32.DeleteDC(self.memory_dc)

@@ -6,10 +6,12 @@ from game.cards.card import Card
 
 
 class AttackSpeedCard(Card):
+    key = "attack_speed"
     name = "Attack speed"
     category = "Weapons"
     stat = "fire_rate"
-    amount = 1
+    amount = 0.5
+    card_amount = 1.5
     unit = "/s"
 
     def targets(self, ship):

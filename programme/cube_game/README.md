@@ -220,4 +220,123 @@ Hier trage ich ein, wo ich bin. Claude liest das zuerst.
 
 Notizen / offene Fragen:
 
--
+- 13.10.2026 (Claude, auf Wunsch gebaut): Gegner überlappen nicht mehr und schieben sich gegenseitig
+  (`engine/collision.py`: `push_apart`, `nearby_pairs` = Spatial Hash; schwere Gegner schieben stärker, ein
+  anstürmender Charger rammt alles weg). Neuer Gegner **Carrier** (`game/enemies/carrier.py`) mit **Crittern**
+  (`critter.py`, lassen keine Sterne fallen).
+  Keine Obergrenze mehr für Gegner. Ab ca. 800 Gegnern wird die Logik zu langsam für 60 Ticks/s – ein Game Over
+  (statt Mindestgröße des Fensters) würde das natürlich begrenzen.
+- 13.10.2026 (Claude, auf Wunsch gebaut): **Game Over**, wenn das Fenster das Schiff zerquetscht (keine Mindestgröße
+  mehr), Game-Over-Bildschirm (`game_over_scene.py`). **Cores** als Meta-Währung (1 % Drop, `core_pickup.py`),
+  gespeichert in `daten\cube_game.json` (`profile.py`). **Spielmenü** zwischen den Runs (`game_menu_scene.py`):
+  Schiff, Schwierigkeit (`difficulty.py`), Skilltree (`skill_tree.py`). Shop, Dash und Rocket müssen erst
+  freigeschaltet werden; Grundfeuerrate halbiert (3/s).
+  Schwierigkeiten: nur Easy ist offen; 4:00 auf einer Stufe überleben schaltet die nächste frei.
+- 13.10.2026: Schwierigkeiten sind jetzt **Dateien**: `data/difficulties/*.json` (Arena, Cores, Spawn-Tempo, welche
+  Gegner ab welcher Sekunde, Schwärme). Erklärung aller Werte: `data/difficulties/README.md`. Werden beim Öffnen des
+  Spielmenüs neu gelesen; Fehler darin zeigt das Spielmenü rot an. Vorstufe zu M11 (Level aus Dateien).
+- 13.10.2026: Gegnerwerte (Grund- und Verhaltenswerte) in `data/enemies.json` (Erklärung: `data/README.md`), pro
+  Schwierigkeit eigene Werte über `enemy_stats` (Zahl / "+1" / "x1.5", "all" für alle Typen) – wie Map-Daten im
+  SC2-Editor. Normal: alle Gegner +1 HP. Buff-Grundgerüst (`game/enemies/buff.py`): zeitlich begrenzt, flach und/oder
+  Faktor, pro Gegner oder für alle (`roster.buffs`); gebuffte Gegner leuchten pink. Noch nichts löst Buffs aus.
+- 13.10.2026: **Mehrere Monitore**: die Arena kann sich über alle Bildschirme ausbreiten, aber nur dorthin, wo wirklich
+  Bildschirm ist (keine Lücken, nicht unter Taskleisten; `engine/desktop.py`, `Desktop.covers()`). Abschalten:
+  `ALL_MONITORS` in `settings.py`. Die Engine zeichnet jetzt direkt in den Speicher des Fensters (kein Kopieren).
+- 13.10.2026: Neuer Gegner **Artillery** (`game/enemies/artillery.py`): hält Sniper-Abstand, markiert die Position des
+  Schiffs mit einem Kreis, der sich füllt, dann schlägt es ein (`game/artillery_strike.py`). Aussehen jetzt getrennt
+  vom Verhalten: **`game/skins/`** (ein Skin pro Gegner), **`game/effects/`** (Explosion, Artillerie-Einschlag,
+  Zielmarkierung, Buff-Leuchten).
+  Schwärme erscheinen am Kartenrand (halb dahinter), mindestens `SWARM_GAP` (300 px) vom Fenster entfernt.
+- 13.10.2026: **Shop im Run** (T): jeden Wert direkt verbessern, jede Stufe desselben Werts kostet mehr (+5 Sterne).
+  **Karten-Shop** im Spielmenü (Reiter *Cards*, Cores): Angebote kaufen oder rerollen, Sammlung bis 12 Karten, bis 3
+  aktiv – die wirken zu Beginn jedes Runs. Zahlen in `data/upgrades.json` (`game/shop.py`, `game/card_shop.py`,
+  `game/card_panel.py`).
+
+**Balance über den Run (Gegner werden stärker, Spieler skaliert nicht endlos).**
+- Gegner-Gewichte wachsen pro Minute (`growth` in `enemies` der Schwierigkeitsdatei) – starke Typen werden häufiger.
+- `phases` in der Schwierigkeitsdatei: Abschnitte mit eigenen Gewichten (`"sniper": "x3"`), Buffs (`max_hp "+1"` ohne
+  Ende = HP steigen mit der Zeit) und optionaler Ansage oben im Bild. Umgesetzt im Spawner (Buffs als Roster-Buffs).
+- `swarms` kann eine Liste sein: Hard hat zusätzlich Charger-Schwärme (ab 60 s, seltener und kleiner als Basic).
+- Shop-Stufen (`amount`) sind schwächer, Karten haben einen eigenen Wert (`card_amount`). Eine Bremse gegen
+  endloses Hochskalieren (z. B. Grundkanone als Maschinengewehr) gibt es bewusst noch nicht – die 20-%-Schwelle wurde
+  wieder entfernt, das soll anders gelöst werden.
+
+**Rand schrumpft mit der Zeit schneller, Projectile speed.**
+- `arena` in der Schwierigkeitsdatei: `shrink_growth` (px/s mehr pro Minute) und `max_shrink_speed` (Obergrenze).
+- Karte *Shot speed* heißt jetzt *Projectile speed* (Schlüssel bleibt `shot_speed`, steht in Spielständen). Grundkanone
+  880 statt 950 px/s. Karten wieder stärker als Shop-Stufen, außer Projectile speed (+150).
+
+**Wachturm (erstes Gebäude).**
+- Skilltree-Knoten *Watchtower* (unter Head start, 3/5/8 Cores, Stufe = Türme gleichzeitig). Im Run **B**: Turm fliegt
+  420 px in Mausrichtung (bleibt auf dem Monitor), kostet Sterne (15, dann +10 je Turm).
+- Gelandet öffnet er ein eigenes Fenster (`engine/view_window.py`, über `Engine.open_view`): randlos, ohne
+  Taskleisteneintrag, nimmt nie den Fokus (`WS_EX_NOACTIVATE`), Klicks gehen durch, liegt über dem Hauptfenster.
+  Die Szene zeichnet es in `draw_view()`; beim Szenenwechsel schließen alle. Ereignisse der Extrafenster ignoriert die
+  Engine. Ohne Layered Window (Rückfall auf SDL) gibt es keine Extrafenster – der Turm steht dann nur in der Welt.
+- HP, wird von Berührung, Schüssen und Artillerie getroffen; lockt Nahkampf-Gegner an (`enemy.lure`). Werte in
+  `data/buildings.json`. Shop-Upgrade / Karte *Vision* vergrößert die Fenster (auch schon stehender Türme).
+- Turmfenster und Spielfeld sind für Schüsse verbunden: Liegt hinter einer Kante ein Turmfenster, fliegt der Schuss
+  hinein und trifft Gegner darin. Trifft er nichts, schiebt er beim Verlassen des Turmfensters die Kante, die er
+  überquert hat (ein Schuss trifft oder schiebt, wie im Spielfeld). Raketen explodieren auch dort. Das Schiff bleibt im
+  Spielfeld. Turmfenster liegen über dem Spielfenster (Owned Window: `GWLP_HWNDPARENT` = Hauptfenster).
+
+**Rahmenlose Zusatzfenster, Radar.**
+- Rahmen = Umriss aller Fenster zusammen (`PlayScene.draw_outline`, per Bitmaske): Wo Fenster sich überlappen oder
+  berühren, verschmelzen die Kanten zu einer Linie mit Knick; ein einzelnes Fenster hat einfach seinen Rahmen.
+  Hintergrund der Zusatzfenster außerhalb des Spielfelds fast schwarz mit Hauch Grau (Radar: Blau), darüber schwarz.
+  Wo ein Zusatzfenster das Hauptfenster überdeckt, legt es dessen HUD/Hinweise darüber (`draw_ui_layer`,
+  transparente Ebene, normal per Alpha darübergelegt).
+- Radar (`game/radar.py`, Werte in `data/radar.json`): Skilltree *Radar* (unter Watchtower) + *Scan size / rate / time*
+  (je 3 Stufen; Start 150 px, alle 4 s, 2,5 s offen). Automatisch: alle `cooldown` s ein hellblaues Fenster über der
+  größten Gegnergruppe außerhalb der Sicht (Raster aus `size`-Zellen, volle Zelle gewinnt), `duration` s lang. Für
+  Schüsse verbunden wie Turmfenster.
+- Spielmenü 960 × 868 (Skilltree hat jetzt 5 Reihen; `INFO_TOP` rechnet sich aus der Zahl der Reihen).
+
+**Sichtfeld = alle Fenster, Tastenanzeige, Pause.**
+- Spielfeld + Zusatzfenster sind das Sichtfeld (`PlayScene.in_sight`): Ein Gegner, der ganz in einem davon war, gilt
+  als gesehen – Artillerie in einem Turm- oder Radarfenster gräbt sich ein, wenn das Schiff in Reichweite ist.
+- Zusatzfenster verschwinden in Pause, Inventar und Shop (`view.hidden`, `ViewWindow.hide`) und kommen beim
+  Weiterspielen wieder.
+- Tastenanzeige: W A S D, darunter die Tasten der freigeschalteten Fähigkeiten (SHIFT, SPACE, B) und rechts eine Maus,
+  deren Tasten beim Schießen leuchten (`KeyOverlay`: breite Tasten, mehrere Tasten pro Kappe, `mouse_buttons`).
+
+**Spielfeld als Standard (`game/field.py`).**
+- `Field` = Arena + alle Zusatzfenster, die mit ihr verbunden sind (überlappend/berührend, auch über andere Fenster).
+  Wird pro Abfrage neu gebaut (`PlayScene.field()`), es sind nur ein paar Rechtecke.
+- Wand = der ganze Außenrand des Feldes (offene Teile der Arena-Kanten + Kanten der verbundenen Fenster, wo das Feld
+  nicht weitergeht). Alles fragt das Feld: Schüsse jeder Art (`wall_hit`), Explosionen (`clamp`, `walls_within`: ein
+  erreichtes Stück Arena-Kante schiebt diese, ein Stück Fensterwand die Kante, über die der Schuss kam – wie Kugeln),
+  Mausbereich (`rects` → `Engine.confine_mouse`), Sichtfeld (`sight`, `sees`: Arena + alle Zusatzfenster, auch
+  unverbundene) für „gesehen“, Randmarker, Spawns und Radar.
+- Maus: ClipCursor auf das umschließende Rechteck, in Lücken zurück aufs nächste Rechteck (`LayeredWindow`);
+  Position per `GetCursorPos`. Zusatzfenster sind nicht mehr durchklickbar (sonst landet ein Klick auf dem Desktop),
+  werden aber nie aktiv: `WS_EX_NOACTIVATE`, dazu eine eigene Fensterprozedur vor SDLs, die auf
+  `WM_MOUSEACTIVATE` mit `MA_NOACTIVATE` antwortet. Verliert das Hauptfenster trotzdem den Fokus an ein eigenes
+  Fenster, holt die Engine ihn zurück, ohne dass die Szene es merkt (`Engine.internal_focus_loss`) – keine Pause.
+- Spawner: keine Gegner in Zusatzfenstern, Schwärme halten `SWARM_GAP` auch zu ihnen.
+- Das Schiff bleibt in der Arena.
+
+**Blickrichtung, Belagerung, Schild-Gegner, Einstellung Tasten-Anzeige.**
+- Gegner haben eine Blickrichtung (`enemy.aim`, `turn_towards`, `facing`). Shooter, Sniper und Artillery drehen sich mit
+  `turn_speed` und schießen nur im `fire_cone`, in Blickrichtung (`shoot_ahead`).
+- Artillery: Zustände laufen / aufbauen / belagert / abbauen (`deploy` 0…1, Füße fahren aus und ein). Mindestabstand
+  `min_range`: zu nah oder außer Reichweite → abbauen, laufen (bei zu nah: zurückweichen), dann wieder aufbauen.
+- Neuer Gegner `shield` (`game/enemies/shield.py`, Skin `game/skins/shield.py`): dreht langsam, läuft nur in
+  Schildrichtung, Dash wie ein Charger. `blocks()` hält Kugeln von vorne auf (Funken: `game/effects/spark.py`, kein
+  Wall-Push); Raketen explodieren auch am Schild und treffen ihn. Ab Easy 2:30, Normal 1:30, Hard 0:45.
+- Toolbox-Seite: Bereich „Einstellungen“ mit „Tasten-Anzeige beim Start einblenden“. Gespeichert unter `"settings"` in
+  `daten\cube_game.json`; Seite und Spiel schreiben nur ihren eigenen Teil (frisch gelesen vor dem Schreiben).
+
+**Schaden über die Zeit, Panzerung, Treffer von der abgewandten Seite.**
+- Phasen können jetzt auch die Arena ändern (`"arena": {"armor": "+3", "shrink_speed": "x1.5"}`), solange sie laufen.
+  `armor` (Startwert unter `arena`): jeder Wand-Push ist so viele Pixel kürzer, mindestens `MIN_PUSH` (0,5 px).
+- In allen Schwierigkeiten: Phasen mit mehr Gegner-Schaden (`contact_damage`/`shot_damage`/`blast_damage` x1.25, x1.2)
+  und härteren Wänden, jeweils mit Ansage.
+- Treffer (`Arena.hit`): die Gesamtschrumpfung bleibt, verteilt sich aber nach der Schiffsposition – die Kanten weit
+  vom Schiff rücken mehr ein (`HIT_SIDE_BIAS` in settings.py: 0 = gleichmäßig wie früher, 1 = am Rand alles von
+  gegenüber).
+
+**Rückstoß und Betäubung.**
+- Trifft der Ansturm des Schild-Gegners das Schiff (und der Treffer zählt), wird es `knockback` Pixel zurückgestoßen
+  (schnell, dann abklingend) und `stun_time` Sekunden betäubt: keine Bewegung, keine Schüsse, keine Fähigkeiten, keine
+  Türme – nur Zielen. Punkte kreisen über dem Schiff. Allgemein: `Ship.knock()`, Gegner-Hook `Enemy.on_hit_ship()`.

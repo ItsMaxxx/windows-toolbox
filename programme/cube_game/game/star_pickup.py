@@ -16,6 +16,8 @@ MAGNET_SPEED = 260          # … at this speed at the edge of the radius, three
 
 
 class StarPickup(Entity):
+    currency = "stars"          # what collecting it gives
+
     def __init__(self, position):
         super().__init__(0, 0, SIZE, SIZE, STAR_COLOR)
         self.rect.center = position

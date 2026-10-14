@@ -6,10 +6,12 @@ from game.cards.card import Card
 
 
 class WallPushCard(Card):
+    key = "wall_push"
     name = "Wall push"
     category = "Weapons"
     stat = "wall_push"
-    amount = 5
+    amount = 3
+    card_amount = 10
     unit = " px"
 
     def targets(self, ship):

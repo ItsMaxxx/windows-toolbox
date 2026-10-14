@@ -1,102 +1,192 @@
 """
 Spawner: creates enemies at regular intervals, far outside the window on the desktop – out of the player's reach –
-from where they come in. The intervals get shorter over time; which type comes is random, weighted.
+from where they come in. The intervals get shorter over time; which type comes is random, weighted – each type only
+once its time has come ("after"), and its weight grows by "growth" every minute after that, so the stronger types
+become more and more common.
 
-Swarms: once per second there's a small chance that a whole group of basic enemies appears at one spot. The longer
-the game goes on, the more likely swarms get and the bigger they are.
+Phases: stretches of the run (from … to …) that change the weights – e.g. three times as many snipers for 40 seconds –
+and/or buff the enemies (as roster buffs that last as long as the phase). A phase can announce itself on screen: its
+text goes into announcements, which the scene shows and empties.
+
+Swarms: once per second there's a small chance that a whole group of enemies appears at one spot. The longer the game
+goes on, the more likely swarms get and the bigger they are. A difficulty can have several kinds of swarms (basic,
+charger, …), each with its own chance and timing. A swarm appears further away than single enemies: its centre is on
+the edge of the map (the desktop), so part of it is still beyond the edge and walks in from there – and even its
+nearest enemy is at least SWARM_GAP away from the window.
+
+The extra windows (watchtowers, radar) count as part of what the player sees: no enemy appears inside one, and swarms
+keep SWARM_GAP from them, too.
+
+All the numbers come from the difficulty (data/difficulties/*.json, see game/difficulty.py); the enemies themselves
+are made by the run's roster, with the run's values (roster.py).
 """
 
+import math
 import random
 
 import pygame
 
-from game.enemies.basic import BasicEnemy
-from game.enemies.charger import Charger
-from game.enemies.shooter import Shooter
-from game.enemies.sniper import Sniper
+from game.enemies.buff import Buff
+from game.enemies.roster import apply
 
-TYPES = [(BasicEnemy, 50), (Charger, 20), (Shooter, 20), (Sniper, 10)]     # (type, weight)
-FIRST_SPAWN = 2.0           # seconds until the first enemy
-START_INTERVAL = 2.6        # seconds between enemies at the start …
-MIN_INTERVAL = 0.9          # … getting shorter down to this
-INTERVAL_DROP = 0.012       # seconds less per second played
 SPAWN_DISTANCE = (250, 500) # pixels beyond the window's corners
-MAX_ENEMIES = 25            # regular spawns stop at this many enemies …
-MAX_WITH_SWARMS = 120       # … swarms may go up to this many
-
-SWARM_START_CHANCE = 0.02   # chance per second at the start …
-SWARM_CHANCE_GROWTH = 0.0008    # … plus this much per second played …
-SWARM_MAX_CHANCE = 0.15     # … up to this
-SWARM_START_SIZE = 6        # enemies in a swarm at the start …
-SWARM_GROWTH_TIME = 10      # … one more every this many seconds …
-SWARM_MAX_SIZE = 40         # … up to this
-SWARM_MIN_GAP = 6           # seconds at least between two swarms
 SWARM_SPACING = 14          # how tightly packed a swarm is (pixels)
+SWARM_GAP = 300             # pixels at least between a swarm's nearest enemy and the window
+SWARM_TRIES = 24            # random directions tried to find an edge far enough away
 
 
 class Spawner:
-    def __init__(self, bounds):
-        """bounds: where enemies may appear (the desktop)."""
-        self.bounds = pygame.Rect(bounds)
-        self.timer = FIRST_SPAWN
+    def __init__(self, desktop, difficulty, roster):
+        """desktop: where enemies may appear (on a monitor – engine/desktop.py). difficulty: a Difficulty
+        (game/difficulty.py). roster: the run's EnemyRoster, which makes the enemies."""
+        self.desktop = desktop
+        self.roster = roster
+        self.spawning = difficulty.spawning
+        self.enemies = difficulty.enemies
+        self.swarms = difficulty.swarms
+        self.phases = difficulty.phases
+        self.timer = self.spawning.first_spawn
         self.elapsed = 0.0
-        self.swarm_timer = 1.0              # next swarm roll in … seconds
-        self.since_swarm = SWARM_MIN_GAP    # seconds since the last swarm
+        self.swarm_timer = 1.0                  # next swarm roll in … seconds
+        self.since_swarm = [swarms.min_gap for swarms in self.swarms]   # per kind: seconds since its last swarm
+        self.started = set()                    # indexes of the phases that have begun
+        self.announcements = []                 # texts of phases that just began – the scene shows and empties it
+        self.windows = []                       # the extra windows' rectangles (set by update())
 
     @property
     def interval(self):
-        return max(MIN_INTERVAL, START_INTERVAL - INTERVAL_DROP * self.elapsed)
+        spawning = self.spawning
+        return max(spawning.min_interval, spawning.start_interval - spawning.interval_drop * self.elapsed)
 
-    @property
-    def swarm_chance(self):
-        return min(SWARM_MAX_CHANCE, SWARM_START_CHANCE + SWARM_CHANCE_GROWTH * self.elapsed)
+    def swarm_chance(self, swarms):
+        return min(swarms.max_chance, swarms.start_chance + swarms.chance_growth * self.elapsed)
 
-    @property
-    def swarm_size(self):
-        return min(SWARM_MAX_SIZE, SWARM_START_SIZE + int(self.elapsed / SWARM_GROWTH_TIME))
+    def swarm_size(self, swarms):
+        return min(swarms.max_size, swarms.start_size + int(self.elapsed / swarms.growth_time))
 
-    def update(self, dt, arena, enemy_count):
-        """Returns the new enemies (a list, usually empty). arena: the window's rectangle on the screen."""
+    def active_phases(self):
+        return [phase for phase in self.phases
+                if phase.start <= self.elapsed and (phase.end is None or self.elapsed < phase.end)]
+
+    def weights(self):
+        """type -> how likely it is right now (only types above 0): each entry's weight once its time has come, plus
+        its growth per minute since then, changed by the active phases (in file order) – so a phase's "+20" can bring
+        a type early, its "x3" only multiplies what's there."""
+        weights = {}
+        for entry in self.enemies:
+            if self.elapsed >= entry.after:
+                minutes = (self.elapsed - entry.after) / 60
+                weights[entry.type] = weights.get(entry.type, 0) + entry.weight + entry.growth * minutes
+        for phase in self.active_phases():
+            for key, operation, number in phase.weights:
+                weights[key] = apply(weights.get(key, 0), operation, number)
+        return {key: weight for key, weight in weights.items() if weight > 0}
+
+    def update(self, dt, arena, windows=()):
+        """Returns the new enemies (a list, usually empty). arena: the window's rectangle on the screen, windows: the
+        extra windows' rectangles (nothing appears in them)."""
+        self.windows = list(windows)
         self.elapsed += dt
-        self.since_swarm += dt
-        new = self.swarm(arena, enemy_count, dt)
+        self.start_phases()
+        new = self.swarm(arena, dt)
         self.timer -= dt
-        if self.timer <= 0 and enemy_count + len(new) < MAX_ENEMIES:
+        if self.timer <= 0:
             self.timer = self.interval
-            enemy_type = random.choices([t for t, _ in TYPES], weights=[w for _, w in TYPES])[0]
-            new.append(enemy_type(self.spawn_point(arena)))
+            weights = self.weights()
+            if weights:
+                key = random.choices(list(weights), weights=list(weights.values()))[0]
+                new.append(self.roster.create(key, self.spawn_point(arena)))
         return new
 
-    def swarm(self, arena, enemy_count, dt):
-        """Once per second: maybe a swarm – a group of basic enemies packed around one spawn point."""
+    def start_phases(self):
+        """Phases whose time has come: their buffs go on all enemies (until the phase ends), their text is shown."""
+        for index, phase in enumerate(self.phases):
+            if index in self.started or self.elapsed < phase.start:
+                continue
+            self.started.add(index)
+            if phase.end is not None and self.elapsed >= phase.end:
+                continue                        # already over (only if a single tick skipped all of it)
+            duration = None if phase.end is None else phase.end - self.elapsed
+            for target, stat, operation, number in phase.enemy_stats:
+                add, factor = (number, 1) if operation == "add" else (0, number)
+                self.roster.buffs.append(Buff(stat, add=add, factor=factor, duration=duration,
+                                              target=None if target == "all" else target))
+            if phase.announce:
+                self.announcements.append(phase.announce)
+
+    def swarm(self, arena, dt):
+        """Once per second, for each kind of swarm: maybe one – a group of enemies packed around one spawn point."""
+        self.since_swarm = [seconds + dt for seconds in self.since_swarm]
         self.swarm_timer -= dt
         if self.swarm_timer > 0:
             return []
         self.swarm_timer += 1.0
-        if self.since_swarm < SWARM_MIN_GAP or random.random() >= self.swarm_chance:
-            return []
-        size = min(self.swarm_size, MAX_WITH_SWARMS - enemy_count)
-        if size <= 0:
-            return []
-        self.since_swarm = 0.0
-        center = self.spawn_point(arena)
-        radius = SWARM_SPACING * size ** 0.5
-        swarm = []
-        for _ in range(size):
-            point = center + pygame.Vector2(random.uniform(0, radius), 0).rotate(random.uniform(0, 360))
-            point.x = min(max(point.x, self.bounds.left), self.bounds.right - 1)
-            point.y = min(max(point.y, self.bounds.top), self.bounds.bottom - 1)
-            swarm.append(BasicEnemy(point))
-        return swarm
+        new = []
+        for index, swarms in enumerate(self.swarms):
+            if (self.elapsed < swarms.after or self.since_swarm[index] < swarms.min_gap
+                    or random.random() >= self.swarm_chance(swarms)):
+                continue
+            self.since_swarm[index] = 0.0
+            size = self.swarm_size(swarms)
+            radius = SWARM_SPACING * size ** 0.5
+            center = self.swarm_point(arena, radius)
+            for _ in range(size):
+                point = center + pygame.Vector2(random.uniform(0, radius), 0).rotate(random.uniform(0, 360))
+                new.append(self.roster.create(swarms.type, point))         # beyond the map's edge is fine
+        return new
+
+    def swarm_point(self, arena, radius):
+        """Where a swarm's centre goes: on the edge of the map, in a random direction from the window – one that's at
+        least SWARM_GAP + radius away from it and every extra window. If the map has no such edge (the window fills
+        almost all of it), the farthest edge found, moved out beyond it as far as needed."""
+        center = pygame.Vector2(arena.center)
+        needed = SWARM_GAP + radius
+        farthest, farthest_room, farthest_direction = None, -1.0, None
+        for _ in range(SWARM_TRIES):
+            direction = pygame.Vector2(1, 0).rotate(random.uniform(0, 360))
+            point = center + direction * self.distance_to_edge(center, direction)
+            room = self.room(point, arena)
+            if room >= needed:
+                return point
+            if room > farthest_room:
+                farthest, farthest_room, farthest_direction = point, room, direction
+        point = farthest
+        for _ in range(5):                      # each step gets at least as far as missing; a few are plenty
+            room = self.room(point, arena)
+            if room >= needed:
+                break
+            point = point + farthest_direction * (needed - room)
+        return point
+
+    def room(self, point, arena):
+        """How far point is from what the player sees: the window and the extra windows."""
+        return min(distance_to_rect(point, rect) for rect in [arena, *self.windows])
+
+    def distance_to_edge(self, start, direction):
+        """How far from start (inside the map) along direction until the edge of the map."""
+        bounds = self.desktop.bounds
+        steps = []
+        if direction.x:
+            steps.append(((bounds.right if direction.x > 0 else bounds.left) - start.x) / direction.x)
+        if direction.y:
+            steps.append(((bounds.bottom if direction.y > 0 else bounds.top) - start.y) / direction.y)
+        return max(0.0, min(steps))
 
     def spawn_point(self, arena):
-        """A random point around the window, SPAWN_DISTANCE beyond its corners, on the desktop."""
+        """A random point around the window, SPAWN_DISTANCE beyond its corners, on a monitor – not in an extra
+        window."""
         center = pygame.Vector2(arena.center)
         reach = pygame.Vector2(arena.size).length() / 2           # centre to corner
         for _ in range(20):
             point = center + pygame.Vector2(reach + random.uniform(*SPAWN_DISTANCE), 0).rotate(random.uniform(0, 360))
-            if self.bounds.collidepoint(point):
+            if self.desktop.contains(point) and not any(window.collidepoint(point) for window in self.windows):
                 return point
-        # the window fills almost the whole desktop: put it on the desktop's edge
-        return pygame.Vector2(min(max(point.x, self.bounds.left), self.bounds.right - 1),
-                              min(max(point.y, self.bounds.top), self.bounds.bottom - 1))
+        # the window fills almost the whole desktop: put it on the nearest monitor's edge
+        return self.desktop.clamp_point(point)
+
+
+def distance_to_rect(point, rect):
+    """0 inside rect, else the distance to its nearest point."""
+    dx = max(rect.left - point[0], 0, point[0] - rect.right)
+    dy = max(rect.top - point[1], 0, point[1] - rect.bottom)
+    return math.hypot(dx, dy)

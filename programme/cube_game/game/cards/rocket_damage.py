@@ -7,10 +7,12 @@ from game.rocket import Rocket
 
 
 class RocketDamageCard(Card):
+    key = "rocket_damage"
     name = "Rocket damage"
     category = "Rocket"
     stat = "damage"
-    amount = 3
+    amount = 2
+    card_amount = 6
     unit = ""
 
     def targets(self, ship):

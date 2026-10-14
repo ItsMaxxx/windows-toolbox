@@ -18,3 +18,6 @@ class Scene:
 
     def draw(self, surface):
         """Draw the whole scene onto surface (the window's content)."""
+
+    def draw_view(self, surface, view):
+        """Draw an extra window's content (Engine.open_view) onto surface – the part of the world at view.rect."""

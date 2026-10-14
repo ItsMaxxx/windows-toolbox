@@ -33,6 +33,7 @@ class Projectile(Entity):
         self.speed_factor = 1.0             # 1 = normal speed; reset after every tick
         self.target = pygame.Vector2(target) if target is not None else None
         self.arrived = False                # True once it has reached its target
+        self.beyond = None                  # flying through a watchtower's window: the arena edge it crossed
 
     @property
     def speed(self):

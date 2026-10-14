@@ -1,5 +1,5 @@
 """
-The main menu shown at start: title, a ship that looks at the mouse, Play and Quit.
+The main menu shown at start: title, a ship that looks at the mouse, Play (leads to the game menu) and Quit.
 """
 
 import pygame
@@ -28,8 +28,8 @@ class MainMenuScene(Scene):
         self.engine.move_window(self.rect)
 
     def play(self):
-        from game.play_scene import PlayScene     # imported here: PlayScene also imports this file (back to the menu)
-        self.engine.change_scene(PlayScene())
+        from game.game_menu_scene import GameMenuScene     # imported here: the game menu also imports this file
+        self.engine.change_scene(GameMenuScene())
 
     def quit(self):
         self.engine.stop()

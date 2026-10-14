@@ -4,7 +4,13 @@ The player's ship: moves with W A S D and always points at the mouse.
 It has 2 weapon slots (slot 1: left mouse button, slot 2: right mouse button) and 2 ability slots (keys in
 settings.ABILITY_KEYS). A slot holds a Weapon / Ability or None (empty). Weapons and abilities decide everything
 about their shots – the ship only says where from and in which direction.
+
+Knocked (knock()): pushed back – fast at first, then slowing down (KNOCKBACK_DECAY) – and stunned for a moment: it
+can't move, shoot, use abilities or throw towers (the scene asks stunned), only aim. Small dots circle above it then.
 """
+
+import math
+
 
 import pygame
 
@@ -14,6 +20,10 @@ from game.basic_gun import BasicGun
 from game.dash import Dash
 from game.rocket import Rocket
 from game.ship_shape import draw_ship
+
+KNOCKBACK_DECAY = 12        # per second: how fast a knockback slows down (it covers distance in total)
+STUN_DOTS = 3
+STUN_COLOR = (255, 230, 120)
 
 
 class Ship(Entity):
@@ -27,6 +37,10 @@ class Ship(Entity):
         self.abilities = [Dash(), Rocket()]
         self.invulnerable = 0.0                         # seconds left in which hits don't count (after a hit)
         self.stars = 0                                  # currency for the shop, dropped by killed enemies
+        self.knockback = pygame.Vector2()               # pixels per second it's being pushed (slowing down)
+        self.stun = 0.0                                 # seconds left in which it can't act
+        self.stun_age = 0.0                             # seconds since the stun began (for the dots)
+        self.watchtower = None                          # the watchtower kit (skill tree) – None: can't build any
 
     @staticmethod
     def move_direction():
@@ -38,9 +52,29 @@ class Ship(Entity):
             direction.normalize_ip()            # otherwise diagonal movement would be ~1.4x faster
         return direction
 
+    @property
+    def stunned(self):
+        return self.stun > 0
+
+    def knock(self, direction, distance, stun):
+        """Pushes it distance pixels in direction (spread over a moment) and stuns it for stun seconds."""
+        if pygame.Vector2(direction).length_squared():
+            self.knockback = pygame.Vector2(direction).normalize() * distance * KNOCKBACK_DECAY
+        if stun > self.stun:
+            self.stun, self.stun_age = stun, 0.0
+
     def update(self, dt, target):
         """target: the point to aim at (the mouse, in world coordinates)."""
-        self.rect.move_ip(self.move_direction() * self.speed * dt)
+        self.stun = max(0.0, self.stun - dt)
+        self.stun_age += dt
+        if not self.stunned:
+            self.rect.move_ip(self.move_direction() * self.speed * dt)
+        if self.knockback.length_squared() > 1:
+            slowing = math.exp(-KNOCKBACK_DECAY * dt)
+            self.rect.move_ip(self.knockback * (1 - slowing) / KNOCKBACK_DECAY)     # exactly the way it slows down
+            self.knockback *= slowing
+        else:
+            self.knockback = pygame.Vector2()
 
         to_target = pygame.Vector2(target) - self.rect.center
         if to_target.length_squared() > 1:      # mouse right on the ship: keep the last direction
@@ -60,15 +94,6 @@ class Ship(Entity):
             return False
         self.invulnerable = settings.INVULNERABLE_TIME
         return True
-
-    def stat_groups(self):
-        """All stats, grouped by part: [(title, [(name, value), …]), …] – the ship itself, then every weapon and
-        ability in a slot. Shown in the shop."""
-        groups = [("Ship", [("Move speed", f"{self.speed:g} px/s")])]
-        for item in self.weapons + self.abilities:
-            if item:
-                groups.append((item.name, item.stat_lines()))
-        return groups
 
     def nose(self):
         """Where shots come out (world coordinates)."""
@@ -93,7 +118,12 @@ class Ship(Entity):
         for ability in self.abilities:
             if ability:
                 ability.draw(surface, offset, self)
+        center = pygame.Vector2(self.rect.center) - offset
+        if self.stunned:                                # little dots circling above it (also while it blinks)
+            for dot in range(STUN_DOTS):
+                angle = self.stun_age * 8 + dot * 2 * math.pi / STUN_DOTS
+                spot = center + (math.cos(angle) * 12, -settings.SHIP_SIZE * 0.9 + math.sin(angle) * 4)
+                pygame.draw.circle(surface, STUN_COLOR, spot, 2)
         if self.invulnerable and int(self.invulnerable * 10) % 2:      # blinks while invulnerable
             return
-        center = pygame.Vector2(self.rect.center) - offset
         draw_ship(surface, center, self.aim, settings.SHIP_SIZE, self.color)

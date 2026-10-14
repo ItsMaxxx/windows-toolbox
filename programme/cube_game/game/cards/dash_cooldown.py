@@ -7,10 +7,12 @@ from game.dash import Dash
 
 
 class DashCooldownCard(Card):
+    key = "dash_cooldown"
     name = "Dash cooldown"
     category = "Dash"
     stat = "cooldown_time"
-    amount = -0.15
+    amount = -0.1
+    card_amount = -0.3
     unit = " s"
     minimum = 0.3
 

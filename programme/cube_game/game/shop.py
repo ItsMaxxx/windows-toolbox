@@ -1,64 +1,46 @@
 """
-The shop's logic: 3 random offers, buying (10 stars, the bought card is replaced by a new random one) and rerolling
-all offers (3 stars). The offers stay the same between visits – they only change by buying or rerolling.
+The shop during a run (T): every stat can be upgraded directly, as often as you like, for stars. Each upgrade of a
+stat costs more than the last one of that stat: price + price_step × (times bought in this run) – the numbers are in
+data/upgrades.json. A stat that can't go further (a cooldown at its minimum) is maxed.
 
-Offers are anything with name, price, available(ship) and apply(ship) – for now only cards (game/cards), later also
-weapons or abilities.
+Upgrades are cards (game/cards): the shop offers every card whose part the ship has (no dash yet: no dash upgrades).
 """
 
-import random
+from game.cards import CARDS
 
-from game.cards import ALL_CARDS
-
-OFFER_COUNT = 3
-REROLL_PRICE = 3            # stars
+CATEGORIES = ("Ship", "Weapons", "Dash", "Rocket", "Watchtower")
 
 
 class Shop:
     def __init__(self, ship):
         self.ship = ship
-        self.offers = [None] * OFFER_COUNT
-        self.roll()
+        self.bought = {}            # card key -> how often it was bought in this run
 
-    def candidates(self, exclude=()):
-        """New offers that make sense for this ship right now, without the types in exclude."""
-        return [card_type() for card_type in ALL_CARDS
-                if card_type not in exclude and card_type().available(self.ship)]
+    def upgrades(self, category):
+        """The cards of one category, in their order – also those the ship has no part for (the panel shows them
+        as locked)."""
+        return [card for card in CARDS.values() if card.category == category]
 
-    def roll(self):
-        """New random offers, all of different types (free – used at the start and by reroll())."""
-        cards = self.candidates()
-        picked = random.sample(cards, min(OFFER_COUNT, len(cards)))
-        self.offers = picked + [None] * (OFFER_COUNT - len(picked))
+    def has_part(self, card):
+        return bool(card.targets(self.ship))
 
-    def can_afford(self, price):
-        return self.ship.stars >= price
+    def level(self, card):
+        return self.bought.get(card.key, 0)
 
-    def reroll(self):
-        """Pays REROLL_PRICE for new offers. False if there aren't enough stars."""
-        if not self.can_afford(REROLL_PRICE):
+    def price(self, card):
+        return round(card.price + card.price_step * self.level(card))
+
+    def maxed(self, card):
+        return self.has_part(card) and not card.available(self.ship)
+
+    def can_afford(self, card):
+        return self.ship.stars >= self.price(card)
+
+    def buy(self, card):
+        """One upgrade of card's stat. False if the ship doesn't have the part, it's maxed or too expensive."""
+        if not card.available(self.ship) or not self.can_afford(card):
             return False
-        self.ship.stars -= REROLL_PRICE
-        self.roll()
+        self.ship.stars -= self.price(card)
+        card.apply(self.ship)
+        self.bought[card.key] = self.level(card) + 1
         return True
-
-    def buy(self, index):
-        """Buys offer number index (0–2). False if it's empty or too expensive."""
-        offer = self.offers[index]
-        if offer is None or not self.can_afford(offer.price):
-            return False
-        self.ship.stars -= offer.price
-        offer.apply(self.ship)
-        self.offers[index] = None
-        for i, card in enumerate(self.offers):
-            # the bought slot gets a new card; so does a slot whose card has reached its limit (e.g. a cooldown that
-            # can't go lower any more)
-            if card is None or not card.available(self.ship):
-                self.offers[i] = self.replacement(i)
-        return True
-
-    def replacement(self, index):
-        """A random new offer for slot index, of a type that isn't in the other slots – or None if there's none."""
-        others = {type(card) for i, card in enumerate(self.offers) if card and i != index}
-        cards = self.candidates(exclude=others)
-        return random.choice(cards) if cards else None

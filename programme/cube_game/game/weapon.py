@@ -1,6 +1,6 @@
 """
 Base class for weapons. A weapon sits in one of the ship's weapon slots and decides everything about its shots:
-damage, attack speed, shot speed and size, wall push, colour. Each weapon has its own cooldown.
+damage, attack speed, projectile speed and size, wall push, colour. Each weapon has its own cooldown.
 
 New weapon = subclass with its own values (see basic_gun.py); override fire() for different patterns
 (e.g. a shotgun that returns several projectiles at once).
@@ -47,5 +47,5 @@ class Weapon:
             ("Damage", f"{self.damage:g}"),
             ("Attack speed", f"{self.fire_rate:g}/s"),
             ("Wall push", f"{self.wall_push:g} px"),
-            ("Shot speed", f"{self.shot_speed:g} px/s"),
+            ("Projectile speed", f"{self.shot_speed:g} px/s"),
         ]

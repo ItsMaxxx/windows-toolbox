@@ -1,15 +1,17 @@
 """
-Shot speed card: Faster shots, for every weapon.
+Projectile speed card: Faster projectiles, for every weapon.
 """
 
 from game.cards.card import Card
 
 
 class ShotSpeedCard(Card):
-    name = "Shot speed"
+    key = "shot_speed"
+    name = "Projectile speed"
     category = "Weapons"
     stat = "shot_speed"
-    amount = 150
+    amount = 100
+    card_amount = 150
     unit = " px/s"
 
     def targets(self, ship):

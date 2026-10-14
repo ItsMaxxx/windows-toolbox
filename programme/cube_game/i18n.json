@@ -13,12 +13,24 @@
     "en": "Play"
   },
   "page.controls": {
-    "de": "W A S D bewegen  ·  Maus zielen  ·  Linksklick schießen  ·  Shift Dash  ·  Leertaste Rakete  ·  Tab Inventar  ·  T Shop  ·  Esc Menü  ·  F3 Tasten-Anzeige",
-    "en": "W A S D to move  ·  mouse to aim  ·  left click to shoot  ·  Shift dash  ·  Space rocket  ·  Tab inventory  ·  T shop  ·  Esc menu  ·  F3 key display"
+    "de": "W A S D bewegen  ·  Maus zielen  ·  Linksklick schießen  ·  Shift Dash  ·  Leertaste Rakete  ·  B Wachturm  ·  Tab Inventar  ·  T Shop  ·  Esc Menü  ·  F3 Tasten-Anzeige",
+    "en": "W A S D to move  ·  mouse to aim  ·  left click to shoot  ·  Shift dash  ·  Space rocket  ·  B watchtower  ·  Tab inventory  ·  T shop  ·  Esc menu  ·  F3 key display"
   },
   "page.play.button": {
     "de": "Spielen",
     "en": "Play"
+  },
+  "page.settings": {
+    "de": "Einstellungen",
+    "en": "Settings"
+  },
+  "page.key_display": {
+    "de": "Tasten-Anzeige beim Start einblenden",
+    "en": "Show the key display at the start"
+  },
+  "page.key_display.hint": {
+    "de": "Die Tasten unten rechts im Spiel. F3 blendet sie während des Spielens ein und aus. Gilt ab dem nächsten Run.",
+    "en": "The keys in the bottom right of the game. F3 shows and hides them while playing. Applies from the next run."
   },
   "page.advanced": {
     "de": "Erweitert",

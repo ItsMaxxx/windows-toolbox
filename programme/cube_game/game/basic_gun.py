@@ -9,4 +9,4 @@ class BasicGun(Weapon):
     name = "Basic gun"
 
     def __init__(self):
-        super().__init__(damage=1, fire_rate=6, shot_speed=950, shot_size=6, wall_push=15, color=(255, 255, 255))
+        super().__init__(damage=1, fire_rate=3, shot_speed=880, shot_size=6, wall_push=15, color=(255, 255, 255))
