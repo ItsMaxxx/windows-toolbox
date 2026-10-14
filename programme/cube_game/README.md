@@ -521,3 +521,16 @@ Notizen / offene Fragen:
   **+20 % Schaden** (`damage_bonus` in `buildings.json`, `PlayScene.expose_enemies`, `Enemy.damage_factor` – nach
   der Panzerung, Türme addieren sich nicht). Sichtfenster und Anlocken bleiben. `base_hp` und `hit_cooldown`
   sind weg (das Spielmenü meldet sie, falls sie noch in der Datei stehen).
+- 15.10.2026 (Claude, auf Wunsch gebaut): **Zwischenspeicher für Bilder** (`engine/sprite_cache.py`): Was jedes Bild
+  gleich aussieht, wird einmal gemalt und danach nur noch kopiert – Gegner-Körper (pro Größe, Tier, weiß beim
+  Treffer), Buff-Rand, Lebenspunkte, Grund von *Burning ground* und *Slow field* (Glut/Ringe kommen live drauf,
+  das Ausblenden macht `set_alpha`), Wachturm-Bereich und der Rand-Umriss der Zusatzfenster (nur neu, wenn ein
+  Fenster sich bewegt). Sieht pixelgenau gleich aus (geprüft); gemessen pro 100 Gegner: Basic 0,84 → 0,28 ms,
+  Shield 1,23 → 0,66 ms, Artillery 1,74 → 1,21 ms (Arm und Füße bleiben live gezeichnet); Rand-Umriss
+  0,5 → 0,06 ms. Neue Hilfen: `PICTURES.get(key, make)`, `scratch(size)`, `load_picture(path)`.
+- 15.10.2026 (Claude, auf Wunsch gebaut): **Eigene Gegner-Bilder**: `assets/images/<gegner>.png` (z. B.
+  `shooter.png`, Schlüssel wie in `enemies.json`) ersetzt den Körper des Gegners – nach rechts blickend malen, er
+  dreht sich mit (`TURN_STEP` 5°, die gedrehten Bilder werden beim ersten Bedarf gemacht und gespeichert), weiß beim
+  Treffer, Seitenverhältnis bleibt. Kein Tier-Rahmen (Evolutionen haben eigene Dateien). Läufe, Lebenspunkte und
+  Buff-Rand bleiben. Kaputte Datei = wieder das Quadrat. Anleitung und Knopf *Bilder-Ordner öffnen* auf der
+  Toolbox-Seite. Gelesen beim Spielstart, nicht während des Spiels.

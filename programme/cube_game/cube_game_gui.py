@@ -27,6 +27,7 @@ t = i18n.Texte(FOLDER / "i18n.json")
 # instead of "Python". If it's missing, the page starts the script directly with the toolbox's Python.
 LAUNCHER = FOLDER / ID_CARD["starter"]
 SCRIPT = FOLDER / ID_CARD["skript"]
+IMAGES = FOLDER / "assets" / "images"           # picture files for enemies (game/skins/skin.py)
 
 
 class CubeGamePage(ToolPage):
@@ -40,6 +41,10 @@ class CubeGamePage(ToolPage):
             Section(t("page.settings"),
                     Switch(t("page.key_display"), key="key_display"),
                     Text(t("page.key_display.hint"), color=MUTED)),
+            Section(t("page.skins"),
+                    Text(t("page.skins.hint"), color=MUTED),
+                    Buttons(Button(t("page.skins.open"), lambda: self.open(IMAGES), width=170, style="grau",
+                                   ziel=IMAGES))),
             Section(t("page.advanced"),
                     Buttons(Button(t("page.open_folder"), lambda: self.open(FOLDER), width=150, style="grau",
                                    ziel=FOLDER))),

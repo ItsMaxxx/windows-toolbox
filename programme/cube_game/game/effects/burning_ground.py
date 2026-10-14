@@ -5,12 +5,17 @@ each pulse instead of glowing white the whole time. It fades out towards the end
 
 Unlike the other effects it does something: the scene calls pulse() after update() and hurts the enemies within
 radius (see PlayScene.update_burning).
+
+Drawing: the glowing ground and its edge are drawn once (engine/sprite_cache.py); every frame they're only copied onto
+a reused layer, the embers go on top, and the whole layer is made more see-through as it fades out.
 """
 
 import math
 import random
 
 import pygame
+
+from engine.sprite_cache import PICTURES, scratch
 
 PULSE = 0.5                 # seconds between two pulses of damage
 FADE_TIME = 0.6             # seconds at the end in which it fades out
@@ -45,11 +50,19 @@ class BurningGround:
     def draw(self, surface, offset):
         fade = min(1.0, (self.duration - self.age) / FADE_TIME)
         size = math.ceil(self.radius * 2)
-        layer = pygame.Surface((size, size), pygame.SRCALPHA)
+        layer = scratch((size, size))
         center = (size / 2, size / 2)
-        pygame.draw.circle(layer, (*GROUND, round(55 * fade)), center, self.radius)
-        pygame.draw.circle(layer, (*GROUND, round(140 * fade)), center, self.radius, 2)
+        layer.blit(PICTURES.get(("burning ground", size, self.radius), lambda: self.make_ground(size)), (0, 0))
         for spot, phase in self.embers:
             flicker = 0.5 + 0.5 * math.sin(self.age * 9 + phase)
-            pygame.draw.circle(layer, (*EMBER, round(220 * fade * flicker)), spot + center, 2)
+            pygame.draw.circle(layer, (*EMBER, round(220 * flicker)), spot + center, 2)
+        layer.set_alpha(round(255 * fade))
         surface.blit(layer, self.position - offset - center)
+
+    def make_ground(self, size):
+        """The glowing ground and its edge, without embers and not faded yet."""
+        ground = pygame.Surface((size, size), pygame.SRCALPHA)
+        center = (size / 2, size / 2)
+        pygame.draw.circle(ground, (*GROUND, 55), center, self.radius)
+        pygame.draw.circle(ground, (*GROUND, 140), center, self.radius, 2)
+        return ground

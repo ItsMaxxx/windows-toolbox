@@ -33,6 +33,7 @@ from engine import Scene
 from engine.collision import close, nearby_pairs, push_apart
 from engine.desktop import Desktop
 from engine.key_overlay import KeyOverlay
+from engine.sprite_cache import SpriteCache
 from engine.ui import draw_text
 from game import inventory, pause_menu, settings, shop_panel, skill_tree
 from game.ability_bar import AbilityBar
@@ -116,6 +117,7 @@ class PlayScene(Scene):
         self.towers = []                        # watchtowers – in the air or standing
         self.ui_layer = None                    # this frame's HUD etc. for the extra windows: (main window, surface)
         self.ui_surface = None                  # the transparent surface it's drawn on (kept between frames)
+        self.outlines = SpriteCache(16)         # the extra windows' borders (draw_outline) – big, so only a few
         self.elapsed = 0.0                      # seconds played (not counting pauses)
         self.kills = 0
         self.cores = 0                          # cores collected in this run (already added to the profile)
@@ -636,21 +638,31 @@ class PlayScene(Scene):
 
         How: a mask of everything covered by a window (a bit bigger than this window, so edges right at its side are
         found, too); the border is every covered pixel that has an uncovered one at most BORDER_WIDTH away. (The main
-        window simply draws the arena's border: where it differs, an extra window lies on top of it.)"""
+        window simply draws the arena's border: where it differs, an extra window lies on top of it.)
+
+        That's slow (half a millisecond for a small window), so the finished border is kept (self.outlines) and only
+        worked out anew once a window has moved or changed its size."""
         width = settings.BORDER_WIDTH
         size = (surface.get_width() + 2 * width, surface.get_height() + 2 * width)
         origin = pygame.Vector2(offset) - (width, width)
-        covered = pygame.Mask(size)
+        covered_rects = []
         for rect in self.field().sight:
             local = rect.move(-origin.x, -origin.y).clip(pygame.Rect((0, 0), size))
             if local.width and local.height:
-                covered.draw(pygame.Mask(local.size, fill=True), local.topleft)
-        uncovered = covered.copy()
-        uncovered.invert()
-        reach = pygame.Mask((2 * width + 1, 2 * width + 1), fill=True)
-        near_uncovered = uncovered.convolve(reach, pygame.Mask(size), (-width, -width))
-        border = covered.overlap_mask(near_uncovered, (0, 0))
-        surface.blit(border.to_surface(setcolor=settings.BORDER, unsetcolor=(0, 0, 0, 0)), (-width, -width))
+                covered_rects.append(tuple(local))
+
+        def make():
+            covered = pygame.Mask(size)
+            for left, top, local_width, local_height in covered_rects:
+                covered.draw(pygame.Mask((local_width, local_height), fill=True), (left, top))
+            uncovered = covered.copy()
+            uncovered.invert()
+            reach = pygame.Mask((2 * width + 1, 2 * width + 1), fill=True)
+            near_uncovered = uncovered.convolve(reach, pygame.Mask(size), (-width, -width))
+            border = covered.overlap_mask(near_uncovered, (0, 0))
+            return border.to_surface(setcolor=settings.BORDER, unsetcolor=(0, 0, 0, 0))
+
+        surface.blit(self.outlines.get((size, tuple(covered_rects)), make), (-width, -width))
 
     def extra_views(self):
         """The open extra windows: the watchtowers' and the radar's."""

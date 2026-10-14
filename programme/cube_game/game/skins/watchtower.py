@@ -8,6 +8,8 @@ import math
 
 import pygame
 
+from engine.sprite_cache import PICTURES
+
 COLOR = (120, 180, 255)
 LENS = (12, 24, 48)
 SWEEP_SPEED = 2.5           # how fast the radar line turns (radians per second)
@@ -51,7 +53,11 @@ class WatchtowerSkin:
         pygame.draw.rect(surface, self.color, (bar.left, bar.top, round(width * share), height))
 
     def draw_area(self, surface, rect):
-        """Its area (rect, in window coordinates): a thin outline – enemies in it take more damage."""
-        layer = pygame.Surface(rect.size, pygame.SRCALPHA)
-        pygame.draw.rect(layer, (*self.color, AREA_ALPHA), layer.get_rect(), 1)
-        surface.blit(layer, rect.topleft)
+        """Its area (rect, in window coordinates): a thin outline – enemies in it take more damage. Drawn once per size,
+        then reused (engine/sprite_cache.py)."""
+        def make():
+            layer = pygame.Surface(rect.size, pygame.SRCALPHA)
+            pygame.draw.rect(layer, (*self.color, AREA_ALPHA), layer.get_rect(), 1)
+            return layer
+
+        surface.blit(PICTURES.get(("watchtower area", tuple(rect.size), self.color), make), rect.topleft)
