@@ -3,7 +3,8 @@
     "cooldown": 3,
     "min_cooldown": 1,
     "distance": 100,
-    "duration": 0.1
+    "duration": 0.1,
+    "charges": 1
   },
   "rocket": {
     "cooldown": 10,

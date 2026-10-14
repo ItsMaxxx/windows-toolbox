@@ -9,7 +9,7 @@ Energy: both weapons share it. Every shot costs its weapon's energy_cost; the sh
 up to max_energy. Firing both at once empties it faster. Once it's empty, the weapons only fire as fast as it comes
 back – a shot goes off as soon as there's enough for it. Abilities don't use energy, only their cooldown.
 
-Hull: armor takes a share off every hit (absorb()), invulnerable_time is how long it can't be hit again after one,
+Hull: armor takes a flat amount off every hit (absorb()), invulnerable_time is how long it can't be hit again after one,
 and magnet_radius is how close stars and cores have to be to get pulled in.
 
 Knocked (knock()): pushed back – fast at first, then slowing down (KNOCKBACK_DECAY) – and stunned for a moment: it
@@ -22,7 +22,7 @@ import math
 import pygame
 
 from engine import Entity
-from game import settings, ship_data
+from game import armor, settings, ship_data
 from game.dash import Dash
 from game.rocket import Rocket
 from game.ship_shape import draw_ship
@@ -48,7 +48,7 @@ class Ship(Entity):
         self.energy_regen = stats["energy_regen"]       # per second
         self.energy = self.max_energy
         self.invulnerable_time = stats["invulnerable_time"]
-        self.armor = stats["armor"]                     # percent off every hit
+        self.armor = stats["armor"]                     # pixels off every hit
         self.magnet_radius = stats["magnet_radius"]
         self.abilities = [Dash(), Rocket()]
         self.invulnerable = 0.0                         # seconds left in which hits don't count (after a hit)
@@ -87,8 +87,8 @@ class Ship(Entity):
         self.energy = self.max_energy
 
     def absorb(self, damage):
-        """What's left of a hit's damage after the armor (at most settings.MAX_SHIP_ARMOR percent off)."""
-        return damage * (1 - min(self.armor, settings.MAX_SHIP_ARMOR) / 100)
+        """What's left of a hit's damage after the armor: armor pixels less, at least settings.MIN_HIT_SHARE."""
+        return armor.reduce(damage, self.armor, settings.MIN_HIT_SHARE)
 
     def update(self, dt, target):
         """target: the point to aim at (the mouse, in world coordinates)."""

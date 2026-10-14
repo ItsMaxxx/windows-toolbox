@@ -8,7 +8,8 @@ hit it can't be hurt again for hit_cooldown seconds. Melee enemies (basic, charg
 lure_range of it and are closer to it than to the ship go for the tower instead. Destroyed, its window closes.
 
 Two classes: WatchtowerKit is what the ship carries (skill tree "Watchtower": how many towers at once; the shop and
-cards upgrade its vision), Watchtower is one tower in the world. The values are in data/buildings.json.
+cards upgrade its vision), Watchtower is one tower in the world. The values are in data/buildings.json, what a tower
+costs in data/shop.json.
 """
 
 import math
@@ -39,8 +40,9 @@ class WatchtowerKit:
 
     @property
     def price(self):
-        stats = values()
-        return round(stats["price"] + stats["price_step"] * self.bought)
+        """Stars for the next tower (data/shop.json)."""
+        from game.shop_data import TOWER
+        return round(TOWER["price"] + TOWER["price_step"] * self.bought)
 
 
 class Watchtower(Entity):
@@ -50,8 +52,6 @@ class Watchtower(Entity):
         "vision": 320,          # side length of its window
         "throw_range": 420,     # how far it's thrown from the ship
         "throw_time": 0.5,      # seconds in the air
-        "price": 15,            # stars for the first tower of a run …
-        "price_step": 10,       # … and this many more for every further one
         "hit_cooldown": 0.4,    # seconds after a hit in which it can't be hurt again
         "lure_range": 220,      # melee enemies this close (and closer to it than to the ship) attack it
     }

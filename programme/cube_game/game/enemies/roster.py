@@ -21,6 +21,7 @@ from game.enemies.basic import BasicEnemy
 from game.enemies.cannoneer import Cannoneer
 from game.enemies.carrier import Carrier
 from game.enemies.charger import Charger
+from game.enemies.cluster import ClusterArtillery
 from game.enemies.critter import Critter
 from game.enemies.fat import FatGuy
 from game.enemies.laser import Laser
@@ -31,18 +32,23 @@ from game.enemies.sniper import Sniper
 # the names the data files use for the enemy types
 ENEMY_TYPES = {"basic": BasicEnemy, "charger": Charger, "shooter": Shooter, "sniper": Sniper, "carrier": Carrier,
                "critter": Critter, "artillery": Artillery, "fat": FatGuy, "cannoneer": Cannoneer, "shield": ShieldBearer,
-               "laser": Laser}
+               "laser": Laser, "cluster": ClusterArtillery}
 # tier 1 type -> its evolution (tier 2)
-EVOLUTIONS = {"basic": "fat", "shooter": "cannoneer", "charger": "shield", "sniper": "laser"}
+EVOLUTIONS = {"basic": "fat", "shooter": "cannoneer", "charger": "shield", "sniper": "laser", "artillery": "cluster"}
 FILE = Path(__file__).resolve().parents[2] / "data" / "enemies.json"
 # 0 would break things (division by 0, invisible enemies, …)
 MUST_BE_POSITIVE = {"base_hp", "size", "fire_interval", "reload_time", "aim_time", "spawn_interval", "blast_radius",
-                    "setup_time", "pack_time", "beam_time"}
+                    "setup_time", "pack_time", "beam_time", "swing_time", "split_count", "split_time"}
 BASE_STATS = {}                     # type key -> {stat: value}: data/enemies.json over the class fallbacks
+COMMON_STATS = {"armor": 0}         # fallbacks every type has (on top of its class's stats)
+
+
+def fallbacks(key):
+    return {**COMMON_STATS, **ENEMY_TYPES[key].stats}
 
 
 def stat_names(key):
-    return ENEMY_TYPES[key].stats.keys()
+    return fallbacks(key).keys()
 
 
 def valid_value(name, value):
@@ -61,8 +67,8 @@ def reload(warnings):
         warnings.append(f"enemies.json: can't be read ({error}) – using built-in values")
         data = {}
     BASE_STATS.clear()
-    for key, enemy_type in ENEMY_TYPES.items():
-        values = dict(enemy_type.stats)
+    for key in ENEMY_TYPES:
+        values = fallbacks(key)
         entry = data.get(key, {})
         if not isinstance(entry, dict):
             warnings.append(f"enemies.json {key}: should be {{ … }} – using built-in values")

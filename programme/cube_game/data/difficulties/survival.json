@@ -20,7 +20,8 @@
     { "type": "basic",   "chance": 0.05, "after": 240, "growth": 0.06, "max_chance": 0.6 },
     { "type": "shooter", "chance": 0.05, "after": 270, "growth": 0.06, "max_chance": 0.6 },
     { "type": "charger", "chance": 0.05, "after": 300, "growth": 0.06, "max_chance": 0.6 },
-    { "type": "sniper",  "chance": 0.05, "after": 330, "growth": 0.06, "max_chance": 0.6 }
+    { "type": "sniper",  "chance": 0.05, "after": 330, "growth": 0.06, "max_chance": 0.6 },
+    { "type": "artillery", "chance": 0.05, "after": 360, "growth": 0.06, "max_chance": 0.6 }
   ],
   "swarms": [
     {
@@ -38,10 +39,10 @@
     { "from": 180, "enemy_stats": { "all": { "base_hp": "+1" } } },
     { "from": 240, "spawn": { "fat": 3, "cannoneer": 1 }, "announce": "Evolution begins!" },
     { "from": 240, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
-    { "from": 300, "arena": { "armor": "+15" }, "announce": "The walls harden!" },
+    { "from": 300, "arena": { "armor": "+5" }, "announce": "The walls harden!" },
     { "from": 360, "enemy_stats": { "all": { "base_hp": "+1" } } },
     { "from": 420, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
-    { "from": 480, "arena": { "armor": "+15" }, "announce": "The walls harden!" },
+    { "from": 480, "arena": { "armor": "+5" }, "announce": "The walls harden!" },
     { "from": 540, "enemy_stats": { "all": { "base_hp": "+1" } } },
     { "from": 600, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
     { "from": 720, "enemy_stats": { "all": { "base_hp": "+2" } } }

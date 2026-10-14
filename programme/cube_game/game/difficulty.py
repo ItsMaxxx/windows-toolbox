@@ -16,7 +16,7 @@ import re
 from dataclasses import dataclass, field, fields, replace
 from pathlib import Path
 
-from game import ability_data, buildings, cards, radar, ship_data, skill_tree
+from game import ability_data, buildings, cards, radar, ship_data, shop_data, skill_tree
 from game.enemies import roster
 from game.enemies.roster import ENEMY_TYPES, EVOLUTIONS, EnemyRoster, stat_names
 from game.weapons import data as weapon_data
@@ -37,7 +37,7 @@ class Arena:
     shrink_speed: float = 20        # pixels per second each edge moves in at the start …
     shrink_growth: float = 0        # … plus this much per minute played …
     max_shrink_speed: float = 60    # … up to this
-    armor: float = 0                # percent every push of an edge is shorter (phases can change it)
+    armor: float = 0                # pixels every push of an edge is shorter (phases can change it)
 
 
 @dataclass(frozen=True)
@@ -390,13 +390,14 @@ def parse_change(value):
 
 
 def reload():
-    """Reads data/enemies.json, data/upgrades.json, data/weapons.json, data/abilities.json, data/buildings.json,
-    data/radar.json, data/ships.json, data/skilltree.json and every file in FOLDER again (DIFFICULTIES and WARNINGS are
-    changed in place)."""
+    """Reads data/enemies.json, data/upgrades.json, data/shop.json, data/weapons.json, data/abilities.json,
+    data/buildings.json, data/radar.json, data/ships.json, data/skilltree.json and every file in FOLDER again
+    (DIFFICULTIES and WARNINGS are changed in place)."""
     WARNINGS.clear()
     roster.reload(WARNINGS)
     cards.reload(WARNINGS)
     weapon_data.reload(WARNINGS)
+    shop_data.reload(WARNINGS)              # after the weapons: their upgrade_factor is the fallback
     ability_data.reload(WARNINGS)
     buildings.reload(WARNINGS)
     radar.reload(WARNINGS)

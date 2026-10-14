@@ -155,7 +155,7 @@ class CardPanel:
         rules, owned = self.shop.rules, self.shop.profile.cards
         title = draw_text(surface, f"YOUR CARDS  {len(owned)}/{rules.max_owned}", 22, settings.TEXT_MUTED,
                           topleft=(self.left, self.collection_top()))
-        draw_text(surface, f"active {self.shop.active_count()}/{rules.max_active}", 22, CORE_COLOR,
+        draw_text(surface, f"active {self.shop.active_count()}/{self.shop.profile.max_active_cards()}", 22, CORE_COLOR,
                   midleft=(title.right + 18, title.centery))
         for index, rect in enumerate(self.slot_rects()):
             if index < len(owned):

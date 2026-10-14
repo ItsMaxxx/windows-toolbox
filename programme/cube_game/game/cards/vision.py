@@ -7,6 +7,7 @@ from game.cards.card import Card
 
 class VisionCard(Card):
     key = "vision"
+    shop_name = "watchtower_vision"
     name = "Vision"
     category = "Watchtower"
     stat = "vision"

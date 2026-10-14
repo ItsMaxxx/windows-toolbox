@@ -14,7 +14,7 @@ doesn't know) as it is, so neither overwrites the other.
 import json
 from pathlib import Path
 
-from game import cards
+from game import cards, skill_tree
 from game.difficulty import DIFFICULTIES, default_key
 from game.skill_tree import NODES_BY_KEY
 from game.weapons import STARTER, WEAPON_TYPES
@@ -66,8 +66,8 @@ class Profile:
         valid = [(cards.saved_key(card.get("key"), weapon), card) for card in saved_cards if isinstance(card, dict)]
         valid = [(key, card) for key, card in valid if key]
         active = 0
-        for key, card in valid[:rules.max_owned]:   # never more than allowed (e.g. a limit was lowered): the first count
-            is_active = card.get("active") is True and active < rules.max_active
+        for key, card in valid[:rules.max_owned]:   # never more than allowed (a limit was lowered): the first count
+            is_active = card.get("active") is True and active < profile.max_active_cards()
             active += is_active
             profile.cards.append({"key": key, "active": is_active})
         offers = data.get("card_offers")
@@ -131,9 +131,14 @@ class Profile:
         self.save()
         return True
 
+    def max_active_cards(self):
+        """How many cards can be active at once: max_active in data/upgrades.json plus the skill tree's Card slots."""
+        return cards.RULES.max_active + round(skill_tree.amount(self, skill_tree.CARD_SLOTS))
+
     def active_cards(self):
-        """The keys of the active cards (a key twice if that card is active twice)."""
-        return [card["key"] for card in self.cards if card["active"]]
+        """The keys of the active cards (a key twice if that card is active twice) – never more than
+        max_active_cards(), e.g. after data/skilltree.json lost a level of Card slots."""
+        return [card["key"] for card in self.cards if card["active"]][:self.max_active_cards()]
 
     # --- difficulties and runs ---
 

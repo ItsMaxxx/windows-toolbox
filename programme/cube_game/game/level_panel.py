@@ -76,7 +76,11 @@ def percent(chance):
 
 
 def plural(key):
-    return f"{ENEMY_TYPES[key].name}s"
+    """ "Snipers", "Artilleries" – the type's name with an s (a y after a consonant becomes ies)."""
+    name = ENEMY_TYPES[key].name
+    if name.endswith("y") and name[-2:-1].lower() not in "aeiou":
+        return name[:-1] + "ies"
+    return name + "s"
 
 
 def change_text(operation, number, unit=""):
@@ -133,7 +137,7 @@ def events(level):
     HP from the start, swarms, and every phase (one Event per kind of change in it)."""
     found = []
     if level.arena.armor:
-        found.append(Event(0, None, "walls", f"Armored walls ({level.arena.armor:g} %)", WALL_COLOR))
+        found.append(Event(0, None, "walls", f"Armored walls ({level.arena.armor:g} px)", WALL_COLOR))
     start_hp = sum(number for target, stat, operation, number in level.enemy_stats
                    if target == "all" and stat == "base_hp" and operation == "add")
     if start_hp:
@@ -167,7 +171,7 @@ def phase_changes(phase):
         changes.append(("wave", f"{'Faster' if faster else 'Slower'} spawns ({gap})", NOTICE_COLOR))
     for name, operation, number in phase.arena:
         if name == "armor":
-            changes.append(("walls", f"Walls harden ({change_text(operation, number, ' %')})", WALL_COLOR))
+            changes.append(("walls", f"Walls harden ({change_text(operation, number, ' px')})", WALL_COLOR))
         else:
             changes.append(("walls", f"Walls close in {change_text(operation, number, ' px/s')}", WALL_COLOR))
     if any(stat in DAMAGE_STATS for _, stat, _, _ in phase.enemy_stats):

@@ -21,7 +21,10 @@ Enemies can't overlap: the scene pushes touching ones apart every tick, the heav
 Facing: every enemy has a direction it faces (aim). Ranged enemies turn it towards the ship at a limited speed
 (turn_towards, their stat "turn_speed" in degrees per second) and only shoot while the ship is within their
 "fire_cone" in front of them (facing) – their shots go where they face, not straight at the ship. Fly round them fast
-enough and they can't keep up.
+enough and they can't keep up. They spawn facing the ship, so they don't waste their first seconds turning round.
+
+Armor (stat "armor", 0 for most): every hit from the player does that much less damage – flat, so many weak shots
+(machine gun) barely scratch an armored enemy, a few heavy ones (cannon) hardly notice it (game/armor.py).
 
 Shots of the player first ask blocks(): an enemy can stop a shot without being hurt (the shield enemy's shield).
 
@@ -32,6 +35,7 @@ spawn in its place on harder levels (the level's "evolutions"). Their skins get 
 import pygame
 
 from engine import Entity
+from game import armor, settings
 from game.projectile import Projectile
 from game.shot_stats import ShotStats
 from game.skins.skin import Skin
@@ -70,7 +74,8 @@ class Enemy(Entity):
         self.seen = False       # set by the scene once it has been completely inside a window (arena or extra)
         self.spawned = []       # enemies created this tick – the scene moves them into its list
         self.lure = None        # a watchtower it goes for instead of the ship (set by the scene, melee enemies only)
-        self.aim = pygame.Vector2(1, 0)     # the direction it faces (length 1)
+        self.aim = pygame.Vector2(1, 0)     # the direction it faces (length 1) – towards the ship from its first update
+        self.oriented = False
 
     def stat(self, name):
         """The value for this run with every active buff: (value + adds) × factors."""
@@ -102,7 +107,8 @@ class Enemy(Entity):
         return pygame.Vector2(self.rect.center)
 
     def take_damage(self, amount):
-        self.hp -= amount
+        """A hit from the player: amount minus the armor (flat), at least settings.MIN_DAMAGE_SHARE of it."""
+        self.hp -= armor.reduce(amount, self.stat("armor"), settings.MIN_DAMAGE_SHARE)
         self.flash = HIT_FLASH
 
     # --- helpers for subclasses ---
@@ -169,6 +175,9 @@ class Enemy(Entity):
     # --- every tick ---
 
     def update(self, dt, ship):
+        if not self.oriented:               # it comes in already facing the ship – turning is for keeping up with it
+            self.oriented = True
+            self.aim = self.direction_to(ship.rect.center) or self.aim
         self.flash = max(0.0, self.flash - dt)
         for buff in self.buffs:
             buff.update(dt)

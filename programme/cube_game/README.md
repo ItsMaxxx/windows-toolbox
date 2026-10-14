@@ -452,3 +452,40 @@ Notizen / offene Fragen:
   freigeschaltete Waffe an. Die Zahl auf der Karte ist, was sie dieser Waffe wirklich gibt (`card_amount` ×
   `upgrade_factor`, Laser-Schaden also +0,04). Die Zahlen in `upgrades.json` bleiben pro Wert, für alle Waffen gleich.
   Alte Spielstände: Waffenkarten von früher (für alle Waffen) werden zur Karte der Waffe in Slot 1 (`cards.saved_key`).
+- 14.10.2026 (Claude, auf Wunsch gebaut): **Aktive Karten über den Skilltree**: Mit dem Karten-Shop ist erst **eine**
+  Karte gleichzeitig aktiv (`max_active` 1 in `upgrades.json`). Der neue Knoten *Card slots* (unter *Card shop*,
+  2 Stufen, 10 und 20 Cores) gibt je eine mehr, also höchstens 3 (`Profile.max_active_cards`). Alte Spielstände mit
+  mehr aktiven Karten behalten die erste aktiv, die anderen sind inaktiv, bis die Slots gekauft sind.
+- 14.10.2026 (Claude, auf Wunsch gebaut): **Panzerung überall flach** (`game/armor.py`): Wände, Schiff und – neu –
+  Gegner ziehen einen festen Betrag ab statt Prozent, mit einem Rest, der immer bleibt (`MIN_PUSH_SHARE` 10 %,
+  `MIN_HIT_SHARE` 25 %, `MIN_DAMAGE_SHARE` 15 % in `settings.py`; ersetzt `MAX_ARMOR` und `MAX_SHIP_ARMOR`). Wand-
+  Panzerung der Level umgerechnet (Prozent × 0,35, auf 0,5 px gerundet: A5 7 px am Start, B6 bis über 20 px). Schiff:
+  Shop +2 px, Karte +6 px, Skilltree +3 px pro Stufe. **Gegner-Panzerung** (`armor` in `enemies.json`, Standard 0 über
+  `roster.COMMON_STATS`, wirkt in `Enemy.take_damage`): Fat Guy, Shield, Cannoneer 1, Carrier, Artillery 0,5.
+  **Machine gun** dafür stark gegen Ungepanzerte, schwach gegen Panzerung und Wände (4 Schuss/s, 6 px Wall push,
+  2,5 Energie), **Cannon** das Gegenteil (9 Schaden, 90 px Wall push, 0,5 Schuss/s, 25 Energie).
+- 14.10.2026 (Claude, auf Wunsch gebaut): **Artillery als Katapult, sichtbare Granaten, Cluster (T2)**.
+  - Die Artillery wirft mit einem Katapultarm statt mit dem Mörser (`arm`, `loaded`, `swing_arm` in
+    `enemies/artillery.py`, gezeichnet in `skins/artillery.py`): Arm hinten mit Granate, schwingt in `swing_time` nach
+    vorn, lässt senkrecht los, kurbelt beim Nachladen zurück.
+  - Granaten fliegen sichtbar im Bogen mit Schatten (`ArtilleryStrike` mit `Arc`, `draw_air` über den Gegnern);
+    Flugbahn einstellbar: `fill_time` (Flugzeit), `arc_height`, `arc_steepness`, `arc_peak`, dazu `shell_size`.
+  - **Cluster** (`enemies/cluster.py`, Evolution der Artillery): Splittergranate ohne eigenen Schaden, platzt in 3
+    Splitter (`split_…`-Werte, `Split`, `ArtilleryStrike.fragments`) mit kleinen Kreisen, weit verstreut. Kommt als
+    Evolution in B4 (dort auch eine in *Artillery incoming!*), B5, B6 und Survival (ab 6:00).
+- 14.10.2026 (Claude, auf Wunsch gebaut): Carrier: neuer Wert **`spawn_amount`** – so viele Critter setzt er nach der
+  ersten Welle jedes Mal aus (Standard 1 wie bisher), nie über `max_critters`.
+- 14.10.2026 (Claude, auf Wunsch gebaut): **`data/shop.json`** für alles, was man im Run mit Sternen kauft
+  (`game/shop_data.py`): pro Upgrade `amount`, `price`, `price_step` (bisher in `upgrades.json`) und unter `watchtower`
+  der Turmpreis (bisher in `buildings.json`). `upgrades.json` hat nur noch `card_amount` und die Regeln des
+  Karten-Shops; liegt ein Wert in der falschen Datei, warnt das Spielmenü (`cards.read_numbers`).
+- 14.10.2026 (Claude, auf Wunsch gebaut): **`shop.json` mit einem Eintrag pro Shop-Zeile**: jede Waffe hat ihre eigenen
+  (`gun_damage`, `mg_damage`, `cannon_wall_push`, `laser_shot_speed` …), dazu `rocket_blast_radius` und
+  `watchtower_vision` (`card.shop_key`, `shop_data.read_upgrades`). `amount` ist genau, was eine Stufe der Waffe gibt –
+  der `upgrade_factor` gilt nur noch für Karten; die Werte sind umgerechnet (z. B. `mg_damage` 0,15), im Spiel ändert
+  sich nichts. Alte Namen meldet das Spielmenü mit dem neuen.
+- 14.10.2026 (Claude, auf Wunsch gebaut): **Dash im Skilltree**: *Distance* (3 Stufen, +25 px) und *Charges* (2 Stufen,
+  +1 Ladung) hinter *Dash* (`skill_tree.build_dash`, `Dash.upgrade`). Fähigkeiten können jetzt **Ladungen** haben
+  (`Ability.max_charges`, `charges`): jede Nutzung nimmt eine, der Cooldown füllt eine nach der anderen auf – mit einer
+  Ladung wie bisher. Grundwert `charges` des Dash in `abilities.json` (1). Die Fähigkeitenanzeige unten links zeigt
+  z. B. „SHIFT  Dash  2/3  1.4s“, Inventar und Spielmenü die Zahl der Ladungen.

@@ -19,7 +19,7 @@ DEFAULTS = {
     "max_energy": 100,              # energy for the weapons (full at the start) …
     "energy_regen": 20,             # … and how much comes back per second
     "invulnerable_time": 0.5,       # seconds after a hit in which it can't be hit again (it blinks)
-    "armor": 0,                     # percent a hit squeezes the arena less (at most settings.MAX_SHIP_ARMOR)
+    "armor": 0,                     # pixels every hit squeezes the arena less (flat, game/armor.py)
     "magnet_radius": 130,           # stars and cores this close get pulled in
     "color": (40, 110, 255),
 }

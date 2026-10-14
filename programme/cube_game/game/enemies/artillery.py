@@ -6,14 +6,19 @@ Artillery: olive, slow, a bit tougher. It's either moving or set up (sieged) –
                fire_range, it sets up. Seen and the ship too close, it backs away until it isn't.
   SETTING_UP – its feet come out (setup_time). From here on it's rooted: it doesn't move at all, not even when other
                enemies push.
-  SIEGED     – its barrel turns towards the ship (turn_speed); it fires while the ship is within fire_cone in front of
-               it.
+  SIEGED     – it turns towards the ship (turn_speed); it fires while the ship is within fire_cone in front of it.
   PACKING    – the setup played backwards (pack_time), then it moves again. It packs up when the ship gets too close
                (min_range) or out of reach (fire_range + RANGE_MARGIN) while it's setting up or sieged.
 
-When it fires, it doesn't shoot at the ship directly: it marks a spot near where the ship is right now (up to
-aim_spread off, anywhere around it) with a red circle (an ArtilleryStrike). The circle slowly fills up – when it's
-full, the shell lands and everything in it gets hit. Keep moving and it can't hurt you; stand still and it will.
+It's a catapult: its arm lies back with a shell in the bucket (arm ≈ ARM_REST degrees, loaded). Firing, the arm swings
+forward over the top (swing_time, faster and faster) and lets go of the shell at the top (ARM_RELEASE); then it cranks
+back during the reload and takes the next shell. The skin draws the arm from arm and loaded.
+
+The shell doesn't fly at the ship directly: it's lobbed at a spot near where the ship is at the moment it's let go (up
+to aim_spread off, anywhere around it), marked with a red circle (an ArtilleryStrike). It's in the air for fill_time on
+an arc – arc_height pixels high plus arc_steepness per pixel of distance, highest at arc_peak of the way – while the
+circle fills; when it lands, everything in the circle gets hit. Keep moving and it can't hurt you; stand still and it
+will. launch() makes the shell – the Cluster (its evolution) throws a splitter shell instead.
 """
 
 import math
@@ -21,12 +26,16 @@ import random
 
 import pygame
 
-from game.artillery_strike import ArtilleryStrike
+from game.artillery_strike import ArtilleryStrike, arc_for
 from game.enemies.enemy import Enemy
-from game.skins.artillery import ArtillerySkin
+from game.skins.artillery import ARM_LENGTH, ArtillerySkin
 
 MOVING, SETTING_UP, SIEGED, PACKING = "moving", "setting up", "sieged", "packing"
-RECOIL_TIME = 0.6           # seconds the barrel takes to slide back out after a shot (only for the skin)
+ARM_REST = 15               # degrees: the catapult's arm lying back (0 would be flat on the ground behind it) …
+ARM_RELEASE = 90            # … straight up: here it lets go of the shell …
+ARM_FORWARD = 120           # … and here it stops, thrown forward
+CRANK_SHARE = 0.7           # part of the reload it takes to crank the arm back (then it's loaded and waits)
+PACK_ARM_SPEED = 200        # degrees per second the arm folds back while it packs up or walks
 ROOTED_MASS = math.inf      # immovable: pushing enemies have to go around it
 RANGE_MARGIN = 40           # pixels: it sets up a bit inside its range and packs up a bit outside – no flickering
 
@@ -44,10 +53,15 @@ class Artillery(Enemy):
         "reload_time": 3.5,         # seconds between two shots
         "turn_speed": 60,           # degrees per second the barrel turns towards the ship
         "fire_cone": 16,            # degrees: fires only while the ship is within this cone in front of it
-        "fill_time": 1.5,           # seconds the circle takes to fill up – the warning
+        "fill_time": 1.5,           # seconds the shell flies – the circle fills up meanwhile (the warning)
         "aim_spread": 60,           # the circle's centre lands up to this far from the ship
         "blast_radius": 80,
         "blast_damage": 50,
+        "swing_time": 0.3,          # seconds the arm takes to swing forward
+        "arc_height": 60,           # pixels the shell flies up (at its highest) …
+        "arc_steepness": 0.15,      # … plus this many per pixel it's thrown
+        "arc_peak": 0.5,            # where on its way it's highest (0.5 halfway, less: up steeply, down long)
+        "shell_size": 14,
     }
 
     def __init__(self, position, roster=None):
@@ -55,7 +69,9 @@ class Artillery(Enemy):
         self.state = MOVING
         self.deploy = 0.0           # 0 packed up … 1 set up (how far the feet are out – the skin shows it)
         self.timer = 0.0            # seconds until the next shot (counts while sieged)
-        self.recoil = 0.0           # 1 right after a shot, back to 0 within RECOIL_TIME (the skin's barrel kick)
+        self.arm = ARM_REST         # degrees the catapult's arm stands at (the skin draws it)
+        self.loaded = False         # a shell in the bucket – it takes one once it's set up
+        self.swing = None           # seconds into the swing while it swings forward, else None
 
     @property
     def rooted(self):
@@ -69,7 +85,9 @@ class Artillery(Enemy):
         target = ship.rect.center
         distance = self.distance_to(target)
         self.turn_towards(target, dt)
-        self.recoil = max(0.0, self.recoil - dt / RECOIL_TIME)
+        if self.state != SIEGED:                        # walking or packing: fold the arm back, no throw
+            self.swing = None
+            self.arm = max(ARM_REST, self.arm - PACK_ARM_SPEED * dt)
         min_range, fire_range = self.stat("min_range"), self.stat("fire_range")
 
         if self.state == MOVING:
@@ -86,6 +104,7 @@ class Artillery(Enemy):
             self.deploy = min(1.0, self.deploy + dt / self.stat("setup_time"))
             if self.deploy >= 1:
                 self.state = SIEGED
+                self.loaded = self.loaded or self.arm <= ARM_REST
             return []
         if self.state == PACKING:
             self.deploy = max(0.0, self.deploy - dt / self.stat("pack_time"))
@@ -93,13 +112,42 @@ class Artillery(Enemy):
                 self.state = MOVING
             return []
 
-        self.timer -= dt                                # SIEGED
-        if self.timer > 0 or not self.facing(target):
+        if self.swing is not None:                      # SIEGED: swinging forward – lets go at the top
+            return self.swing_arm(dt, target)
+        self.timer -= dt
+        reload = self.stat("reload_time")
+        if not self.loaded:                             # cranking back, then the next shell goes in
+            back = (ARM_FORWARD - ARM_REST) * dt / max(0.05, reload * CRANK_SHARE)
+            self.arm = max(ARM_REST, self.arm - back)
+            self.loaded = self.arm <= ARM_REST
+        if self.timer > 0 or not self.loaded or not self.facing(target):
             return []
-        self.timer = self.stat("reload_time")
-        self.recoil = 1.0
-        spot = pygame.Vector2(target) + self.spread()
-        return [ArtilleryStrike(spot, self.stat("blast_radius"), self.stat("fill_time"), self.stat("blast_damage"))]
+        self.timer = reload
+        self.swing = 0.0
+        return []
+
+    def swing_arm(self, dt, target):
+        """One tick of the swing: the arm speeds up like a catapult's (the square of the time); at ARM_RELEASE the shell
+        goes. Returns the shell in that tick."""
+        self.swing += dt
+        part = min(1.0, self.swing / max(0.01, self.stat("swing_time")))
+        self.arm = ARM_REST + (ARM_FORWARD - ARM_REST) * part ** 2
+        thrown = []
+        if self.loaded and self.arm >= ARM_RELEASE:
+            self.loaded = False
+            thrown.append(self.launch(pygame.Vector2(target) + self.spread()))
+        if part >= 1:
+            self.swing = None
+        return thrown
+
+    def launch(self, spot):
+        """The shell for spot, thrown from the bucket at the top of the swing."""
+        return ArtilleryStrike(self.center, spot, self.stat("blast_radius"), self.stat("fill_time"),
+                               self.stat("blast_damage"), self.arc(spot), size=self.stat("shell_size"))
+
+    def arc(self, spot):
+        return arc_for(self.center, spot, self.stat("arc_height"), self.stat("arc_steepness"), self.stat("arc_peak"),
+                       self.size * ARM_LENGTH)
 
     def spread(self):
         """A random offset up to aim_spread long, evenly over the whole disc (the square root keeps the middle from

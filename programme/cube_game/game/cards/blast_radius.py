@@ -8,6 +8,7 @@ from game.rocket import Rocket
 
 class BlastRadiusCard(Card):
     key = "blast_radius"
+    shop_name = "rocket_blast_radius"
     name = "Blast radius"
     category = "Rocket"
     stat = "blast_radius"

@@ -6,7 +6,7 @@
   "core_chance": 0.05,
   "unlock": { "requires": "a4" },
   "hints": ["Very hard walls – every push counts", "Charger swarms", "A bit of everything"],
-  "arena": { "start_size": [800, 560], "shrink_speed": 9, "shrink_growth": 2, "max_shrink_speed": 20, "armor": 20 },
+  "arena": { "start_size": [800, 560], "shrink_speed": 9, "shrink_growth": 2, "max_shrink_speed": 20, "armor": 7 },
   "spawning": { "first_spawn": 2, "start_interval": 2.7, "min_interval": 1.0, "interval_drop": 0.01 },
   "enemies": [
     { "type": "basic",     "weight": 45, "after": 0 },
@@ -29,15 +29,15 @@
     }
   ],
   "phases": [
-    { "from": 60, "arena": { "armor": "+10" }, "announce": "The walls harden!" },
+    { "from": 60, "arena": { "armor": "+3.5" }, "announce": "The walls harden!" },
     { "from": 100, "enemy_stats": { "all": { "base_hp": "+1" } } },
     { "from": 120, "to": 150, "weights": { "charger": "x3" }, "spawn": { "charger": 4 }, "spawn_interval": "x0.85",
       "announce": "Chargers incoming!" },
-    { "from": 160, "arena": { "armor": "+10" }, "announce": "The walls harden!" },
+    { "from": 160, "arena": { "armor": "+3.5" }, "announce": "The walls harden!" },
     { "from": 180, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
-    { "from": 210, "to": 240, "weights": { "charger": "x1.5", "shooter": "x1.5" }, "spawn": { "charger": 3, "shooter": 2 }, "spawn_interval": "x0.65", "arena": { "armor": "+5" }, "announce": "Final wave!" },
+    { "from": 210, "to": 240, "weights": { "charger": "x1.5", "shooter": "x1.5" }, "spawn": { "charger": 3, "shooter": 2 }, "spawn_interval": "x0.65", "arena": { "armor": "+2" }, "announce": "Final wave!" },
     { "from": 225, "to": 240, "spawn": { "basic": 4, "shooter": 2, "sniper": 1 }, "spawn_interval": "x0.8", "enemy_stats": { "all": { "contact_damage": "x1.15", "shot_damage": "x1.15", "blast_damage": "x1.15" } }, "announce": "Hold on!" },
     { "from": 270, "enemy_stats": { "all": { "base_hp": "+1" } } },
-    { "from": 300, "arena": { "armor": "+15" }, "announce": "The walls harden!" }
+    { "from": 300, "arena": { "armor": "+5" }, "announce": "The walls harden!" }
   ]
 }

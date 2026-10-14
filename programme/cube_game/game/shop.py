@@ -1,7 +1,7 @@
 """
 The shop during a run (T): every stat can be upgraded directly, as often as you like, for stars. Each upgrade of a
 stat costs more than the last one of that stat: price + price_step × (times bought in this run) – the numbers are in
-data/upgrades.json. A stat that can't go further (a cooldown at its minimum) is maxed.
+data/shop.json. A stat that can't go further (a cooldown at its minimum) is maxed.
 
 Upgrades are cards (game/cards), in sections – only for what the ship has in this run:
   - the ship itself,

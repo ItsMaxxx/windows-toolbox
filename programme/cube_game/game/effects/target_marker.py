@@ -22,3 +22,11 @@ def draw_target_marker(surface, center, radius, progress, age):
     if progress < BLINK_FROM or math.sin(age * BLINK_SPEED) > 0:
         pygame.draw.circle(surface, COLOR, center, radius, 2)
     pygame.draw.circle(surface, COLOR, center, 3)           # the exact spot
+
+
+def draw_landing_marker(surface, center, radius):
+    """Where a splitter shell comes down: only a thin ring and the spot – it doesn't hurt there itself, its fragments'
+    circles show where they will."""
+    dim = [round(channel * 0.6) for channel in COLOR]
+    pygame.draw.circle(surface, dim, center, radius, 1)
+    pygame.draw.circle(surface, dim, center, 3)

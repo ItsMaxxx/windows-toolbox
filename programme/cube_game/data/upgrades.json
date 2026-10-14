@@ -1,22 +1,26 @@
 {
   "upgrades": {
-    "move_speed":       { "amount": 20, "card_amount": 60, "price": 10, "price_step": 5 },
-    "max_energy":       { "amount": 10, "card_amount": 30, "price": 10, "price_step": 5 },
-    "energy_regen":     { "amount": 2, "card_amount": 6, "price": 10, "price_step": 5 },
-    "armor":            { "amount": 3, "card_amount": 10, "price": 12, "price_step": 6 },
-    "recovery":         { "amount": 0.1, "card_amount": 0.3, "price": 10, "price_step": 5 },
-    "magnet":           { "amount": 25, "card_amount": 70, "price": 6, "price_step": 3 },
-    "damage":           { "amount": 0.5, "card_amount": 2, "price": 10, "price_step": 5 },
-    "attack_speed":     { "amount": 0.5, "card_amount": 1.5, "price": 10, "price_step": 5 },
-    "wall_push":        { "amount": 3, "card_amount": 10, "price": 10, "price_step": 5 },
-    "shot_speed":       { "amount": 100, "card_amount": 150, "price": 10, "price_step": 5 },
-    "dash_distance":    { "amount": 25, "card_amount": 80, "price": 10, "price_step": 5 },
-    "dash_cooldown":    { "amount": -0.1, "card_amount": -0.3, "price": 10, "price_step": 5 },
-    "rocket_damage":    { "amount": 2, "card_amount": 6, "price": 10, "price_step": 5 },
-    "blast_radius":     { "amount": 15, "card_amount": 50, "price": 10, "price_step": 5 },
-    "rocket_wall_push": { "amount": 20, "card_amount": 60, "price": 10, "price_step": 5 },
-    "rocket_cooldown":  { "amount": -0.3, "card_amount": -1, "price": 10, "price_step": 5 },
-    "vision":           { "amount": 40, "card_amount": 80, "price": 10, "price_step": 5 }
+    "move_speed":       { "card_amount": 60 },
+    "max_energy":       { "card_amount": 30 },
+    "energy_regen":     { "card_amount": 6 },
+    "armor":            { "card_amount": 6 },
+    "recovery":         { "card_amount": 0.3 },
+    "magnet":           { "card_amount": 70 },
+
+    "damage":           { "card_amount": 2 },
+    "attack_speed":     { "card_amount": 1.5 },
+    "wall_push":        { "card_amount": 10 },
+    "shot_speed":       { "card_amount": 150 },
+
+    "dash_distance":    { "card_amount": 80 },
+    "dash_cooldown":    { "card_amount": -0.3 },
+
+    "rocket_damage":    { "card_amount": 6 },
+    "blast_radius":     { "card_amount": 50 },
+    "rocket_wall_push": { "card_amount": 60 },
+    "rocket_cooldown":  { "card_amount": -1 },
+
+    "vision":           { "card_amount": 80 }
   },
   "card_shop": {
     "offers": 3,
@@ -25,6 +29,6 @@
     "reroll_price": 3,
     "sell_refund": 1,
     "max_owned": 12,
-    "max_active": 3
+    "max_active": 1
   }
 }

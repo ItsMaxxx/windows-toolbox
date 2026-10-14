@@ -1,6 +1,7 @@
 """
 Bottom left in the game: the ability slots with their key, e.g. "SHIFT  Dash". Bright when ready, faded with the
-seconds left while cooling down. Above them the energy bar (shared by both weapons) – it turns red while there isn't
+seconds left while cooling down. An ability with several charges shows how many it has, e.g. "SHIFT  Dash  1/2  0.8s"
+(bright while at least one is there, the seconds until the next one while one is missing). Above them the energy bar (shared by both weapons) – it turns red while there isn't
 enough energy for a shot of any weapon.
 """
 
@@ -23,11 +24,13 @@ class AbilityBar:
         slots = [(key, ability) for key, ability in zip(settings.ABILITY_KEY_NAMES, ship.abilities) if ability]
         for index, (key, ability) in enumerate(slots):
             y = bottom - (len(slots) - index) * LINE_HEIGHT
-            if ability.ready:
-                draw_text(surface, f"{key}  {ability.name}", 22, settings.TEXT, alpha=READY_ALPHA, topleft=(10, y))
-            else:
-                draw_text(surface, f"{key}  {ability.name}  {ability.cooldown:.1f}s", 22, settings.TEXT,
-                          alpha=settings.HINT_ALPHA, topleft=(10, y))
+            text = f"{key}  {ability.name}"
+            if ability.max_charges > 1:
+                text += f"  {ability.charges}/{ability.max_charges}"
+            if ability.charges < ability.max_charges:
+                text += f"  {ability.cooldown:.1f}s"
+            draw_text(surface, text, 22, settings.TEXT, alpha=READY_ALPHA if ability.ready else settings.HINT_ALPHA,
+                      topleft=(10, y))
         self.draw_energy(surface, ship, bottom - len(slots) * LINE_HEIGHT - 8)
 
     @staticmethod

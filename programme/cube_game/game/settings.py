@@ -22,9 +22,12 @@ PUSH_SPEED = 600                # a hit pushes its edge out smoothly at this spe
 # … but not evenly: the edges far from the ship move in more, the near ones less. 0 = every edge the same, 1 = with the
 # ship right at the left edge, the left edge doesn't move at all and the right one twice as far (the total stays)
 HIT_SIDE_BIAS = 1.0
-MAX_ARMOR = 90                  # percent: the arena's armor never takes more than this off a push
-MAX_SHIP_ARMOR = 60             # percent: the ship's armor never takes more than this off a hit …
-MAX_INVULNERABLE_TIME = 3.0     # … and Recovery never makes it invulnerable longer than this after a hit (seconds)
+# Armor is flat (game/armor.py): the walls' takes that many pixels off every push, the ship's off every hit, an enemy's
+# that much damage off every hit – but at least this share is always left:
+MIN_PUSH_SHARE = 0.1            # of a push against an armored wall
+MIN_HIT_SHARE = 0.25            # of a hit on the armored ship
+MIN_DAMAGE_SHARE = 0.15         # of a hit on an armored enemy
+MAX_INVULNERABLE_TIME = 3.0     # Recovery never makes the ship invulnerable longer than this after a hit (seconds)
 ALL_MONITORS = False             # with several monitors the arena can spread over all of them (False: main monitor only)
 OFFSCREEN_MARKERS = True        # dots at the window's edge showing where enemies outside the window are
 

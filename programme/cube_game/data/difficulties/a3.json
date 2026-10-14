@@ -6,7 +6,7 @@
   "core_chance": 0.06,
   "unlock": { "requires": "a2" },
   "hints": ["Many ranged units", "Snipers shoot from far outside – watch for their line", "Basic swarms cover the shooters behind them"],
-  "arena": { "start_size": [800, 560], "shrink_speed": 7, "shrink_growth": 2, "max_shrink_speed": 21, "armor": 2 },
+  "arena": { "start_size": [800, 560], "shrink_speed": 7, "shrink_growth": 2, "max_shrink_speed": 21, "armor": 0.5 },
   "spawning": { "first_spawn": 2.5, "start_interval": 2.6, "min_interval": 0.85, "interval_drop": 0.012 },
   "enemies": [
     { "type": "basic",   "weight": 30, "after": 0 },

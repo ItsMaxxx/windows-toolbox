@@ -38,6 +38,7 @@ RADAR, RADAR_SIZE, RADAR_COOLDOWN, RADAR_DURATION = "radar", "radar_size", "rada
 BURNING_GROUND = "burning_ground"
 ARMOR, RECOVERY = "armor", "recovery"        # the ship's hull
 CARD_SHOP = "card_shop"         # the Cards tab of the game menu – without it, no cards (and active ones don't apply)
+CARD_SLOTS = "card_slots"       # more cards active at once (on top of max_active in data/upgrades.json)
 
 
 @dataclass(frozen=True)
@@ -91,7 +92,10 @@ DEFAULT_NODES = [
          "ship", (0.9, 1.1)),
     Node(CARD_SHOP, "Card shop", "Unlocks the Cards tab: buy cards with cores – active cards apply at the start of "
          "every run.", (4,), (CORE_LUCK,), "ship", (0.9, 2.4)),
-    Node(ARMOR, "Armor", "Every hit squeezes the window less.", (3, 6, 10), (BIGGER_ARENA,), "ship", (-0.9, 3.3)),
+    Node(CARD_SLOTS, "Card slots", "One more card can be active at once: +{per_level:g} per level.", (4, 8),
+         (CARD_SHOP,), "ship", (0.9, 3.3)),
+    Node(ARMOR, "Armor", "Every hit squeezes the window a few pixels less.", (3, 6, 10), (BIGGER_ARENA,), "ship",
+         (-0.9, 3.3)),
     Node(RECOVERY, "Recovery", "After a hit you stay invulnerable for longer.", (2, 4, 6), (ARMOR,), "ship",
          (0, 3.3)),
 
@@ -111,8 +115,8 @@ DEFAULT_NODES = [
          (-2.3, -0.75)),
     Node("gun_damage", "Damage", "More damage.", (2, 3, 5), ("gun_energy",), "gun", (-2.3, 0.75)),
 
-    Node("machine_gun", "Machine gun", "A weapon: very fast, but its shots spread a lot.", (5,),
-         ("gun_attack_speed",), "machine_gun", (-3.4, -1.45)),
+    Node("machine_gun", "Machine gun", "A weapon: very fast weak shots – great against unarmored enemies, bad against "
+         "armor and walls.", (5,), ("gun_attack_speed",), "machine_gun", (-3.4, -1.45)),
     Node("mg_attack_speed", "Attack speed", "Shoots faster – and spreads more.", (2, 4, 6),
          ("machine_gun",), "machine_gun", (-3.0, -2.55)),
     Node("mg_damage", "Damage", "More damage – and spreads more.", (2, 4, 6), ("machine_gun",),
@@ -126,8 +130,8 @@ DEFAULT_NODES = [
     Node("mg_shot_speed", "Projectile speed", "Faster projectiles.", (2, 4, 6), ("mg_energy",),
          "machine_gun", (-5.6, -1.3)),
 
-    Node("cannon", "Cannon", "A weapon: slow, heavy shots that pierce an enemy.", (5,), ("gun_damage",), "cannon",
-         (-3.4, 1.45)),
+    Node("cannon", "Cannon", "A weapon: slow heavy shots that pierce – great against armor and walls, wasted on weak "
+         "enemies.", (5,), ("gun_damage",), "cannon", (-3.4, 1.45)),
     Node("cannon_damage", "Damage", "More damage.", (2, 4, 6), ("cannon",), "cannon", (-3.0, 2.55)),
     Node("cannon_attack_speed", "Attack speed", "Shoots faster.", (2, 4, 6), ("cannon",), "cannon",
          (-4.35, 2.05)),
@@ -142,6 +146,9 @@ DEFAULT_NODES = [
 
     # abilities – to the right: the dash in the middle, the rocket below
     Node(DASH, "Dash", "SHIFT: a quick burst in the direction you're moving.", (3,), (SHOP,), "dash", (1.6, 0)),
+    Node("dash_distance", "Distance", "Dashes further.", (3, 5, 8), (DASH,), "dash", (2.75, 0)),
+    Node("dash_charges", "Charges", "One more dash stored: dash again right away, each refills on its own.", (5, 10),
+         ("dash_distance",), "dash", (3.85, -0.35)),
 
     Node(ROCKET, "Rocket", "SPACE: a rocket that explodes at the mouse and pushes the walls out.", (4,), (SHOP,),
          "rocket", (2.6, 1.25)),
@@ -172,7 +179,8 @@ DEFAULT_VALUES = {
     HEAD_START: {"per_level": 10},                  # stars at the start of a run
     BIGGER_ARENA: {"per_level": (60, 40)},          # pixels wider, higher
     CORE_LUCK: {"per_level": 0.005},                # drop chance (on top of the level's)
-    ARMOR: {"per_level": 5},                        # percent off every hit
+    CARD_SLOTS: {"per_level": 1},                   # cards active at once
+    ARMOR: {"per_level": 3},                        # pixels off every hit
     RECOVERY: {"per_level": 0.15},                  # seconds invulnerable after a hit
     "max_energy": {"per_level": 20},
     "energy_regen": {"per_level": 4},
@@ -194,6 +202,8 @@ DEFAULT_VALUES = {
     "laser_damage": {"per_level": 0.01},
     "laser_energy": {"per_level": -0.12},
     "laser_wall_push": {"per_level": 0.4},
+    "dash_distance": {"per_level": 25},             # pixels
+    "dash_charges": {"per_level": 1},               # dashes stored at once
     "rocket_cooldown": {"per_level": -0.6},
     "rocket_radius": {"per_level": 15},
     "rocket_damage": {"per_level": 1},
@@ -204,8 +214,8 @@ DEFAULT_VALUES = {
     RADAR_COOLDOWN: {"per_level": -0.75},           # seconds (negative: sooner)
     RADAR_DURATION: {"per_level": 1},               # seconds
 }
-MUST_NOT_BE_NEGATIVE = {HEAD_START, BIGGER_ARENA, CORE_LUCK, WATCHTOWER, BURNING_GROUND, ARMOR, RECOVERY}
-DESCRIBED = {HEAD_START, BIGGER_ARENA, CORE_LUCK, WATCHTOWER}      # descriptions with their values in them
+MUST_NOT_BE_NEGATIVE = {HEAD_START, BIGGER_ARENA, CORE_LUCK, WATCHTOWER, BURNING_GROUND, ARMOR, RECOVERY, CARD_SLOTS}
+DESCRIBED = {HEAD_START, BIGGER_ARENA, CORE_LUCK, WATCHTOWER, CARD_SLOTS}      # descriptions with their values in them
 NODES = []                      # the tree as it is now (filled by reload(), changed in place)
 NODES_BY_KEY = {}
 
@@ -279,8 +289,8 @@ def amount(profile, key, name="per_level"):
 
 reload([])                      # until the game menu reads it again (with its warnings)
 
-# upgrade nodes: node key -> (part, value) – the part is a weapon's key, "rocket", "energy" (the ship's) or "ship"
-# (its hull), the value what one level raises by the node's "per_level"
+# upgrade nodes: node key -> (part, value) – the part is a weapon's key, "dash", "rocket", "energy" (the ship's) or
+# "ship" (its hull), the value what one level raises by the node's "per_level"
 EFFECTS = {
     "max_energy": ("energy", "max"),
     "energy_regen": ("energy", "regen"),
@@ -304,6 +314,8 @@ EFFECTS = {
     "laser_damage": ("laser", "damage"),
     "laser_energy": ("laser", "energy_use"),
     "laser_wall_push": ("laser", "wall_push"),
+    "dash_distance": ("dash", "distance"),
+    "dash_charges": ("dash", "charges"),
     "rocket_cooldown": ("rocket", "cooldown"),
     "rocket_radius": ("rocket", "blast_radius"),
     "rocket_damage": ("rocket", "damage"),
@@ -312,8 +324,8 @@ EFFECTS = {
 EFFECT_UNITS = {"damage": " damage", "attack_speed": " shots/s", "energy_use": " energy per shot",
                 "wall_push": " px wall push", "projectile_speed": " px/s projectile speed", "spread": "° spread",
                 "piercing": " enemy pierced", "max": " max energy", "regen": " energy/s", "cooldown": " s cooldown",
-                "blast_radius": " px blast radius", "armor": "% less damage from hits",
-                "invulnerable_time": " s invulnerable after a hit"}
+                "blast_radius": " px blast radius", "distance": " px dash distance", "charges": " dash stored",
+                "armor": " px less damage per hit", "invulnerable_time": " s invulnerable after a hit"}
 PER_SECOND = {"damage": " damage/s", "energy_use": " energy/s", "wall_push": " px/s wall push"}    # the laser's
 
 
@@ -346,7 +358,8 @@ def start_ship(profile, center):
     for node_key, (part, value) in EFFECTS.items():
         if part in ("energy", "ship") and profile.owns(node_key):
             ship.upgrade(value, amount(profile, node_key))
-    ship.abilities = [Dash() if profile.owns(DASH) else None, build_rocket(profile) if profile.owns(ROCKET) else None]
+    ship.abilities = [build_dash(profile) if profile.owns(DASH) else None,
+                      build_rocket(profile) if profile.owns(ROCKET) else None]
     ship.stars = round(amount(profile, HEAD_START))
     if profile.owns(WATCHTOWER):
         ship.watchtower = WatchtowerKit(max_count=round(amount(profile, WATCHTOWER)))
@@ -364,6 +377,15 @@ def build_weapon(profile, key):
             if "spread_per_level" in NODES_BY_KEY[node_key].values:      # the machine gun spreads more
                 weapon.upgrade("spread", amount(profile, node_key, "spread_per_level"))
     return weapon
+
+
+def build_dash(profile):
+    """The dash with its bought skill tree upgrades."""
+    dash = Dash()
+    for node_key, (part, value) in EFFECTS.items():
+        if part == "dash" and profile.owns(node_key):
+            dash.upgrade(value, amount(profile, node_key))
+    return dash
 
 
 def build_rocket(profile):

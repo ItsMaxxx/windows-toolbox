@@ -103,7 +103,7 @@ class PlayScene(Scene):
         self.projectiles = []                   # the player's shots
         self.enemies = []
         self.enemy_projectiles = []
-        self.strikes = []                       # artillery strikes on their way (a circle filling up)
+        self.strikes = []                       # artillery shells in the air (a circle filling where they land)
         self.beams = []                         # laser beams while they're on
         self.roster = EnemyRoster(self.difficulty)          # the enemies' values on this difficulty, buffs on all
         self.spawner = Spawner(self.desktop, self.difficulty, self.roster)
@@ -121,6 +121,7 @@ class PlayScene(Scene):
         self.unlocks = upcoming if upcoming and not profile.difficulty_unlocked(upcoming) else None
         self.unlocked = None                    # set once it happened in this run
         self.cleared = False                    # the goal was reached in this run
+        self.first_clear = not profile.cleared(profile.difficulty)    # … and never before – only then it's announced
         self.notices = []                       # on screen at the top: [text, colour, seconds left]
         self.ability_bar = AbilityBar()
         self.hud = Hud()
@@ -169,7 +170,7 @@ class PlayScene(Scene):
         new_best = self.profile.record(self.elapsed)
         self.profile.save()
         result = RunResult(self.elapsed, self.kills, self.cores, self.profile.difficulty, new_best, self.unlocked,
-                           self.cleared)
+                           self.cleared and self.first_clear)
         self.engine.change_scene(GameOverScene(self.profile, result, self.arena.rect.center))
 
     def quit(self):
@@ -287,15 +288,16 @@ class PlayScene(Scene):
 
     def clear_level(self):
         """The goal is reached: the time counts right now (saved), so leaving the run afterwards keeps the unlock. The
-        run goes on."""
+        run goes on. "… CLEARED" only the first time the level is cleared, "… UNLOCKED" whenever something unlocks."""
         self.profile.record(self.elapsed)
         self.profile.save()
         self.cleared = True
-        text = f"{self.difficulty.name.upper()} CLEARED"
+        parts = [f"{self.difficulty.name.upper()} CLEARED"] if self.first_clear else []
         if self.unlocks:
             self.unlocked, self.unlocks = self.unlocks, None
-            text += f"  ·  {DIFFICULTIES[self.unlocked].name.upper()} UNLOCKED"
-        self.notices.append([text, NOTICE_COLOR, NOTICE_TIME])
+            parts.append(f"{DIFFICULTIES[self.unlocked].name.upper()} UNLOCKED")
+        if parts:
+            self.notices.append(["  ·  ".join(parts), NOTICE_COLOR, NOTICE_TIME])
 
     def notify(self, text):
         """A small notice for a moment – the same text again only restarts it."""
@@ -466,16 +468,22 @@ class PlayScene(Scene):
                 self.enemy_projectiles.remove(projectile)
 
     def update_strikes(self, dt):
-        """Artillery strikes land when their circle is full: they hurt the ship and watchtowers in the circle."""
+        """Artillery shells land when their circle is full: they hurt the ship and watchtowers in the circle. A
+        splitter shell hurts nothing itself – it bursts into fragments, strikes of their own."""
+        fragments = []
         for strike in self.strikes:
             if strike.update(dt):
-                if strike.hits(self.ship.rect):
-                    self.hit_ship(strike.damage)
-                for tower in self.towers:
-                    if strike.hits(tower.rect):
-                        tower.take_damage(strike.damage)
-                self.explosions.append(ArtilleryBlast(strike.center, strike.radius))
-        self.strikes = [strike for strike in self.strikes if not strike.landed]
+                if strike.damage:
+                    if strike.hits(self.ship.rect):
+                        self.hit_ship(strike.damage)
+                    for tower in self.towers:
+                        if strike.hits(tower.rect):
+                            tower.take_damage(strike.damage)
+                    self.explosions.append(ArtilleryBlast(strike.center, strike.radius))
+                else:
+                    self.explosions.append(Explosion(strike.center, strike.radius, strike.color))
+                fragments += strike.fragments()
+        self.strikes = [strike for strike in self.strikes if not strike.landed] + fragments
 
     def update_beams(self, dt):
         """Laser beams hurt the ship and every watchtower they touch – each once per beam – and go out after their
@@ -592,6 +600,8 @@ class PlayScene(Scene):
                 enemy.draw(surface, offset)
         for projectile in self.enemy_projectiles + self.projectiles:
             projectile.draw(surface, offset)
+        for strike in self.strikes:                     # artillery shells in the air, over everything on the ground
+            strike.draw_air(surface, offset)
         self.ship.draw(surface, offset)
 
     def draw_view(self, surface, view):

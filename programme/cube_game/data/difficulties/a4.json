@@ -6,18 +6,18 @@
   "core_chance": 0.06,
   "unlock": { "requires": "a3" },
   "hints": ["Artillery and drone carriers", "Keep moving – artillery aims where you stand", "Kill carriers before their drones swarm you"],
-  "arena": { "start_size": [800, 560], "shrink_speed": 8, "shrink_growth": 2, "max_shrink_speed": 22, "armor": 4 },
+  "arena": { "start_size": [800, 560], "shrink_speed": 8, "shrink_growth": 2, "max_shrink_speed": 22, "armor": 1.5 },
   "spawning": { "first_spawn": 2.5, "start_interval": 2.8, "min_interval": 1.05, "interval_drop": 0.009 },
   "enemies": [
     { "type": "basic",     "weight": 40, "after": 0 },
-    { "type": "shooter",   "weight": 15, "after": 0,  "growth": 2 },
+    { "type": "shooter",   "weight": 15, "after": 0,  "growth": 3 },
     { "type": "artillery", "weight": 15, "after": 20, "growth": 3 },
-    { "type": "carrier",   "weight": 12, "after": 45, "growth": 3 }
+    { "type": "carrier",   "weight": 10, "after": 50, "growth": 3 }
   ],
   "swarms": {
     "type": "basic", "after": 50,
-    "start_chance": 0.02, "chance_growth": 0.0008, "max_chance": 0.12,
-    "start_size": 5, "growth_time": 12, "max_size": 24, "min_gap": 9
+    "start_chance": 0.04, "chance_growth": 0.0008, "max_chance": 0.12,
+    "start_size": 5, "growth_time": 12, "max_size": 30, "min_gap": 9
   },
   "phases": [
     { "from": 60, "to": 90, "weights": { "artillery": "x3" }, "spawn": { "artillery": 3 }, "spawn_interval": "x0.8",

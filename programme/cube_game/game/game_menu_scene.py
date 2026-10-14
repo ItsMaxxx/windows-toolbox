@@ -20,7 +20,6 @@ from engine import Scene
 from engine.context_menu import ContextMenu
 from engine.desktop import work_area
 from engine.ui import draw_panel, draw_text
-from game import cards
 from game import difficulty as difficulty_files
 from game import settings, skill_tree
 from game.card_panel import CardPanel
@@ -288,15 +287,16 @@ class GameMenuScene(Scene):
             ("LMB", ship.weapons[0].name if ship.weapons[0] else "empty"),
             ("RMB", ship.weapons[1].name if ship.weapons[1] else "empty"),
             ("Energy", f"{ship.max_energy:g}  ·  +{ship.energy_regen:g}/s"),
-            ("Armor", f"{min(ship.armor, settings.MAX_SHIP_ARMOR):g}%  ·  {ship.invulnerable_time:g} s"),
-            (settings.ABILITY_KEY_NAMES[0], dash.name if dash else None),
+            ("Armor", f"{ship.armor:g} px  ·  {ship.invulnerable_time:g} s"),
+            (settings.ABILITY_KEY_NAMES[0], (dash.name + (f" ×{dash.max_charges}" if dash.max_charges > 1 else ""))
+             if dash else None),
             (settings.ABILITY_KEY_NAMES[1], rocket.name if rocket else None),
             (settings.BUILD_KEY_NAME, f"Watchtower ×{ship.watchtower.max_count}" if ship.watchtower else None),
             ("Radar", f"every {radar.cooldown:g} s" if radar else None),
             ("Shop", "T" if profile.owns(skill_tree.SHOP) else None),
             ("Arena", f"{width} × {height}"),
             ("Start stars", str(ship.stars)),
-            ("Active cards", f"{len(profile.active_cards())}/{cards.RULES.max_active}"
+            ("Active cards", f"{len(profile.active_cards())}/{profile.max_active_cards()}"
              if profile.owns(skill_tree.CARD_SHOP) else None),
             (f"Best ({difficulty.name})", format_time(best) if best else "–"),
         ]
@@ -349,10 +349,10 @@ class GameMenuScene(Scene):
                                "the energy", 20, settings.TEXT, alpha=settings.HINT_ALPHA * 2,
                       midtop=(center, INFO_TOP + 12))
         elif self.tab == "cards":
-            rules = cards.RULES
-            draw_text(surface, f"buy cards with cores  ·  up to {rules.max_active} active cards apply at the start of "
-                               f"every run", 20, settings.TEXT, alpha=settings.HINT_ALPHA * 2,
-                      midtop=(center, INFO_TOP + 12))
+            limit = self.profile.max_active_cards()
+            apply = "card applies" if limit == 1 else "cards apply"
+            draw_text(surface, f"buy cards with cores  ·  up to {limit} active {apply} at the start of every run", 20,
+                      settings.TEXT, alpha=settings.HINT_ALPHA * 2, midtop=(center, INFO_TOP + 12))
         else:
             draw_text(surface, "click an upgrade to buy it  ·  point at one for details  ·  cores drop rarely from "
                                "killed enemies", 20,

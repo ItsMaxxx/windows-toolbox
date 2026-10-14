@@ -9,7 +9,8 @@ Werte) zeigt das Spielmenü rot an; das Spiel nimmt dann den Standardwert, statt
 | `ships.json` | Grundwerte des Schiffs – und künftiger Schiffe (siehe unten) |
 | `skilltree.json` | jeder Skilltree-Knoten: was er kostet und was eine Stufe bringt (siehe unten) |
 | `enemies.json` | Standardwerte jedes Gegnertyps (diese Seite) |
-| `upgrades.json` | Shop im Run (Sterne) und Karten-Shop im Spielmenü (Cores) – siehe unten |
+| `shop.json` | was man im Run mit Sternen kauft: die Upgrades im Shop (T) und die Wachtürme (B) – siehe unten |
+| `upgrades.json` | Karten-Shop im Spielmenü (Cores): was eine Karte bringt, Regeln des Shops – siehe unten |
 | `weapons.json` | Grundwerte der Waffen – siehe unten |
 | `abilities.json` | Grundwerte der Fähigkeiten: Dash und Rakete (siehe unten) |
 | `buildings.json` | Gebäude, die man im Run setzt – bisher der Wachturm (siehe unten) |
@@ -39,7 +40,7 @@ Das sind die Grundwerte zu Beginn eines Runs – Skilltree, Shop und Karten komm
 | `max_energy` | so viel Energie hat es (voll zu Beginn) – beide Waffen teilen sie, jeder Schuss kostet `energy_use` |
 | `energy_regen` | so viel Energie kommt pro Sekunde zurück |
 | `invulnerable_time` | nach einem Treffer so viele Sekunden unverwundbar (es blinkt) – höchstens `MAX_INVULNERABLE_TIME` (3 s, `settings.py`) |
-| `armor` | Panzerung des Schiffs in Prozent: jeder Treffer quetscht die Arena so viel weniger (25 Schaden bei 20 → 20 px). Höchstens `MAX_SHIP_ARMOR` (60 %, `settings.py`). Nicht dasselbe wie die Panzerung der Wände im Level |
+| `armor` | Panzerung des Schiffs in Pixeln, flach: jeder Treffer quetscht die Arena so viel weniger (Basic 25 bei `armor` 9 → 16 px, Kanonenkugel 100 → 91) – stark gegen viele kleine Treffer. Mindestens `MIN_HIT_SHARE` (25 %, `settings.py`) eines Treffers bleibt |
 | `magnet_radius` | so nah müssen Sterne und Cores sein, damit sie zum Schiff gezogen werden |
 | `color` | Farbe als `[Rot, Grün, Blau]`, je 0 … 255 |
 
@@ -65,11 +66,13 @@ Energieverbrauch, Cooldown). Fehlt ein Wert oder ein ganzer Knoten, gilt der ein
 | `bigger_arena` | `[breiter, höher]` in Pixeln |
 | `core_luck` | Chance auf einen Core pro Kill (0.005 = +0,5 %) |
 | `max_energy` / `energy_regen` | Energie des Schiffs / Energie pro Sekunde (Grundwerte in `ships.json`) |
-| `armor` / `recovery` | den gleichnamigen Wert des Schiffs in `ships.json`: `armor` (%), `invulnerable_time` (s) |
+| `armor` / `recovery` | den gleichnamigen Wert des Schiffs in `ships.json`: `armor` (px), `invulnerable_time` (s) |
 | `gun_…`, `mg_…`, `cannon_…`, `laser_…` | den gleichnamigen Wert der Waffe in `weapons.json`: `damage`, `attack_speed`, `energy_use` (`…_energy`), `wall_push`, `projectile_speed` (`…_shot_speed`), `spread` (`mg_precision`), `piercing` (`cannon_piercing`) |
 | `mg_attack_speed` / `mg_damage` | dazu `spread_per_level`: so viel Grad mehr Streuung pro Stufe |
+| `dash_distance` / `dash_charges` | `distance` (px) / `charges` (Dashes auf Vorrat) des Dash (Grundwerte in `abilities.json`) |
 | `rocket_cooldown` / `rocket_radius` / `rocket_damage` / `rocket_wall_push` | `cooldown` (s), `blast_radius` (px), `damage`, `wall_push` der Rakete (Grundwerte in `abilities.json`) |
 | `watchtower` | so viele Türme mehr gleichzeitig |
+| `card_slots` | so viele Karten mehr gleichzeitig aktiv (dazu `max_active` in `upgrades.json`) |
 | `radar_size` / `radar_cooldown` / `radar_duration` | Fenstergröße (px) / Zeit zwischen Scans (s, negativ = öfter) / Dauer eines Scans (s) |
 
 Knoten, die nur etwas freischalten (`shop`, `card_shop`, `dash`, `rocket`, `machine_gun`, `cannon`, `laser`, `radar`),
@@ -99,7 +102,8 @@ Wie im StarCraft-2-Editor, wo jede Map eigene Einheitenwerte haben kann – jede
 
 Ein Eintrag pro Gegnertyp: `basic`, `charger`, `shooter`, `sniper`, `carrier`, `critter`, `artillery` (Tier 1) und
 ihre Evolutionen (Tier 2, mit dunklem Rahmen im Würfel): `fat` (aus Basic), `cannoneer` (aus Shooter), `shield` (aus
-Charger), `laser` (aus Sniper). Wann eine Evolution statt Tier 1 kommt, steht im Level (`evolutions`).
+Charger), `laser` (aus Sniper), `cluster` (aus Artillery). Wann eine Evolution statt Tier 1 kommt, steht im Level
+(`evolutions`).
 Zeiten in Sekunden, Strecken und Größen in Pixeln, Tempo in Pixeln pro Sekunde, Winkel in Grad.
 
 **Schaden ans Schiff ist in Pixeln** (`contact_damage`, `shot_damage`, `blast_damage`): So weit rücken die Kanten der
@@ -123,6 +127,7 @@ handeln nur nach vorne. Wer schnell genug um sie herumfliegt, entkommt ihnen.
 | `speed` | Lauftempo |
 | `size` | Kantenlänge des Würfels (auch die Hitbox; Größere schieben Kleinere weg) |
 | `contact_damage` | Schaden in Pixeln bei Berührung (0 = harmlos) |
+| `armor` | Panzerung, flach (Standard 0): jeder Treffer des Spielers macht so viel weniger Schaden, mindestens `MIN_DAMAGE_SHARE` (15 %, `settings.py`) bleibt. Gun 2 gegen `armor` 1 → 1, Machine gun 1 → 0,15, Cannon 9 → 8. Gepanzert: Fat Guy, Shield, Cannoneer (1), Carrier, Artillery (0,5) |
 
 **Charger**
 
@@ -163,26 +168,51 @@ handeln nur nach vorne. Wer schnell genug um sie herumfliegt, entkommt ihnen.
 |---|---|
 | `preferred_distance` / `close_in` / `back_off` | Abstand halten wie beim Sniper |
 | `spawn_range` | setzt Critter aus, wenn das Schiff höchstens so weit weg ist |
-| `spawn_interval` | Sekunden zwischen zwei Crittern |
+| `spawn_interval` | Sekunden zwischen zwei Mal Aussetzen |
 | `max_critters` | so viele dürfen pro Carrier gleichzeitig leben |
-| `first_wave` | so viele kommen beim ersten Mal auf einmal |
+| `first_wave` | so viele kommen beim ersten Mal auf einmal … |
+| `spawn_amount` | … und so viele jedes weitere Mal (nie mehr, als bis `max_critters` Platz ist) |
 
 **Artillery** – läuft auf das Schiff zu. Sobald sie einmal ganz in einem Fenster war (Spielfeld, Turm- oder
 Radarfenster) und das Schiff zwischen `min_range` und `fire_range` ist, baut sie auf: Die Füße fahren aus, ab da
 bewegt sie sich nicht mehr (auch nicht durch andere Gegner). Kommt das Schiff näher als `min_range` oder geht es aus
 der Reichweite, baut sie ab (rückwärts) und läuft wieder – bei zu wenig Abstand von dir weg.
 
+Sie ist ein Katapult: Der Arm liegt hinten, mit einer Granate in der Schale. Beim Schuss schwingt er nach vorn
+(`swing_time`), lässt oben los und schlägt gegen den Querbalken; während des Nachladens kurbelt sie ihn zurück. Die
+Granate fliegt sichtbar im Bogen (mit Schatten am Boden) – solange füllt sich der rote Kreis am Ziel. Höhe wird von
+oben gesehen so gezeigt, dass die Granate weiter oben auf dem Bildschirm gezeichnet wird.
+
 | Wert | Bedeutung |
 |---|---|
 | `fire_range` | baut höchstens in diesem Abstand auf (wenn schon gesehen) und feuert … |
 | `min_range` | … und mindestens in diesem; näher: abbauen und zurückweichen |
 | `setup_time` / `pack_time` | Sekunden zum Aufbauen (dann sofort schussbereit) / Abbauen |
-| `turn_speed` / `fire_cone` | siehe oben – der Lauf dreht sich zum Schiff |
+| `turn_speed` / `fire_cone` | siehe oben – das Katapult dreht sich zum Schiff |
 | `reload_time` | Sekunden zwischen zwei Schüssen |
-| `fill_time` | so lange füllt sich der rote Kreis, bevor es einschlägt (die Warnung) |
+| `fill_time` | so viele Sekunden fliegt die Granate – so lange füllt sich der rote Kreis (die Warnung) |
 | `aim_spread` | der Kreis landet zufällig bis zu so weit neben dem Schiff (0 = genau auf das Schiff) |
 | `blast_radius` | Radius des Kreises |
 | `blast_damage` | Schaden in Pixeln, wenn das Schiff beim Einschlag im Kreis ist |
+| `swing_time` | Sekunden, die der Arm zum Vorschwingen braucht (die Granate fliegt los, wenn er senkrecht steht) |
+| `arc_height` | **Flugbahn:** so viele Pixel steigt die Granate am höchsten Punkt … |
+| `arc_steepness` | … plus so viele pro Pixel Wurfweite (0.15: ein Wurf über 600 px steigt 90 px höher) |
+| `arc_peak` | wo auf dem Weg sie am höchsten ist: 0.5 in der Mitte, kleiner = steil hoch und lang herab, größer = flach hoch und steil herab (0.05 … 0.95) |
+| `shell_size` | Durchmesser der Granate in Pixeln (in der Luft etwas größer) |
+
+**Cluster** – die Evolution der Artillery: dunkler, mehr HP, gepanzert. Baut auf und wirft genau wie die Artillery
+(dieselben Werte, auch die Flugbahn), aber eine **Splittergranate**: Wo sie aufkommt, schadet sie nicht selbst (nur ein
+dünner Ring zeigt die Stelle) – sie platzt in `split_count` Splitter, die weit auseinanderspringen, jeder mit einem
+eigenen kleinen roten Kreis, der sich füllt, solange er fliegt. `blast_radius` und `blast_damage` hat sie nicht.
+
+| Wert | Bedeutung |
+|---|---|
+| `split_count` | so viele Splitter (gleichmäßig rundherum, etwas zufällig verdreht) |
+| `split_spread` / `split_min_spread` | jeder landet höchstens / mindestens so weit von der Aufschlagstelle |
+| `split_radius` | Radius des Kreises eines Splitters |
+| `split_damage` | Schaden in Pixeln, wenn das Schiff im Kreis eines Splitters ist |
+| `split_time` | Sekunden, die ein Splitter fliegt (so lange füllt sich sein Kreis) |
+| `split_arc_height` | so hoch springt ein Splitter |
 
 **Fat Guy** – die Evolution des Basic: nur die vier Grundwerte (größer, viel mehr HP), sonst wie ein Basic.
 
@@ -217,23 +247,45 @@ stärkerer Charger.
 | `dash_mass` | so viel schwerer ist er beim Ansturm |
 | `knockback` / `stun_time` | trifft der Ansturm das Schiff: so viele Pixel Rückstoß und so viele Sekunden betäubt (nicht bewegen, schießen, Fähigkeiten) |
 
-## `upgrades.json`
+## `shop.json`
 
-**`upgrades`** – ein Eintrag pro Wert, den man verbessern kann (`move_speed`, `max_energy`, `energy_regen`, `armor`,
-`recovery`, `magnet`, `damage`, `attack_speed`, `wall_push`,
-`shot_speed` (Projectile speed), `dash_distance`, `dash_cooldown`, `rocket_damage`, `blast_radius`, `rocket_wall_push`,
-`rocket_cooldown`, `vision`). Gilt für beides: eine Stufe im Shop während des Runs und eine Karte im Karten-Shop.
-Die Waffenwerte (`damage`, `attack_speed`, `wall_push`, `shot_speed`) gelten immer nur für eine Waffe: Im Shop stehen
-sie einmal pro ausgerüsteter Waffe (jede mit eigenem Preis), im Karten-Shop gibt es sie als Karte pro Waffe
-(*Cannon: Damage*) – sie wirkt nur, solange diese Waffe in einem Slot ist. Die Zahlen hier gelten für alle Waffen
-gleich, mal deren `upgrade_factor` (`weapons.json`).
+Alles, was man während eines Runs mit Sternen kauft.
+
+**`upgrades`** – ein Eintrag pro Zeile im Shop (T), die Leerzeilen in der Datei trennen die Abschnitte:
+
+| Abschnitt | Einträge |
+|---|---|
+| Ship | `move_speed`, `max_energy`, `energy_regen`, `armor`, `recovery`, `magnet` |
+| jede Waffe | `gun_…`, `mg_…`, `cannon_…`, `laser_…` mit `damage`, `attack_speed`, `wall_push`, `shot_speed` (Projectile speed), z. B. `mg_damage` |
+| Dash | `dash_distance`, `dash_cooldown` |
+| Rocket | `rocket_damage`, `rocket_blast_radius`, `rocket_wall_push`, `rocket_cooldown` |
+| Watchtower | `watchtower_vision` |
+
+Eine Waffe steht nur im Shop, wenn sie ausgerüstet ist, Dash, Rocket und Watchtower erst, wenn freigeschaltet.
 
 | Wert | Bedeutung |
 |---|---|
-| `amount` | so viel ändert eine Stufe im Shop (negativ bei Cooldowns) |
-| `card_amount` | so viel ändert eine Karte aus dem Karten-Shop – meist mehr als eine Stufe |
+| `amount` | genau so viel ändert eine Stufe (negativ bei Cooldowns) – bei Waffen ohne `upgrade_factor` |
 | `price` | Sterne für die erste Stufe in einem Run … |
 | `price_step` | … und so viele mehr für jede weitere Stufe desselben Werts (10, 15, 20, …) |
+
+Fehlt ein Eintrag, gilt der eingebaute Wert (bei Waffen der allgemeine mal ihr `upgrade_factor`). Alte Namen wie
+`damage` oder `blast_radius` ignoriert das Spiel – das Spielmenü sagt, wie sie jetzt heißen.
+
+**`watchtower`** – die Wachtürme (B):
+
+| Wert | Bedeutung |
+|---|---|
+| `price` | Sterne für den ersten Turm eines Runs … |
+| `price_step` | … und so viele mehr für jeden weiteren |
+
+## `upgrades.json`
+
+**`upgrades`** – pro Kartentyp nur **`card_amount`**: so viel ändert eine Karte aus dem Karten-Shop – meist mehr als
+eine Stufe im Shop. Die Namen sind die Kartentypen (`damage`, `blast_radius`, `vision` …, nicht die Shop-Einträge): Die
+Waffenkarten gibt es zwar pro Waffe (*Cannon: Damage*, wirkt nur, solange die Cannon in einem Slot ist), ihr Wert steht
+aber einmal hier und gilt für jede Waffe mal deren `upgrade_factor` (`weapons.json`). Steht hier noch `amount`, `price`
+oder `price_step`, wird es ignoriert (das Spielmenü sagt, dass es in `shop.json` gehört).
 
 **`card_shop`** – der Karten-Shop im Spielmenü (Reiter *Cards*), bezahlt mit Cores. Ganze Zahlen. Den Reiter gibt
 es erst, wenn der Skilltree-Knoten *Card shop* gekauft ist – vorher wirken auch aktive Karten nicht.
@@ -246,7 +298,7 @@ es erst, wenn der Skilltree-Knoten *Card shop* gekauft ist – vorher wirken auc
 | `reroll_price` | Cores für neue Angebote |
 | `sell_refund` | Cores zurück beim Verkaufen (Rechtsklick auf eine Karte der Sammlung → *Sell*) |
 | `max_owned` | so viele Karten passen in die Sammlung |
-| `max_active` | so viele davon können aktiv sein – aktive Karten wirken zu Beginn jedes Runs aufs Schiff |
+| `max_active` | so viele davon können aktiv sein (der Skilltree-Knoten *Card slots* gibt mehr) – aktive Karten wirken zu Beginn jedes Runs aufs Schiff |
 
 ## `weapons.json`
 
@@ -266,7 +318,7 @@ Beide Waffen teilen sich die Energie des Schiffs (`max_energy`, `energy_regen` i
 | `projectile_speed` / `projectile_size` | Tempo (px/s) und Durchmesser (px) der Schüsse |
 | `wall_push` | so viele Pixel schiebt ein Schuss die Wand, die er trifft |
 | `energy_use` | Energie pro Schuss |
-| `upgrade_factor` | wie stark Shop-Stufen und Karten bei dieser Waffe wirken, pro Karte (`damage`, `attack_speed`, `wall_push`, `projectile_speed`; fehlt einer, gilt 1). Die Karten geben jeder Waffe denselben Wert – eine Waffe mit vielen winzigen Schüssen braucht daher einen kleinen Faktor. |
+| `upgrade_factor` | wie stark Karten aus dem Karten-Shop bei dieser Waffe wirken (die Shop-Stufen haben eigene Einträge in `shop.json`), pro Karte (`damage`, `attack_speed`, `wall_push`, `projectile_speed`; fehlt einer, gilt 1). Die Karten geben jeder Waffe denselben Wert – eine Waffe mit vielen winzigen Schüssen braucht daher einen kleinen Faktor. |
 
 **Eigene Werte**
 
@@ -280,11 +332,11 @@ Beide Waffen teilen sich die Energie des Schiffs (`max_energy`, `energy_regen` i
 ## `abilities.json`
 
 Die Fähigkeiten in den beiden Slots: `dash` (Shift) und `rocket` (Leertaste). Beide schaltet man im Skilltree frei; was
-dessen Upgrades dazugeben, steht in `skilltree.json`, was Shop-Stufen und Karten bringen, in `upgrades.json`.
+dessen Upgrades dazugeben, steht in `skilltree.json`, was Shop-Stufen bringen, in `shop.json`, was Karten bringen, in `upgrades.json`.
 
 | Wert | Bedeutung |
 |---|---|
-| `cooldown` | Sekunden, bis die Fähigkeit wieder bereit ist … |
+| `cooldown` | Sekunden, bis die Fähigkeit wieder bereit ist (mit mehreren Ladungen: bis eine Ladung zurück ist) … |
 | `min_cooldown` | … nie kürzer als das, egal wie viele Upgrades und Karten |
 
 **`dash`** – ein kurzer Sprung in Laufrichtung (im Stand: zur Maus). Durch Wände kommt man nicht.
@@ -293,6 +345,7 @@ dessen Upgrades dazugeben, steht in `skilltree.json`, was Shop-Stufen und Karten
 |---|---|
 | `distance` | so viele Pixel weit |
 | `duration` | so viele Sekunden dauert der Sprung (kleiner = schneller) |
+| `charges` | so viele Dashes auf Vorrat (Standard 1, der Skilltree-Knoten *Charges* gibt mehr): jeder Dash nimmt eine Ladung, der `cooldown` füllt eine nach der anderen wieder auf. Ein neuer Dash geht erst, wenn der vorige vorbei ist |
 
 **`rocket`** – fliegt dorthin, wo die Maus beim Abschuss war, und explodiert dort. Der brennende Boden (*Burning
 ground*) steht in `skilltree.json`.
@@ -318,8 +371,6 @@ kleines Fenster, das diese Stelle dauerhaft zeigt. Gegner können ihn zerstören
 | `vision` | Kantenlänge seines Fensters in Pixeln (Upgrade *Vision* im Shop und als Karte macht es größer) |
 | `throw_range` | so weit fliegt er vom Schiff weg |
 | `throw_time` | Sekunden in der Luft |
-| `price` | Sterne für den ersten Turm eines Runs … |
-| `price_step` | … und so viele mehr für jeden weiteren |
 | `hit_cooldown` | nach einem Treffer so viele Sekunden unverwundbar |
 | `lure_range` | Nahkampf-Gegner (Basic, Charger, Critter) in diesem Umkreis, die näher am Turm als am Schiff sind, greifen den Turm an |
 

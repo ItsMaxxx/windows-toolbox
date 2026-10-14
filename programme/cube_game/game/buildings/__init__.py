@@ -40,7 +40,9 @@ def reload(warnings):
             warnings.append(f"buildings.json {key}: should be {{ … }} – using built-in values")
             entry = {}
         for name, value in entry.items():
-            if name not in values:
+            if name in ("price", "price_step"):
+                warnings.append(f"buildings.json {key}.{name}: what towers cost is in shop.json now – ignored")
+            elif name not in values:
                 warnings.append(f"buildings.json {key}: unknown value \"{name}\" – ignored")
             elif valid_value(name, value):
                 values[name] = value

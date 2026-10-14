@@ -17,18 +17,24 @@ A card type is a subclass that only sets class attributes:
     unit      – shown after the numbers, e.g. " px" or " s"
     minimum   – the stat never goes below this (for cooldowns)
     maximum   – the stat never goes above this (for the ship's armor, …)
+    shop_name – its entry in data/shop.json, if that isn't its key ("rocket_blast_radius"; weapon cards make theirs)
 and targets(ship): which objects have that stat (the ship, all weapons, the dash, …).
 
-A target can scale the card: a weapon's upgrade_factors (from data/weapons.json) say how strongly each card works on
-it, by card type key – e.g. the laser gets only 0.02 × the damage, because it fires 30 tiny bolts a second.
+A target can scale a card from the card shop: a weapon's upgrade_factors (from data/weapons.json) say how strongly each
+card works on it, by card type key – e.g. the laser gets only 0.02 × the damage, because it fires 30 tiny bolts a
+second. The shop during a run doesn't scale: every card has its own entry in data/shop.json (shop_key – e.g.
+"mg_damage"), and its amount is exactly what one upgrade adds.
 
 Weapon cards (WeaponCard) belong to one weapon each: "Cannon: Damage" only changes the cannon – in the shop during a
 run and as a card from the card shop (there it does nothing while the cannon isn't in a slot).
 
-The numbers here are only the fallback – the real values are in data/upgrades.json.
+The numbers here are only the fallback – the real values are in data/shop.json (amount, price, price_step) and
+data/upgrades.json (card_amount).
 """
 
 from game.weapons import WEAPON_TYPES, data as weapon_data
+
+SHOP_PREFIX = {"machine_gun": "mg"}        # weapon key -> its upgrades' prefix in data/shop.json (as in the skill tree)
 
 CATEGORY_COLORS = {"Ship": (40, 110, 255), "Weapons": (235, 235, 235), "Dash": (80, 200, 255), "Rocket": (255, 70, 50),
                    "Watchtower": (120, 180, 255)}
@@ -44,6 +50,7 @@ class Card:
     unit = ""
     minimum = None
     maximum = None
+    shop_name = None            # its name in data/shop.json if not its key
     price = 10                  # stars for the first upgrade in a run …
     price_step = 5              # … and this many more for every further one
 
@@ -52,8 +59,13 @@ class Card:
         return CATEGORY_COLORS.get(self.category, (255, 255, 255))
 
     @property
+    def shop_key(self):
+        """Its name in data/shop.json (the type's key, unless shop_name says otherwise)."""
+        return self.shop_name or self.key
+
+    @property
     def kind(self):
-        """The card type's key – its numbers in data/upgrades.json and the weapons' upgrade_factor use it."""
+        """The card type's key – its card_amount in data/upgrades.json and the weapons' upgrade_factor use it."""
         return type(self).key
 
     @property
@@ -91,17 +103,20 @@ class Card:
         a shop upgrade's amount)."""
         target = self.targets(ship)[0]
         now = getattr(target, self.stat)
-        after = self.changed(now, amount, self.factor(target))
+        after = self.changed(now, *self.step(target, amount))
         return f"{now:.4g}{self.unit}", f"{after:.4g}{self.unit}"
+
+    def step(self, target, amount=None):
+        """(amount, factor) for target: a shop upgrade (amount None) adds its own amount exactly, a card from the card
+        shop its amount × the target's upgrade_factor."""
+        return (self.amount, 1) if amount is None else (amount, self.factor(target))
 
     def factor(self, target):
         """How strongly this card works on target (1 unless a weapon says otherwise)."""
         return getattr(target, "upgrade_factors", {}).get(self.kind, 1)
 
-    def changed(self, value, amount=None, factor=1):
-        """value with amount × factor added (amount None: a shop upgrade's amount), never below the minimum or above
-        the maximum."""
-        amount = self.amount if amount is None else amount
+    def changed(self, value, amount, factor=1):
+        """value with amount × factor added, never below the minimum or above the maximum."""
         value = round(value + amount * factor, 6)               # 1.2 - 0.15 would be 1.0499999…
         if self.minimum is not None:
             value = max(self.minimum, value)
@@ -112,7 +127,7 @@ class Card:
     def apply(self, ship, amount=None):
         """Adds amount to the stat on every target (None: a shop upgrade's amount)."""
         for target in self.targets(ship):
-            setattr(target, self.stat, self.changed(getattr(target, self.stat), amount, self.factor(target)))
+            setattr(target, self.stat, self.changed(getattr(target, self.stat), *self.step(target, amount)))
 
     def apply_card(self, ship):
         """The card from the game menu: adds card_amount."""
@@ -122,12 +137,17 @@ class Card:
 class WeaponCard(Card):
     """A card for one weapon: it only changes that weapon, and only while it's in a slot. Every weapon card type exists
     once per weapon (cards/__init__.py) – its key is the type's key and the weapon's, e.g. "damage:cannon"; the numbers
-    (amount, …) are the type's, the same for every weapon."""
+    card_amount is the type's, the same for every weapon (times its upgrade_factor); in the shop during a run each
+    weapon has its own entry (shop_key: "gun_damage", "mg_damage", …) with its own amount and prices."""
     category = "Weapons"
 
     def __init__(self, weapon):
         self.weapon = weapon                    # the weapon's key (game/weapons)
         self.key = f"{type(self).key}:{weapon}"
+
+    @property
+    def shop_key(self):
+        return f"{SHOP_PREFIX.get(self.weapon, self.weapon)}_{self.kind}"
 
     @property
     def weapon_type(self):

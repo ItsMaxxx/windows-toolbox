@@ -62,13 +62,13 @@ Zeiten in Sekunden, Größen in Pixeln, Chancen von 0 bis 1 (0.01 = 1 %).
 | `shrink_speed` | so viele Pixel pro Sekunde rückt **jede** Kante am Anfang nach innen. Zum Vergleich: die Grundkanone schiebt 3 × 15 = 45 px/s zurück, alle vier Kanten zusammen schrumpfen 4 × `shrink_speed` … |
 | `shrink_growth` | … plus so viel pro Minute Spielzeit … (optional, Standard 0) |
 | `max_shrink_speed` | … höchstens so viel (Standard 60) |
-| `armor` | Panzerung am Anfang in Prozent (Standard 0): jeder Stoß gegen eine Kante schiebt sie so viel Prozent weniger weit, höchstens 90 % (`MAX_ARMOR` in `settings.py`). Phasen können sie erhöhen |
+| `armor` | Panzerung am Anfang in Pixeln (Standard 0), flach: jeder Stoß gegen eine Kante schiebt sie so viele Pixel weniger weit, mindestens `MIN_PUSH_SHARE` (10 %, `settings.py`) bleibt. Phasen können sie erhöhen |
 
 Beispiel A5: 10 px/s am Anfang, + 2 pro Minute – nach 5 Minuten 20 px/s, das ist auch die Obergrenze.
 Fehlen `shrink_growth` und `max_shrink_speed`, schrumpft die Arena immer gleich schnell.
 
-Panzerung: Die Gun schiebt mit 18 px; bei `armor` 20 sind es noch 14,4, die Rakete 120 → 96. Jede Waffe verliert
-denselben Anteil – auch der Laser mit seinen vielen kleinen Stößen.
+Panzerung ist flach: bei `armor` 7 schiebt die Gun 35 → 28 px, die Cannon 90 → 83, die Machine gun nur noch 6 → 0,6
+(das Minimum) – viele kleine Stöße (Machine gun, Laser) verlieren viel, wenige große (Cannon, Rakete) kaum etwas.
 
 ## `spawning` – wie oft Gegner kommen
 
@@ -86,7 +86,7 @@ ist – mit `weight` gewichtet (50 gegen 10 = fünfmal so oft).
 
 | Schlüssel | Bedeutung |
 |---|---|
-| `type` | `basic`, `charger`, `shooter`, `sniper`, `carrier`, `artillery`, `critter` – oder direkt eine Evolution: `fat`, `cannoneer`, `shield`, `laser` (meist besser über `evolutions`) |
+| `type` | `basic`, `charger`, `shooter`, `sniper`, `carrier`, `artillery`, `critter` – oder direkt eine Evolution: `fat`, `cannoneer`, `shield`, `laser`, `cluster` (meist besser über `evolutions`) |
 | `weight` | wie häufig im Vergleich zu den anderen … |
 | `after` | … ab dieser Spielzeit … |
 | `growth` | … plus so viel Gewicht pro Minute danach (optional, Standard 0) |
@@ -106,12 +106,13 @@ einer Chance als seine Evolution:
 | `shooter` | `cannoneer` – sehr langsam, riesige langsame Kanonenkugel mit massivem Schaden |
 | `charger` | `shield` – der Schild-Gegner |
 | `sniper` | `laser` – dickere Ziellinie, dann ein Strahl für eine halbe Sekunde statt einer Kugel |
+| `artillery` | `cluster` – wirft Splittergranaten: am Aufschlag drei kleine Explosionen, weit verstreut |
 
 Eine Liste, ein Eintrag pro Typ:
 
 | Schlüssel | Bedeutung |
 |---|---|
-| `type` | der Tier-1-Typ (`basic`, `shooter`, `charger`, `sniper`) |
+| `type` | der Tier-1-Typ (`basic`, `shooter`, `charger`, `sniper`, `artillery`) |
 | `chance` | Chance am Anfang (0.1 = jeder zehnte) … |
 | `after` | … ab dieser Spielzeit (vorher nie) … |
 | `growth` | … plus so viel pro Minute danach (optional, Standard 0) … |
@@ -194,7 +195,7 @@ Mehr Schaden über die Zeit und härtere Wände – so stehen sie in den Dateien
 ```json
 { "from": 180, "enemy_stats": { "all": { "contact_damage": "x1.25", "shot_damage": "x1.25", "blast_damage": "x1.25" } },
   "announce": "Enemies hit harder!" },
-{ "from": 240, "arena": { "armor": "+3" }, "announce": "The walls harden!" }
+{ "from": 240, "arena": { "armor": "+5" }, "announce": "The walls harden!" }
 ```
 
 Mehrere Phasen ohne `to` stapeln sich: zweimal `"x1.25"` und `"x1.2"` ergibt das 1,5-fache, `"+3"` und `"+2"` ergibt 5.

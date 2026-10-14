@@ -1,8 +1,7 @@
 """
-Armor card: Every hit squeezes the arena less (not above settings.MAX_SHIP_ARMOR).
+Armor card: Every hit squeezes the arena a few pixels less (flat – strong against many small hits).
 """
 
-from game import settings
 from game.cards.card import Card
 
 
@@ -11,7 +10,6 @@ class ArmorCard(Card):
     name = "Armor"
     category = "Ship"
     stat = "armor"
-    amount = 3
-    card_amount = 10
-    unit = "%"
-    maximum = settings.MAX_SHIP_ARMOR
+    amount = 2
+    card_amount = 6
+    unit = " px"

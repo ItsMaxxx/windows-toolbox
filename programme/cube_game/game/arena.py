@@ -7,10 +7,10 @@ Once it's as narrow or as low as the ship, the ship is crushed (crushed()) and t
 The edges move in faster the longer the run lasts: shrink_growth more pixels per second every minute, up to
 max_shrink_speed (all three from the difficulty).
 
-Armor: every push of an edge is armor percent shorter (at most MAX_ARMOR, so pushing always does something) – the
-same share for every weapon, many small pushes (the laser) lose as much as one big one. The difficulty sets where it
-starts; its phases can change it – and the shrink speed – for a while or for good (changes, set by the scene
-from the active phases).
+Armor: every push of an edge is armor pixels shorter – flat, so many small pushes (machine gun, laser) lose far more
+than a few big ones (cannon); at least settings.MIN_PUSH_SHARE of a push is always left (game/armor.py). The difficulty
+sets where it starts; its phases can change it – and the shrink speed – for a while or for good (changes, set by the
+scene from the active phases).
 
 Getting hit squeezes the arena (hit()) – mostly from the side away from the ship, so it can't be dragged along by
 just moving one way.
@@ -19,7 +19,7 @@ just moving one way.
 import pygame
 
 from engine.collision import keep_inside
-from game import settings, ship_data
+from game import armor, settings, ship_data
 from game.enemies.roster import apply
 
 SIDES = ("left", "right", "top", "bottom")
@@ -75,7 +75,7 @@ class Arena:
 
     @property
     def armor(self):
-        """Percent every push of an edge is shorter right now (before the MAX_ARMOR cap)."""
+        """Pixels every push of an edge is shorter right now."""
         return max(0.0, self.changed("armor", self.base_armor))
 
     def update(self, dt):
@@ -141,9 +141,9 @@ class Arena:
         return fits
 
     def push(self, side, distance):
-        """Hit on an edge: it moves out by distance minus armor percent (smoothly, over the next ticks)."""
+        """Hit on an edge: it moves out by distance minus the armor (smoothly, over the next ticks)."""
         if distance > 0:
-            self.pending[side] += distance * (1 - min(self.armor, settings.MAX_ARMOR) / 100)
+            self.pending[side] += armor.reduce(distance, self.armor, settings.MIN_PUSH_SHARE)
 
     def side_hit(self, point):
         """Which edge point has crossed ("left", "right", "top", "bottom") – or None while it's inside.

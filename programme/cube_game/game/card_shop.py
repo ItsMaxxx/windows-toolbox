@@ -1,8 +1,9 @@
 """
 The card shop in the game menu, between runs – paid with cores. It offers a few cards (RULES.offers); buy one and it
 goes into the collection, or reroll all offers. Every card in the collection makes the next one more expensive.
-The collection holds up to RULES.max_owned cards; up to RULES.max_active of them can be active – those apply to the
-ship at the start of every run (skill_tree.start_ship). The same card can be owned and active more than once: they
+The collection holds up to RULES.max_owned cards; up to profile.max_active_cards() of them can be active
+(RULES.max_active, more with the skill tree's Card slots) – those apply to the ship at the start of every run
+(skill_tree.start_ship). The same card can be owned and active more than once: they
 stack. Selling a card gives a few cores back.
 
 Collection and offers are kept in the profile (saved after every change), so the offers stay the same until you buy
@@ -91,8 +92,11 @@ class CardShop:
     def toggle(self, index):
         """Makes card number index in the collection active or inactive. "" if it worked, else why not."""
         card = self.profile.cards[index]
-        if not card["active"] and self.active_count() >= self.rules.max_active:
-            return f"Only {self.rules.max_active} cards can be active – deactivate one first"
+        limit = self.profile.max_active_cards()
+        if not card["active"] and self.active_count() >= limit:
+            slots = skill_tree.NODES_BY_KEY[skill_tree.CARD_SLOTS]
+            more = "" if self.profile.maxed(slots) else " or buy Card slots in the skill tree"
+            return f"Only {limit} {'card' if limit == 1 else 'cards'} can be active – deactivate one first{more}"
         card["active"] = not card["active"]
         self.save()
         return ""

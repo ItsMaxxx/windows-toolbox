@@ -6,7 +6,7 @@
   "core_chance": 0.05,
   "unlock": { "requires": "a5" },
   "hints": ["Everything at once", "Swarms of Basics and Chargers", "Enemies hit harder over time"],
-  "arena": { "start_size": [800, 560], "shrink_speed": 11, "shrink_growth": 2, "max_shrink_speed": 22, "armor": 8 },
+  "arena": { "start_size": [800, 560], "shrink_speed": 11, "shrink_growth": 2, "max_shrink_speed": 22, "armor": 3 },
   "spawning": { "first_spawn": 2, "start_interval": 2.6, "min_interval": 1.05, "interval_drop": 0.01 },
   "enemies": [
     { "type": "basic",     "weight": 50, "after": 0 },
@@ -32,7 +32,7 @@
     { "from": 90, "to": 120, "weights": { "sniper": "x2", "artillery": "x2" }, "spawn": { "sniper": 2, "artillery": 2 },
       "spawn_interval": "x0.85", "announce": "Long range incoming!" },
     { "from": 120, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
-    { "from": 150, "arena": { "armor": "+15" }, "announce": "The walls harden!" },
+    { "from": 150, "arena": { "armor": "+5" }, "announce": "The walls harden!" },
     { "from": 180, "enemy_stats": { "all": { "base_hp": "+1" } } },
     { "from": 210, "to": 240, "weights": { "charger": "x3" }, "spawn": { "charger": 5 }, "spawn_interval": "x0.85",
       "announce": "Chargers incoming!" },
@@ -40,6 +40,6 @@
     { "from": 265, "to": 300, "weights": { "sniper": "x1.5", "artillery": "x1.5", "charger": "x1.5" }, "spawn": { "sniper": 2, "artillery": 1, "charger": 2 }, "spawn_interval": "x0.7", "announce": "Final wave!" },
     { "from": 285, "to": 300, "spawn": { "charger": 3, "sniper": 1, "carrier": 1 }, "spawn_interval": "x0.8", "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "arena": { "shrink_speed": "x1.3" }, "announce": "Hold on!" },
     { "from": 330, "enemy_stats": { "all": { "base_hp": "+1" } } },
-    { "from": 360, "arena": { "armor": "+15" }, "announce": "The walls harden!" }
+    { "from": 360, "arena": { "armor": "+5" }, "announce": "The walls harden!" }
   ]
 }

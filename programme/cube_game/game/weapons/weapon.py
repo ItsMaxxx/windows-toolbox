@@ -6,8 +6,8 @@ of the ship's energy a shot uses. Each weapon has its own cooldown; the energy i
 Its values come from data/weapons.json (STATS[key], see data.py). They are changed two ways:
   - the skill tree: upgrade(name, amount) adds amount to a value, never below its minimum (how much: the node's
     "per_level" in data/skilltree.json × its level – skill_tree.build_weapon),
-  - shop upgrades and cards: they set the attributes directly – upgrade_factors says how strongly they work on this
-    weapon (game/cards/card.py).
+  - shop upgrades and cards: they set the attributes directly – a shop upgrade by its own amount in data/shop.json,
+    a card by its card_amount × upgrade_factors, how strongly cards work on this weapon (game/cards/card.py).
 Names are the ones in the data file ("attack_speed"); ATTRIBUTES says which attribute each one is ("fire_rate").
 
 New weapon = subclass with its own key, name and colour (see gun.py); override fire() / make_projectile() for

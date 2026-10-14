@@ -3,7 +3,8 @@ The abilities' base values (dash, rocket): data/abilities.json (every value expl
 reads it again into STATS – the game menu calls it every time it opens (via difficulty.reload()). What's missing or
 invalid in the file keeps the value in DEFAULTS, and a warning goes to the game menu.
 
-What the skill tree adds is in data/skilltree.json, what shop upgrades and cards add in data/upgrades.json.
+What the skill tree adds is in data/skilltree.json, what shop upgrades add in data/shop.json, what cards add in
+data/upgrades.json.
 """
 
 import copy
@@ -17,6 +18,7 @@ DEFAULTS = {
         "min_cooldown": 0.3,        # … never shorter than this, whatever upgrades and cards take off
         "distance": 220,            # pixels
         "duration": 0.12,           # seconds the dash takes
+        "charges": 1,               # dashes stored at once (the skill tree's Charges add more)
     },
     "rocket": {
         "cooldown": 7,
@@ -29,7 +31,7 @@ DEFAULTS = {
         "size": 12,                 # diameter of the rocket (pixels)
     },
 }
-MUST_BE_POSITIVE = {"cooldown", "duration", "speed", "size"}
+MUST_BE_POSITIVE = {"cooldown", "duration", "speed", "size", "charges"}
 STATS = copy.deepcopy(DEFAULTS)
 
 

@@ -36,7 +36,7 @@ class Inventory:
         self.draw_rows(surface, [("Move speed", f"{ship.speed:g} px/s"),
                                  ("Energy", f"{ship.energy:.0f}/{ship.max_energy:g}"),
                                  ("Energy regen", f"{ship.energy_regen:g}/s"),
-                                 ("Armor", f"{min(ship.armor, settings.MAX_SHIP_ARMOR):g}%"),
+                                 ("Armor", f"{ship.armor:g} px"),
                                  ("Recovery", f"{ship.invulnerable_time:g} s"),
                                  ("Magnet", f"{ship.magnet_radius:g} px")],
                        preview.left, preview.right, preview.bottom + 16)

@@ -5,8 +5,6 @@
     "vision": 320,
     "throw_range": 420,
     "throw_time": 0.5,
-    "price": 15,
-    "price_step": 10,
     "hit_cooldown": 0.4,
     "lure_range": 220
   }

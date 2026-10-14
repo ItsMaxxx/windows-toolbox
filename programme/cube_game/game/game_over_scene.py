@@ -33,7 +33,7 @@ class RunResult:
     difficulty: str             # key in DIFFICULTIES
     new_best: bool
     unlocked: str | None = None # level unlocked in this run
-    cleared: bool = False       # the level's goal was reached in this run
+    cleared: bool = False       # the level's goal was reached in this run for the first time (only then it's shown)
 
 
 def format_time(seconds):
@@ -99,11 +99,11 @@ class GameOverScene(Scene):
             pygame.draw.line(surface, LINE, (left, y + 22), (right, y + 22))
             y += 30
         y += 6
-        if result.cleared:
-            text = f"{DIFFICULTIES[result.difficulty].name.upper()} CLEARED!"
-            if result.unlocked:
-                text += f"  {DIFFICULTIES[result.unlocked].name.upper()} UNLOCKED!"
-            y = draw_text(surface, text, 28, NEW_BEST_COLOR, midtop=(panel.centerx, y)).bottom + 8
+        parts = [f"{DIFFICULTIES[result.difficulty].name.upper()} CLEARED!"] if result.cleared else []
+        if result.unlocked:
+            parts.append(f"{DIFFICULTIES[result.unlocked].name.upper()} UNLOCKED!")
+        if parts:
+            y = draw_text(surface, "  ".join(parts), 28, NEW_BEST_COLOR, midtop=(panel.centerx, y)).bottom + 8
         if result.new_best:
             draw_text(surface, "NEW BEST TIME!", 28, NEW_BEST_COLOR, midtop=(panel.centerx, y))
 
