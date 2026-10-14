@@ -32,7 +32,8 @@ class RunResult:
     cores: int                  # collected in this run
     difficulty: str             # key in DIFFICULTIES
     new_best: bool
-    unlocked: str | None = None # difficulty unlocked in this run
+    unlocked: str | None = None # level unlocked in this run
+    cleared: bool = False       # the level's goal was reached in this run
 
 
 def format_time(seconds):
@@ -88,7 +89,7 @@ class GameOverScene(Scene):
         result = self.result
         rows = [("Time", format_time(result.time)), ("Kills", str(result.kills)),
                 ("Cores", f"+{result.cores}   (total {self.profile.cores})"),
-                ("Difficulty", DIFFICULTIES[result.difficulty].name)]
+                ("Level", DIFFICULTIES[result.difficulty].name)]
         left, right, y = 60, panel.right - 60, 116
         for name, value in rows:
             draw_text(surface, name, 24, settings.TEXT_MUTED, topleft=(left, y))
@@ -98,10 +99,12 @@ class GameOverScene(Scene):
             pygame.draw.line(surface, LINE, (left, y + 22), (right, y + 22))
             y += 30
         y += 6
+        if result.cleared:
+            text = f"{DIFFICULTIES[result.difficulty].name.upper()} CLEARED!"
+            if result.unlocked:
+                text += f"  {DIFFICULTIES[result.unlocked].name.upper()} UNLOCKED!"
+            y = draw_text(surface, text, 28, NEW_BEST_COLOR, midtop=(panel.centerx, y)).bottom + 8
         if result.new_best:
-            y = draw_text(surface, "NEW BEST TIME!", 28, NEW_BEST_COLOR, midtop=(panel.centerx, y)).bottom + 8
-        if result.unlocked:
-            draw_text(surface, f"{DIFFICULTIES[result.unlocked].name.upper()} UNLOCKED!", 28, NEW_BEST_COLOR,
-                      midtop=(panel.centerx, y))
+            draw_text(surface, "NEW BEST TIME!", 28, NEW_BEST_COLOR, midtop=(panel.centerx, y))
 
         self.menu.draw(surface, (panel.centerx, 310))

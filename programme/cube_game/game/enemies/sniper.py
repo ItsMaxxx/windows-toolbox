@@ -15,7 +15,7 @@ class Sniper(Enemy):
     name = "Sniper"
     skin = SniperSkin()
     stats = {                       # fallback – see data/enemies.json
-        "max_hp": 1, "speed": 80, "size": 22, "contact_damage": 1,
+        "max_hp": 1, "speed": 80, "size": 22, "contact_damage": 25,
         "preferred_distance": 650,  # walks closer when further than this + close_in …
         "back_off": 150,            # … backs off when closer than this - back_off
         "close_in": 80,
@@ -25,7 +25,7 @@ class Sniper(Enemy):
         "reload_time": 2.2,
         "turn_speed": 70,           # degrees per second the laser turns towards the ship
         "fire_cone": 30,            # degrees: starts aiming only while the ship is within this cone in front of it
-        "shot_damage": 2, "shot_speed": 1400, "shot_size": 6,
+        "shot_damage": 50, "shot_speed": 1400, "shot_size": 6,
     }
 
     def __init__(self, position, roster=None):
@@ -54,4 +54,8 @@ class Sniper(Enemy):
                 self.aiming, self.timer = True, self.stat("aim_time")
             return []
         self.aiming, self.timer = False, self.stat("reload_time")
-        return [self.shoot_ahead(self.shot_stats(SHOT_COLOR))]
+        return [self.fire()]
+
+    def fire(self):
+        """The shot at the end of aiming: one fast bullet where it faces."""
+        return self.shoot_ahead(self.shot_stats(SHOT_COLOR))

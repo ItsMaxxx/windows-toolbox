@@ -1,0 +1,49 @@
+{
+  "name": "Survival",
+  "description": "endless – how long can you last?",
+  "order": 20,
+  "goal": null,
+  "core_chance": 0.035,
+  "unlock": { "requires": "b6" },
+  "hints": ["Endless – how long can you last?", "Starts with Basics, then every type comes in", "Evolutions from 4:00 on"],
+  "arena": { "start_size": [800, 560], "shrink_speed": 10, "shrink_growth": 2.5, "max_shrink_speed": 32, "armor": 0 },
+  "spawning": { "first_spawn": 2.5, "start_interval": 3.0, "min_interval": 0.6, "interval_drop": 0.01 },
+  "enemies": [
+    { "type": "basic",     "weight": 50, "after": 0 },
+    { "type": "shooter",   "weight": 20, "after": 30,  "growth": 4 },
+    { "type": "charger",   "weight": 20, "after": 60,  "growth": 4 },
+    { "type": "sniper",    "weight": 10, "after": 90,  "growth": 3 },
+    { "type": "artillery", "weight": 8,  "after": 120, "growth": 2 },
+    { "type": "carrier",   "weight": 8,  "after": 150, "growth": 2 }
+  ],
+  "evolutions": [
+    { "type": "basic",   "chance": 0.05, "after": 240, "growth": 0.06, "max_chance": 0.6 },
+    { "type": "shooter", "chance": 0.05, "after": 270, "growth": 0.06, "max_chance": 0.6 },
+    { "type": "charger", "chance": 0.05, "after": 300, "growth": 0.06, "max_chance": 0.6 },
+    { "type": "sniper",  "chance": 0.05, "after": 330, "growth": 0.06, "max_chance": 0.6 }
+  ],
+  "swarms": [
+    {
+      "type": "basic", "after": 60,
+      "start_chance": 0.015, "chance_growth": 0.0008, "max_chance": 0.2,
+      "start_size": 5, "growth_time": 12, "max_size": 40, "min_gap": 6
+    },
+    {
+      "type": "charger", "after": 180,
+      "start_chance": 0.01, "chance_growth": 0.0005, "max_chance": 0.12,
+      "start_size": 4, "growth_time": 16, "max_size": 20, "min_gap": 10
+    }
+  ],
+  "phases": [
+    { "from": 180, "enemy_stats": { "all": { "max_hp": "+1" } } },
+    { "from": 240, "announce": "Evolution begins!" },
+    { "from": 240, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
+    { "from": 300, "arena": { "armor": "+15" }, "announce": "The walls harden!" },
+    { "from": 360, "enemy_stats": { "all": { "max_hp": "+1" } } },
+    { "from": 420, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
+    { "from": 480, "arena": { "armor": "+15" }, "announce": "The walls harden!" },
+    { "from": 540, "enemy_stats": { "all": { "max_hp": "+1" } } },
+    { "from": 600, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
+    { "from": 720, "enemy_stats": { "all": { "max_hp": "+2" } } }
+  ]
+}

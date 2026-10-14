@@ -1,5 +1,5 @@
 """
-Top right in the game: the time survived, the cores collected in this run, and – once the shop is unlocked – the
+Top right in the game: the time survived (until the level is cleared with its goal: "01:23 / 03:00"), the cores collected in this run, and – once the shop is unlocked – the
 stars the player has and a small shop icon with its key (T). With the watchtower unlocked, one more line: the next
 tower's price, how many stand of how many allowed, and its key (B).
 """
@@ -12,14 +12,19 @@ RIGHT_MARGIN = 12
 READY_ALPHA = 200
 
 
+def clock(seconds):
+    minutes, seconds = divmod(int(seconds), 60)
+    return f"{minutes:02}:{seconds:02}"
+
+
 class Hud:
-    def draw(self, surface, elapsed, stars, cores, towers=None):
+    def draw(self, surface, elapsed, stars, cores, towers=None, goal=None):
         """stars: None while the shop is locked (then stars and the shop icon aren't shown). towers: (standing,
-        allowed, price of the next) – None without the watchtower."""
+        allowed, price of the next) – None without the watchtower. goal: seconds to clear the level – None once it's
+        cleared (or the level is endless)."""
         right = surface.get_width() - RIGHT_MARGIN
-        minutes, seconds = divmod(int(elapsed), 60)
-        timer = draw_text(surface, f"{minutes:02}:{seconds:02}", 30, settings.TEXT, alpha=READY_ALPHA,
-                          topright=(right, 8))
+        text = clock(elapsed) if goal is None else f"{clock(elapsed)} / {clock(goal)}"
+        timer = draw_text(surface, text, 30, settings.TEXT, alpha=READY_ALPHA, topright=(right, 8))
 
         count = draw_text(surface, str(cores), 26, settings.TEXT, alpha=READY_ALPHA, topright=(right, timer.bottom + 4))
         draw_core(surface, (count.left - 12, count.centery), 8)

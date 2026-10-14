@@ -45,7 +45,7 @@ class WatchtowerKit:
 
 class Watchtower(Entity):
     stats = {                   # fallback only – the real values are in data/buildings.json
-        "max_hp": 6,
+        "max_hp": 150,          # takes enemy damage in pixels like the ship (a Basic touching it: 25)
         "size": 24,             # pixels (square)
         "vision": 320,          # side length of its window
         "throw_range": 420,     # how far it's thrown from the ship

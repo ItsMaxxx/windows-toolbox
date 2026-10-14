@@ -2,7 +2,7 @@
 A buff (or debuff): a temporary change to one of an enemy's stats during a run – flat (add) and/or as a factor.
 
     Buff("speed", factor=1.5, duration=5)       50 % faster for 5 seconds
-    Buff("contact_damage", add=1)               +1 contact damage until it's removed
+    Buff("contact_damage", add=25)              +25 px contact damage until it's removed
     Buff("speed", factor=0.5, duration=2)       a slow (debuff)
 
 All buffs on a stat are combined like this: (value + all adds) × all factors – so a +1 always counts the same, no

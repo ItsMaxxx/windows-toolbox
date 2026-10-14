@@ -1,13 +1,15 @@
 """
 The game menu between runs (Play in the main menu leads here). Left: the ship as it will start the next run. Right:
-the difficulty and three tabs: the loadout (which weapon in which slot, loadout_panel.py), and where cores are spent
-(only here): the skill tree (skill_tree_panel.py) and the card shop with the card collection (card_panel.py). Start
-begins a run, Back returns to the main menu.
+the chosen level and four tabs: the levels (level_panel.py – every level with indicators of what's coming), the
+loadout (which weapon in which slot, loadout_panel.py), and where cores are spent (only here): the skill tree
+(skill_tree_panel.py) and the card shop with the card collection (card_panel.py) – that one only once "Card shop"
+is bought in the skill tree. Start begins a run, Back returns to
+the main menu.
 
-Mouse: click a difficulty, a tab, an upgrade (buys its next level), a card or a button – right click a card in the
+Mouse: click a level, a tab, an upgrade (buys its next level), a card or a button – right click a card in the
 collection for a small menu (sell). In the loadout, drag weapons onto the slots.
-Keyboard: A/D or arrow keys change the difficulty (only between unlocked ones), Tab goes to the next tab, Enter starts,
-Esc goes back. A locked difficulty shows what unlocks it.
+Keyboard: A/D or arrow keys change the level (only between unlocked ones), Tab goes to the next tab, Enter starts,
+Esc goes back. A locked level shows what unlocks it.
 
 Every time it opens, the difficulty files are read again (so changes to them show up right away); if something in
 them is wrong, the problems are listed in red above the buttons.
@@ -26,6 +28,7 @@ from game.card_panel import CardPanel
 from game.card_shop import CardShop
 from game.skill_tree_panel import SkillTreePanel
 from game.difficulty import DIFFICULTIES, WARNINGS
+from game.level_panel import LevelPanel
 from game.loadout_panel import LoadoutPanel
 from game.game_over_scene import format_time
 from game.icons import CORE_COLOR, draw_core
@@ -34,12 +37,10 @@ from game.ship_shape import draw_ship
 
 MARGIN = 24
 LEFT_WIDTH = 260                    # ship column
-RIGHT_LEFT = 320                    # difficulty and skill tree
+RIGHT_LEFT = 320                    # level and tabs
 PREVIEW_HEIGHT = 170
-DIFFICULTY_TOP = 94
-DIFFICULTY_HEIGHT = 40
-DIFFICULTY_GAP = 12
-TABS = (("loadout", "Loadout"), ("tree", "Skill tree"), ("cards", "Cards"))
+LEVEL_TOP = 94                      # the chosen level, above the tabs
+TABS = (("levels", "Levels"), ("loadout", "Loadout"), ("tree", "Skill tree"), ("cards", "Cards"))
 TAB_TOP = 168
 TAB_SIZE = (150, 32)
 TAB_GAP = 10
@@ -73,14 +74,15 @@ class GameMenuScene(Scene):
             self.profile.difficulty = difficulty_files.default_key()      # its file was removed or changed
         self.rect = pygame.Rect((0, 0), settings.GAME_MENU_WINDOW_SIZE)
         self.rect.center = work_area().center
-        self.tab = "tree"
+        self.tab = "levels"
         self.card_panel = CardPanel(CardShop(self.profile), RIGHT_LEFT, TREE_TOP,
                                     self.rect.width - MARGIN - RIGHT_LEFT, self.show_message)
         area = (RIGHT_LEFT, TREE_TOP, self.rect.width - MARGIN - RIGHT_LEFT, TREE_BOTTOM - TREE_TOP)
         self.tree_panel = SkillTreePanel(self.profile, area)
         self.loadout_panel = LoadoutPanel(self.profile, area, self.show_message)
-        # what the mouse is on: ("difficulty", key), ("tab", key), ("node", key), ("cards", what – see CardPanel),
-        # ("loadout", what – see LoadoutPanel), "start", "back" or None
+        self.level_panel = LevelPanel(self.profile, area)
+        # what the mouse is on: ("difficulty", key) – a level –, ("tab", key), ("node", key), ("cards", what – see
+        # CardPanel), ("loadout", what – see LoadoutPanel), "start", "back" or None
         self.hovered = None
         self.menu = None                        # the open context menu (right click on a card)
         self.message = ""
@@ -92,12 +94,6 @@ class GameMenuScene(Scene):
         self.engine.move_window(self.rect)
 
     # --- layout (window coordinates) ---
-
-    def difficulty_rects(self):
-        width = (self.rect.width - MARGIN - RIGHT_LEFT - 2 * DIFFICULTY_GAP) // 3
-        return {key: pygame.Rect(RIGHT_LEFT + index * (width + DIFFICULTY_GAP), DIFFICULTY_TOP, width,
-                                 DIFFICULTY_HEIGHT)
-                for index, key in enumerate(DIFFICULTIES)}
 
     @staticmethod
     def tab_rects():
@@ -114,13 +110,14 @@ class GameMenuScene(Scene):
         return rect
 
     def thing_at(self, position):
-        for key, rect in self.difficulty_rects().items():
-            if rect.collidepoint(position):
-                return ("difficulty", key)
         for key, rect in self.tab_rects().items():
             if rect.collidepoint(position):
                 return ("tab", key)
-        if self.tab == "tree":
+        if self.tab == "levels":
+            key = self.level_panel.thing_at(position)
+            if key is not None:
+                return ("difficulty", key)
+        elif self.tab == "tree":
             key = self.tree_panel.thing_at(position)
             if key is not None:
                 return ("node", key)
@@ -128,7 +125,7 @@ class GameMenuScene(Scene):
             thing = self.loadout_panel.thing_at(position)
             if thing is not None:
                 return ("loadout", thing)
-        else:
+        elif self.profile.owns(skill_tree.CARD_SHOP):
             thing = self.card_panel.thing_at(position)
             if thing is not None:
                 return ("cards", thing)
@@ -161,10 +158,9 @@ class GameMenuScene(Scene):
 
     @staticmethod
     def unlock_hint(key):
-        """E.g. "Survive 04:00 on Normal to unlock Hard"."""
-        unlock = DIFFICULTIES[key].unlock
-        requires = DIFFICULTIES[unlock.requires].name
-        return f"Survive {format_time(unlock.survive)} on {requires} to unlock {DIFFICULTIES[key].name}"
+        """E.g. "Survive 02:30 on A3 to unlock A4"."""
+        requires = DIFFICULTIES[DIFFICULTIES[key].requires]
+        return f"Survive {format_time(requires.goal)} on {requires.name} to unlock {DIFFICULTIES[key].name}"
 
     def buy(self, key):
         node = skill_tree.NODES_BY_KEY[key]
@@ -253,17 +249,24 @@ class GameMenuScene(Scene):
         self.draw_ship_column(surface)
         self.draw_difficulty(surface)
         self.draw_tabs(surface)
-        if self.tab == "tree":
+        if self.tab == "levels":
+            self.level_panel.draw(surface, self.hovered[1] if self.hovered and self.hovered[0] == "difficulty" else None)
+        elif self.tab == "tree":
             self.tree_panel.draw(surface, self.hovered[1] if self.hovered and self.hovered[0] == "node" else None)
         elif self.tab == "loadout":
             self.loadout_panel.draw(surface, self.hovered[1] if self.hovered and self.hovered[0] == "loadout" else None)
-        else:
+        elif self.profile.owns(skill_tree.CARD_SHOP):
             self.card_panel.draw(surface, self.hovered[1] if self.hovered and self.hovered[0] == "cards" else None)
+        else:
+            center = ((RIGHT_LEFT + self.rect.width - MARGIN) // 2, (TREE_TOP + TREE_BOTTOM) // 2)
+            title = draw_text(surface, "CARDS LOCKED", 40, LOCKED, center=center)
+            draw_text(surface, "Unlock the Card shop in the skill tree (below Core luck).", 24, settings.TEXT_MUTED,
+                      midtop=(center[0], title.bottom + 12))
         self.draw_info(surface)
         self.draw_warnings(surface)
         self.draw_button(surface, self.back_rect(), "Back", 28, self.hovered == "back")
         self.draw_button(surface, self.start_rect(), "Start", 34, True, hovered=self.hovered == "start")
-        draw_text(surface, "ENTER start  ·  ESC back  ·  A / D difficulty  ·  TAB switch tab", 20, settings.TEXT,
+        draw_text(surface, "ENTER start  ·  ESC back  ·  A / D level  ·  TAB switch tab", 20, settings.TEXT,
                   alpha=settings.HINT_ALPHA * 2, midbottom=(panel.centerx, panel.bottom - 20))
         if self.menu is not None:
             self.menu.draw(surface)
@@ -295,7 +298,8 @@ class GameMenuScene(Scene):
             ("Shop", "T" if profile.owns(skill_tree.SHOP) else None),
             ("Arena", f"{width} × {height}"),
             ("Start stars", str(ship.stars)),
-            ("Active cards", f"{len(profile.active_cards())}/{cards.RULES.max_active}"),
+            ("Active cards", f"{len(profile.active_cards())}/{cards.RULES.max_active}"
+             if profile.owns(skill_tree.CARD_SHOP) else None),
             (f"Best ({difficulty.name})", format_time(best) if best else "–"),
         ]
         y = preview.bottom + 16
@@ -309,28 +313,18 @@ class GameMenuScene(Scene):
             y += 27
 
     def draw_difficulty(self, surface):
-        draw_text(surface, "DIFFICULTY", 22, settings.TEXT_MUTED, topleft=(RIGHT_LEFT, 70))
-        hovered_locked = None
-        for key, rect in self.difficulty_rects().items():
-            hovered = self.hovered == ("difficulty", key)
-            if self.profile.difficulty_unlocked(key):
-                self.draw_button(surface, rect, DIFFICULTIES[key].name, 26, key == self.profile.difficulty,
-                                 hovered=hovered)
-                continue
-            if hovered:
-                hovered_locked = key
-                pygame.draw.rect(surface, HOVER_FILL, rect, border_radius=6)
-            pygame.draw.rect(surface, LOCKED, rect, width=2, border_radius=6)
-            draw_text(surface, f"{DIFFICULTIES[key].name}  (locked)", 26, LOCKED, center=rect.center)
-        right = self.rect.width - MARGIN
-        if hovered_locked:
-            text, color = self.unlock_hint(hovered_locked), settings.TEXT
-        else:
-            difficulty = DIFFICULTIES[self.profile.difficulty]
-            chance = skill_tree.core_chance(self.profile, difficulty)
-            text = f"{difficulty.description}  ·  core chance {chance * 100:.3g} %".lstrip(" ·")
-            color = settings.TEXT_MUTED
-        draw_text(surface, text, 22, color, midtop=((RIGHT_LEFT + right) // 2, DIFFICULTY_TOP + DIFFICULTY_HEIGHT + 10))
+        """The chosen level above the tabs: its name, description, goal and core chance (choose it in the Levels
+        tab or with A / D)."""
+        draw_text(surface, "LEVEL", 22, settings.TEXT_MUTED, topleft=(RIGHT_LEFT, 70))
+        level = DIFFICULTIES[self.profile.difficulty]
+        name = draw_text(surface, level.name, 44, settings.TEXT, topleft=(RIGHT_LEFT, LEVEL_TOP))
+        draw_text(surface, level.description, 24, settings.TEXT_MUTED, midleft=(name.right + 16, name.centery + 2))
+        chance = skill_tree.core_chance(self.profile, level)
+        goal = "endless" if level.goal is None else f"goal {format_time(level.goal)}"
+        if self.profile.cleared(level.key):
+            goal = "cleared"
+        draw_text(surface, f"{goal}  ·  core chance {chance * 100:.3g} %", 22, settings.TEXT,
+                  midright=(self.rect.width - MARGIN, name.centery + 2))
 
     def draw_tabs(self, surface):
         for key, label in TABS:
@@ -344,6 +338,14 @@ class GameMenuScene(Scene):
             draw_text(surface, self.message, 24, self.message_color, midtop=(center, INFO_TOP + 12))
         elif self.hovered and self.hovered[0] == "cards" and self.card_panel.info(self.hovered[1]):
             draw_text(surface, self.card_panel.info(self.hovered[1]), 22, settings.TEXT, midtop=(center, INFO_TOP + 12))
+        elif self.tab == "levels":
+            hovered = self.hovered[1] if self.hovered and self.hovered[0] == "difficulty" else None
+            if hovered and not self.profile.difficulty_unlocked(hovered):
+                draw_text(surface, self.unlock_hint(hovered), 22, settings.TEXT, midtop=(center, INFO_TOP + 12))
+            else:
+                draw_text(surface, "click a level to choose it  ·  survive its goal to unlock the next  ·  the run "
+                                   "goes on after the goal", 20, settings.TEXT, alpha=settings.HINT_ALPHA * 2,
+                          midtop=(center, INFO_TOP + 12))
         elif self.tab == "loadout":
             draw_text(surface, "drag a weapon onto a slot  ·  drag it off its slot to empty it  ·  both weapons share "
                                "the energy", 20, settings.TEXT, alpha=settings.HINT_ALPHA * 2,

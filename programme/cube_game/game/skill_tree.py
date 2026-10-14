@@ -6,7 +6,8 @@ The tree is a graph: Shop sits in the middle, the branches (BRANCHES – ship, e
 scouting) grow outwards from it in every direction, also diagonally. Each node has its own place (position, in grid
 units from the middle – skill_tree_panel.py says how big a unit is); the lines between nodes come from requires.
 
-The ship starts with nothing but its gun: the shop, the other weapons, both abilities and all bonuses come from here.
+The ship starts with nothing but its gun: the shop, the card shop, the other weapons, both abilities and all bonuses
+come from here.
 Upgrades of a weapon, the rocket or the energy are listed in EFFECTS (which value of which part); how much one level
 adds is in data/weapons.json ("tree" of that part). What the bought nodes (and the active cards from the card shop) do
 to a new run is in the functions at the bottom – the game menu uses them, too, to show the next run's ship.
@@ -30,6 +31,7 @@ SHOP, DASH, ROCKET, HEAD_START, BIGGER_ARENA, CORE_LUCK, WATCHTOWER = (
     "shop", "dash", "rocket", "head_start", "bigger_arena", "core_luck", "watchtower")
 RADAR, RADAR_SIZE, RADAR_COOLDOWN, RADAR_DURATION = "radar", "radar_size", "radar_cooldown", "radar_duration"
 BURNING_GROUND = "burning_ground"
+CARD_SHOP = "card_shop"         # the Cards tab of the game menu – without it, no cards (and active ones don't apply)
 
 
 @dataclass(frozen=True)
@@ -78,6 +80,8 @@ NODES = [
          (2, 4, 6), (HEAD_START,), "ship", (-0.9, 2.4)),
     Node(CORE_LUCK, "Core luck", f"Cores drop more often: +{CORE_LUCK_BONUS:.1%} per level.", (3, 6, 9), (SHOP,),
          "ship", (0.9, 1.1)),
+    Node(CARD_SHOP, "Card shop", "Unlocks the Cards tab: buy cards with cores – active cards apply at the start of "
+         "every run.", (4,), (CORE_LUCK,), "ship", (0.9, 2.4)),
 
     # energy and the laser behind it – upwards
     Node("max_energy", "Max energy", "More energy for your weapons.", (2, 4, 6), (SHOP,), "energy", (-0.9, -1.1)),
@@ -206,7 +210,8 @@ def effect_text(node):
 
 def start_ship(profile, center):
     """The ship a run starts with: the weapons of the loadout (at least the gun), its energy, the unlocked abilities,
-    the watchtower kit, the head start stars and the active cards – with every bought upgrade."""
+    the watchtower kit, the head start stars and the active cards (once the card shop is unlocked) – with every
+    bought upgrade."""
     ship = Ship(center)
     ship.weapons = [build_weapon(profile, key) if key and weapon_unlocked(profile, key) else None
                     for key in profile.loadout]
@@ -219,7 +224,7 @@ def start_ship(profile, center):
     ship.stars = HEAD_START_STARS * profile.level(HEAD_START)
     if profile.owns(WATCHTOWER):
         ship.watchtower = WatchtowerKit(max_count=profile.level(WATCHTOWER))
-    for key in profile.active_cards():
+    for key in profile.active_cards() if profile.owns(CARD_SHOP) else ():
         CARDS[key].apply_card(ship)                  # a dash card without the dash simply changes nothing
     return ship
 

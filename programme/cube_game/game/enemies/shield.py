@@ -1,5 +1,5 @@
 """
-Shield: a steel blue cube behind a big shield. It turns very slowly (turn_speed) and only ever moves where its shield
+Shield: the Charger's evolution (tier 2) – a steel blue cube behind a big shield. It turns very slowly (turn_speed) and only ever moves where its shield
 points – so it comes at you in a wide arc, and you can get round it.
 
 The shield blocks the player's shots from the front (blocks()): a shot that hits the shield itself, or the body from
@@ -21,11 +21,12 @@ SHIELD_GAP = 4              # pixels between the body and the shield
 class ShieldBearer(Enemy):
     key = "shield"
     name = "Shield"
+    tier = 2                        # the Charger's evolution
     melee = True
     shielded = True
     skin = ShieldSkin()
     stats = {                       # fallback – see data/enemies.json
-        "max_hp": 4, "speed": 55, "size": 30, "contact_damage": 2,
+        "max_hp": 4, "speed": 55, "size": 30, "contact_damage": 50,
         "turn_speed": 40,           # degrees per second – very slow
         "shield_width": 54,         # pixels: how long the shield is (across, in front of the body)
         "shield_arc": 150,          # degrees: shots that hit the body from within this cone in front are blocked, too

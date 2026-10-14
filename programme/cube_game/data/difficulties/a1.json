@@ -1,0 +1,23 @@
+{
+  "name": "A1",
+  "description": "the start: only Basics and Shooters",
+  "order": 1,
+  "goal": 180,
+  "core_chance": 0.08,
+  "unlock": { "requires": null },
+  "hints": ["Only Basics and Shooters", "Slow walls – learn to push them back"],
+  "arena": { "start_size": [800, 560], "shrink_speed": 7, "shrink_growth": 1.5, "max_shrink_speed": 15, "armor": 0 },
+  "spawning": { "first_spawn": 3, "start_interval": 3.4, "min_interval": 1.5, "interval_drop": 0.008 },
+  "enemies": [
+    { "type": "basic",   "weight": 50, "after": 0 },
+    { "type": "shooter", "weight": 20, "after": 20, "growth": 3 }
+  ],
+  "swarms": [],
+  "phases": [
+    { "from": 60, "to": 80, "weights": { "shooter": "x3" }, "announce": "Shooters incoming!" },
+    { "from": 100, "enemy_stats": { "all": { "max_hp": "+1" } } },
+    { "from": 150, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
+    { "from": 240, "enemy_stats": { "all": { "max_hp": "+1" } } },
+    { "from": 300, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" }
+  ]
+}

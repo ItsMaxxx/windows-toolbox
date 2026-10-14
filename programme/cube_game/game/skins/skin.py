@@ -3,6 +3,7 @@ Base class for enemy skins. A skin draws one enemy in this order:
     draw_below()  – things under the body (barrel, laser, warning line, …)
     buff glow     – if the enemy has an active buff (game/effects/buff_glow.py)
     body          – the square in the skin's colour, white for a moment after a hit
+    tier frame    – evolutions (tier 2) only: a dark frame inside the body
     draw_above()  – things on top of the body (e.g. the Carrier's hangar)
     health pips   – once it's damaged
 A skin for a new enemy is a subclass that sets color and overrides draw_below/draw_above if it needs to. It may read
@@ -18,6 +19,17 @@ from game.effects.buff_glow import draw_buff_glow
 FLASH_COLOR = (255, 255, 255)
 PIP_SIZE = (6, 4)           # health pips above a damaged enemy
 PIP_EMPTY = (70, 70, 70)
+TIER_FRAME_SHADE = 0.45     # the tier 2 frame: the body's colour this dark …
+TIER_FRAME_INSET = 0.18     # … this far inside the edge (part of the size) …
+TIER_FRAME_WIDTH = 0.1      # … and this thick (at least 2 px)
+
+
+def draw_tier_frame(surface, rect, color):
+    """The mark of an evolution: a dark frame inside the body (also used for the icons in the game menu)."""
+    inset = round(rect.width * TIER_FRAME_INSET)
+    frame = pygame.Rect(rect).inflate(-2 * inset, -2 * inset)
+    width = max(2, round(rect.width * TIER_FRAME_WIDTH))
+    pygame.draw.rect(surface, [round(channel * TIER_FRAME_SHADE) for channel in color], frame, width)
 
 
 class Skin:
@@ -29,6 +41,8 @@ class Skin:
         if enemy.active_buffs():
             draw_buff_glow(surface, rect)
         pygame.draw.rect(surface, FLASH_COLOR if enemy.flash else self.color, rect)
+        if enemy.tier == 2:
+            draw_tier_frame(surface, rect, self.color)
         self.draw_above(surface, enemy, rect)
         max_hp = max(1, round(enemy.stat("max_hp")))
         if enemy.hp < max_hp:

@@ -8,6 +8,9 @@ Where an enemy's values come from – each layer overrides the one before:
   3. "enemy_stats" in the difficulty file – the difficulty's own values, like a map in the StarCraft 2 editor:
      a number replaces the value, "+1" / "-1" adds, "x1.5" multiplies; "all" applies to every type that has the stat
 Buffs (buff.py) come on top during the run.
+
+Evolutions: some tier 1 types have a stronger tier 2 version (EVOLUTIONS). A level's "evolutions" say how likely one
+of them spawns in its place – the spawner asks for that (see spawner.py); create() always makes exactly the type asked.
 """
 
 import json
@@ -15,20 +18,26 @@ from pathlib import Path
 
 from game.enemies.artillery import Artillery
 from game.enemies.basic import BasicEnemy
+from game.enemies.cannoneer import Cannoneer
 from game.enemies.carrier import Carrier
 from game.enemies.charger import Charger
 from game.enemies.critter import Critter
+from game.enemies.fat import FatGuy
+from game.enemies.laser import Laser
 from game.enemies.shield import ShieldBearer
 from game.enemies.shooter import Shooter
 from game.enemies.sniper import Sniper
 
 # the names the data files use for the enemy types
 ENEMY_TYPES = {"basic": BasicEnemy, "charger": Charger, "shooter": Shooter, "sniper": Sniper, "carrier": Carrier,
-               "critter": Critter, "artillery": Artillery, "shield": ShieldBearer}
+               "critter": Critter, "artillery": Artillery, "fat": FatGuy, "cannoneer": Cannoneer, "shield": ShieldBearer,
+               "laser": Laser}
+# tier 1 type -> its evolution (tier 2)
+EVOLUTIONS = {"basic": "fat", "shooter": "cannoneer", "charger": "shield", "sniper": "laser"}
 FILE = Path(__file__).resolve().parents[2] / "data" / "enemies.json"
 # 0 would break things (division by 0, invisible enemies, …)
 MUST_BE_POSITIVE = {"max_hp", "size", "fire_interval", "reload_time", "aim_time", "spawn_interval", "blast_radius",
-                    "setup_time", "pack_time"}
+                    "setup_time", "pack_time", "beam_time"}
 BASE_STATS = {}                     # type key -> {stat: value}: data/enemies.json over the class fallbacks
 
 

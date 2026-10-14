@@ -3,6 +3,9 @@ Base class for all enemies. Every enemy type is a subclass (class Charger(Enemy)
 and only changes what's different: its key, stats, behaviour (act()) and skin. How it looks is entirely in its skin
 (game/skins/) – this file and the subclasses only decide what it does.
 
+Damage to the ship (contact_damage, shot_damage, blast_damage) is in pixels: how far the arena's edges move in on
+average (Arena.hit). Watchtowers take the same numbers off their HP.
+
 Stats (HP, speed, size, contact damage and every number of the behaviour) are read with self.stat("speed"): the value
 for this run (data/enemies.json and the difficulty's enemy_stats, put together by the roster – see roster.py) with the
 buffs on top (buff.py). The stats dict in each class is only the fallback if data/enemies.json lacks a value – the
@@ -21,6 +24,9 @@ Facing: every enemy has a direction it faces (aim). Ranged enemies turn it towar
 enough and they can't keep up.
 
 Shots of the player first ask blocks(): an enemy can stop a shot without being hurt (the shield enemy's shield).
+
+Tiers: the plain types are tier 1. Some have an evolution (tier 2, roster.EVOLUTIONS): a stronger version that can
+spawn in its place on harder levels (the level's "evolutions"). Their skins get a dark frame inside the body.
 """
 
 import pygame
@@ -36,6 +42,7 @@ HIT_FLASH = 0.1             # seconds an enemy flashes white after a hit
 class Enemy(Entity):
     key = "enemy"           # its name in the data files
     name = "Enemy"
+    tier = 1                # 2: the evolution of a tier 1 type (roster.EVOLUTIONS)
     skin = Skin()           # how it looks (game/skins/)
     drops_loot = True       # leaves a star (with the shop unlocked) and, rarely, a core when killed
     melee = False           # only fights by touching – then a watchtower nearby can lure it away from the ship
@@ -44,7 +51,7 @@ class Enemy(Entity):
         "max_hp": 1,
         "speed": 100,           # pixels per second
         "size": 28,             # pixels (square hitbox) – read at spawn
-        "contact_damage": 1,    # damage when it touches the ship (0 = harmless to touch)
+        "contact_damage": 25,   # pixels the edges move in when it touches the ship (0 = harmless to touch)
     }
 
     def __init__(self, position, roster=None):

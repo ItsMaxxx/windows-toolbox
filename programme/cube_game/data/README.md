@@ -11,20 +11,27 @@ Werte) zeigt das Spielmenü rot an; das Spiel nimmt dann den Standardwert, statt
 | `weapons.json` | Waffen, Energie und Rakete: Grundwerte und was jede Skilltree-Stufe bringt – siehe unten |
 | `buildings.json` | Gebäude, die man im Run setzt – bisher der Wachturm (siehe unten) |
 | `radar.json` | der Radar aus dem Skilltree (siehe unten) |
-| `difficulties/*.json` | eine Datei pro Schwierigkeit – Arena, Cores, Spawns und eigene Gegnerwerte (`difficulties/README.md`) |
+| `difficulties/*.json` | eine Datei pro Level (A1 … B6, Survival) – Ziel, Arena, Cores, Spawns, Evolutionen und eigene Gegnerwerte (`difficulties/README.md`) |
 
 ## Woher ein Gegnerwert kommt
 
 Wie im StarCraft-2-Editor, wo jede Map eigene Einheitenwerte haben kann – jede Schicht überschreibt die vorige:
 
 1. `enemies.json` – der Standard (fehlt hier ein Wert, gilt der Notfallwert in der Klasse in `game/enemies/`)
-2. `enemy_stats` in der Schwierigkeitsdatei – eigene Werte nur auf dieser Stufe
+2. `enemy_stats` in der Level-Datei – eigene Werte nur auf diesem Level
 3. Buffs während eines Runs – zeitlich begrenzt, flach und/oder als Faktor (`game/enemies/buff.py`)
 
 ## `enemies.json`
 
-Ein Eintrag pro Gegnertyp: `basic`, `charger`, `shooter`, `sniper`, `carrier`, `critter`, `artillery`, `shield`.
+Ein Eintrag pro Gegnertyp: `basic`, `charger`, `shooter`, `sniper`, `carrier`, `critter`, `artillery` (Tier 1) und
+ihre Evolutionen (Tier 2, mit dunklem Rahmen im Würfel): `fat` (aus Basic), `cannoneer` (aus Shooter), `shield` (aus
+Charger), `laser` (aus Sniper). Wann eine Evolution statt Tier 1 kommt, steht im Level (`evolutions`).
 Zeiten in Sekunden, Strecken und Größen in Pixeln, Tempo in Pixeln pro Sekunde, Winkel in Grad.
+
+**Schaden ans Schiff ist in Pixeln** (`contact_damage`, `shot_damage`, `blast_damage`): So weit rücken die Kanten der
+Arena bei einem Treffer im Schnitt ein – Breite und Höhe werden je um das Doppelte kleiner. Die Kanten weit weg vom
+Schiff rücken mehr ein, die nahen weniger (`HIT_SIDE_BIAS` in `settings.py`). Zum Vergleich: ein Basic macht 25, die
+Grundkanone schiebt eine Kante pro Schuss um 18 zurück. Wachtürme verlieren dieselbe Zahl an Lebenspunkten.
 
 **Blickrichtung (Shooter, Sniper, Artillery, Shield):** Diese Gegner drehen sich mit begrenztem Tempo zum Schiff und
 handeln nur nach vorne. Wer schnell genug um sie herumfliegt, entkommt ihnen.
@@ -41,7 +48,7 @@ handeln nur nach vorne. Wer schnell genug um sie herumfliegt, entkommt ihnen.
 | `max_hp` | Lebenspunkte (ein Kästchen über dem Gegner pro Punkt) |
 | `speed` | Lauftempo |
 | `size` | Kantenlänge des Würfels (auch die Hitbox; Größere schieben Kleinere weg) |
-| `contact_damage` | Schaden bei Berührung (0 = harmlos) |
+| `contact_damage` | Schaden in Pixeln bei Berührung (0 = harmlos) |
 
 **Charger**
 
@@ -61,7 +68,7 @@ handeln nur nach vorne. Wer schnell genug um sie herumfliegt, entkommt ihnen.
 | `fire_range` | schießt, wenn das Schiff höchstens so weit weg ist |
 | `fire_interval` | Sekunden zwischen zwei Schüssen |
 | `turn_speed` / `fire_cone` | siehe oben |
-| `shot_damage` / `shot_speed` / `shot_size` | der Schuss |
+| `shot_damage` / `shot_speed` / `shot_size` | der Schuss: Schaden in Pixeln, Tempo, Durchmesser |
 
 **Sniper**
 
@@ -74,7 +81,7 @@ handeln nur nach vorne. Wer schnell genug um sie herumfliegt, entkommt ihnen.
 | `aim_time` | so lange ist der Laser sichtbar … |
 | `lock_time` | … davon die letzten Sekunden folgt er nicht mehr (der Moment zum Ausweichen) |
 | `reload_time` | Pause nach dem Schuss |
-| `shot_damage` / `shot_speed` / `shot_size` | der Schuss |
+| `shot_damage` / `shot_speed` / `shot_size` | der Schuss: Schaden in Pixeln, Tempo, Durchmesser |
 
 **Carrier**
 
@@ -101,9 +108,25 @@ der Reichweite, baut sie ab (rückwärts) und läuft wieder – bei zu wenig Abs
 | `fill_time` | so lange füllt sich der rote Kreis, bevor es einschlägt (die Warnung) |
 | `aim_spread` | der Kreis landet zufällig bis zu so weit neben dem Schiff (0 = genau auf das Schiff) |
 | `blast_radius` | Radius des Kreises |
-| `blast_damage` | Schaden, wenn das Schiff beim Einschlag im Kreis ist |
+| `blast_damage` | Schaden in Pixeln, wenn das Schiff beim Einschlag im Kreis ist |
 
-**Shield** – hält einen großen Schild vor sich, dreht sich sehr langsam und läuft nur in Schildrichtung (kommt also
+**Fat Guy** – die Evolution des Basic: nur die vier Grundwerte (größer, viel mehr HP), sonst wie ein Basic.
+
+**Cannoneer** – die Evolution des Shooters: verhält sich wie ein Shooter, aber sehr langsam und mit einer riesigen
+Kanonenkugel, die langsam fliegt und massiv Schaden macht. Dieselben Werte wie beim Shooter (`shooting_distance`,
+`fire_range`, `fire_interval`, `turn_speed`, `fire_cone`, `shot_damage`, `shot_speed`, `shot_size`).
+
+**Laser** – die Evolution des Snipers: zielt wie ein Sniper (dieselben Werte außer `shot_speed`/`shot_size`), die
+Linie ist dicker. Statt einer Kugel feuert er einen Strahl entlang der Linie; wer ihn berührt, solange er an ist, nimmt
+Schaden (einmal pro Strahl). Solange der Strahl an ist, bewegt und dreht er sich nicht. Stirbt er, erlischt der Strahl.
+
+| Wert | Bedeutung |
+|---|---|
+| `shot_damage` | Schaden in Pixeln, wenn der Strahl das Schiff (oder einen Wachturm) berührt |
+| `beam_time` | so viele Sekunden ist der Strahl an |
+| `beam_width` | Dicke des Strahls in Pixeln |
+
+**Shield** – die Evolution des Chargers: hält einen großen Schild vor sich, dreht sich sehr langsam und läuft nur in Schildrichtung (kommt also
 im Bogen). Der Schild blockt Kugeln von vorne (mit Funken, ohne Wand-Push), Explosionen treffen ihn von jeder Seite.
 Ist das Schiff vor dem Schild und nah genug, lädt er auf (Warnlinie) und stürmt mit dem Schild voran – wie ein
 stärkerer Charger.
@@ -133,7 +156,8 @@ stärkerer Charger.
 | `price` | Sterne für die erste Stufe in einem Run … |
 | `price_step` | … und so viele mehr für jede weitere Stufe desselben Werts (10, 15, 20, …) |
 
-**`card_shop`** – der Karten-Shop im Spielmenü (Reiter *Cards*), bezahlt mit Cores. Ganze Zahlen.
+**`card_shop`** – der Karten-Shop im Spielmenü (Reiter *Cards*), bezahlt mit Cores. Ganze Zahlen. Erst
+nutzbar, wenn der Skilltree-Knoten *Card shop* gekauft ist – vorher wirken auch aktive Karten nicht.
 
 | Wert | Bedeutung |
 |---|---|
@@ -198,7 +222,7 @@ kleines Fenster, das diese Stelle dauerhaft zeigt. Gegner können ihn zerstören
 
 | Wert | Bedeutung |
 |---|---|
-| `max_hp` | Lebenspunkte |
+| `max_hp` | Lebenspunkte – in derselben Einheit wie der Schaden der Gegner (Pixel): 150 = sechs Berührungen eines Basic (je 25). Über dem Turm ein Lebensbalken |
 | `size` | Kantenlänge des Turms (auch die Hitbox; Gegner werden aus ihm herausgeschoben, er selbst bewegt sich nie) |
 | `vision` | Kantenlänge seines Fensters in Pixeln (Upgrade *Vision* im Shop und als Karte macht es größer) |
 | `throw_range` | so weit fliegt er vom Schiff weg |

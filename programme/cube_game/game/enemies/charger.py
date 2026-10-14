@@ -18,7 +18,7 @@ class Charger(Enemy):
     melee = True
     skin = ChargerSkin()
     stats = {                       # fallback – see data/enemies.json
-        "max_hp": 3, "speed": 85, "size": 34, "contact_damage": 2,
+        "max_hp": 3, "speed": 85, "size": 34, "contact_damage": 50,
         "charge_range": 280,        # starts winding up when the ship is this close
         "windup_time": 0.55,        # seconds of warning before it charges – it keeps turning towards the ship meanwhile
         "charge_speed": 700,

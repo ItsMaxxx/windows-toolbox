@@ -5,9 +5,9 @@ over (game over screen).
 
 What the run starts with comes from the profile: the difficulty and the skill tree (shop, abilities, bonuses – see
 skill_tree.py). Killed enemies drop stars (only with the shop unlocked) and, rarely, a core; cores are saved right
-away, so they're kept even if the run is left through the pause menu. Surviving long enough unlocks the next
-difficulty (its unlock.survive) – also saved right then, with a notice on screen. Phases of the difficulty that
-announce themselves ("Snipers incoming!") get a notice, too.
+away, so they're kept even if the run is left through the pause menu. Surviving the level's goal clears it and unlocks
+the next level – saved right then, with a notice on screen; the run goes on until the ship is crushed. Phases of the
+level that announce themselves ("Snipers incoming!") get a notice, too.
 
 Watchtowers (B, once unlocked): thrown out from the ship, each one gets its own window (Engine.open_view) that shows
 the world around it – draw_view() draws it. Enemies can destroy them (game/buildings/watchtower.py). The radar (once
@@ -43,6 +43,7 @@ from game.field import Field
 from game.enemies.roster import EnemyRoster
 from game.enemies.spawner import Spawner
 from game.artillery_strike import ArtilleryStrike
+from game.laser_beam import LaserBeam
 from game.effects.artillery_blast import ArtilleryBlast
 from game.effects.burning_ground import BurningGround
 from game.effects.explosion import Explosion
@@ -102,6 +103,7 @@ class PlayScene(Scene):
         self.enemies = []
         self.enemy_projectiles = []
         self.strikes = []                       # artillery strikes on their way (a circle filling up)
+        self.beams = []                         # laser beams while they're on
         self.roster = EnemyRoster(self.difficulty)          # the enemies' values on this difficulty, buffs on all
         self.spawner = Spawner(self.desktop, self.difficulty, self.roster)
         self.explosions = []                    # effects: explosions, blasts (only drawn, they do nothing)
@@ -114,9 +116,10 @@ class PlayScene(Scene):
         self.kills = 0
         self.cores = 0                          # cores collected in this run (already added to the profile)
         upcoming = next_difficulty(profile.difficulty)
-        # the difficulty this run will unlock once it has lasted long enough – None if there's none (left)
+        # the level this run will unlock once it has lasted the goal – None if there's none (left)
         self.unlocks = upcoming if upcoming and not profile.difficulty_unlocked(upcoming) else None
         self.unlocked = None                    # set once it happened in this run
+        self.cleared = False                    # the goal was reached in this run
         self.notices = []                       # on screen at the top: [text, colour, seconds left]
         self.ability_bar = AbilityBar()
         self.hud = Hud()
@@ -164,7 +167,8 @@ class PlayScene(Scene):
         from game.game_over_scene import GameOverScene, RunResult     # imported here: it also imports this file
         new_best = self.profile.record(self.elapsed)
         self.profile.save()
-        result = RunResult(self.elapsed, self.kills, self.cores, self.profile.difficulty, new_best, self.unlocked)
+        result = RunResult(self.elapsed, self.kills, self.cores, self.profile.difficulty, new_best, self.unlocked,
+                           self.cleared)
         self.engine.change_scene(GameOverScene(self.profile, result, self.arena.rect.center))
 
     def quit(self):
@@ -203,8 +207,8 @@ class PlayScene(Scene):
         for notice in self.notices:
             notice[2] -= dt
         self.notices = [notice for notice in self.notices if notice[2] > 0]
-        if self.unlocks and self.elapsed >= DIFFICULTIES[self.unlocks].unlock.survive:
-            self.unlock_next_difficulty()
+        if not self.cleared and self.difficulty.goal is not None and self.elapsed >= self.difficulty.goal:
+            self.clear_level()
         self.arena.changes = [change for phase in self.spawner.active_phases() for change in phase.arena]
         self.arena.update(dt)
         self.ship.update(dt, self.engine.mouse_position())
@@ -228,7 +232,12 @@ class PlayScene(Scene):
         self.spawner.announcements.clear()
         for enemy in self.enemies[:]:                   # [:] – a copy, because spawned enemies are added
             for attack in enemy.update(dt, self.ship):
-                (self.strikes if isinstance(attack, ArtilleryStrike) else self.enemy_projectiles).append(attack)
+                if isinstance(attack, ArtilleryStrike):
+                    self.strikes.append(attack)
+                elif isinstance(attack, LaserBeam):
+                    self.beams.append(attack)
+                else:
+                    self.enemy_projectiles.append(attack)
             if not enemy.seen and field.sees(enemy.rect):
                 enemy.seen = True                       # the player has had it in view
             self.enemies += enemy.spawned
@@ -241,6 +250,7 @@ class PlayScene(Scene):
         self.update_player_shots(dt)
         self.update_enemy_shots(dt)
         self.update_strikes(dt)
+        self.update_beams(dt)
         self.update_burning(dt)
         for enemy in self.enemies:
             if enemy.rect.colliderect(self.ship.rect) and enemy.stat("contact_damage"):
@@ -274,12 +284,17 @@ class PlayScene(Scene):
 
         self.engine.move_window(self.window_rect())
 
-    def unlock_next_difficulty(self):
-        """Survived long enough: the time counts right now (saved), so leaving the run afterwards keeps the unlock."""
+    def clear_level(self):
+        """The goal is reached: the time counts right now (saved), so leaving the run afterwards keeps the unlock. The
+        run goes on."""
         self.profile.record(self.elapsed)
         self.profile.save()
-        self.unlocked, self.unlocks = self.unlocks, None
-        self.notices.append([f"{DIFFICULTIES[self.unlocked].name.upper()} UNLOCKED", NOTICE_COLOR, NOTICE_TIME])
+        self.cleared = True
+        text = f"{self.difficulty.name.upper()} CLEARED"
+        if self.unlocks:
+            self.unlocked, self.unlocks = self.unlocks, None
+            text += f"  ·  {DIFFICULTIES[self.unlocked].name.upper()} UNLOCKED"
+        self.notices.append([text, NOTICE_COLOR, NOTICE_TIME])
 
     def notify(self, text):
         """A small notice for a moment – the same text again only restarts it."""
@@ -461,12 +476,27 @@ class PlayScene(Scene):
                 self.explosions.append(ArtilleryBlast(strike.center, strike.radius))
         self.strikes = [strike for strike in self.strikes if not strike.landed]
 
+    def update_beams(self, dt):
+        """Laser beams hurt the ship and every watchtower they touch – each once per beam – and go out after their
+        time (or when their Laser dies)."""
+        for beam in self.beams:
+            beam.update(dt)
+            if beam.done:
+                continue
+            if self.ship not in beam.hurt and beam.hits(self.ship.rect) and self.hit_ship(beam.damage):
+                beam.hurt.append(self.ship)
+            for tower in self.towers:
+                if tower.landed and tower not in beam.hurt and beam.hits(tower.rect):
+                    tower.take_damage(beam.damage)
+                    beam.hurt.append(tower)
+        self.beams = [beam for beam in self.beams if not beam.done]
+
     def hit_ship(self, damage):
-        """The window is the ship's health: a hit squeezes the edges in, mostly the ones away from the ship – unless
-        the ship is still invulnerable. True if the hit counted."""
+        """The window is the ship's health: a hit squeezes the edges in by damage pixels (on average), mostly the ones
+        away from the ship – unless the ship is still invulnerable. True if the hit counted."""
         if not self.ship.hit():
             return False
-        self.arena.hit(settings.HIT_SHRINK * damage, self.ship.rect.center)
+        self.arena.hit(damage, self.ship.rect.center)
         return True
 
     def explode(self, projectile):
@@ -531,7 +561,8 @@ class PlayScene(Scene):
         self.ability_bar.draw(surface, self.ship)
         kit = self.ship.watchtower
         towers = (len(self.towers), kit.max_count, kit.price) if kit else None
-        self.hud.draw(surface, self.elapsed, self.ship.stars if self.shop_unlocked else None, self.cores, towers)
+        self.hud.draw(surface, self.elapsed, self.ship.stars if self.shop_unlocked else None, self.cores, towers,
+                      None if self.cleared else self.difficulty.goal)
         top = 14
         for text, color, seconds in self.notices:
             top = draw_text(surface, text, 36, color, alpha=round(255 * min(1.0, seconds)),
@@ -547,6 +578,8 @@ class PlayScene(Scene):
             ground.draw(surface, offset)
         for strike in self.strikes:
             strike.draw(surface, offset)
+        for beam in self.beams:
+            beam.draw(surface, offset)
         for explosion in self.explosions:
             explosion.draw(surface, offset)
         for pickup in self.pickups:

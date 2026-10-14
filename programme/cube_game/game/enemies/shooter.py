@@ -9,21 +9,20 @@ import random
 from game.enemies.enemy import Enemy
 from game.skins.shooter import ShooterSkin
 
-SHOT_COLOR = (200, 90, 255)
-
 
 class Shooter(Enemy):
     key = "shooter"
     name = "Shooter"
     skin = ShooterSkin()
+    shot_color = (200, 90, 255)
     stats = {                       # fallback – see data/enemies.json
-        "max_hp": 2, "speed": 95, "size": 28, "contact_damage": 1,
+        "max_hp": 2, "speed": 95, "size": 28, "contact_damage": 25,
         "shooting_distance": 320,   # stops walking when the ship is this close
         "fire_range": 520,          # fires when the ship is at most this far away
         "fire_interval": 1.5,       # seconds between shots
         "turn_speed": 140,          # degrees per second its barrel turns towards the ship
         "fire_cone": 20,            # degrees: fires only while the ship is within this cone in front of it
-        "shot_damage": 1, "shot_speed": 380, "shot_size": 10,
+        "shot_damage": 25, "shot_speed": 380, "shot_size": 10,
     }
 
     def __init__(self, position, roster=None):
@@ -39,5 +38,5 @@ class Shooter(Enemy):
         self.cooldown = max(0.0, self.cooldown - dt)
         if self.cooldown <= 0 and distance <= self.stat("fire_range") and self.facing(target):
             self.cooldown = self.stat("fire_interval")
-            return [self.shoot_ahead(self.shot_stats(SHOT_COLOR))]
+            return [self.shoot_ahead(self.shot_stats(self.shot_color))]
         return []

@@ -18,7 +18,7 @@ class Carrier(Enemy):
     name = "Carrier"
     skin = CarrierSkin()
     stats = {                       # fallback – see data/enemies.json
-        "max_hp": 6, "speed": 75, "size": 40, "contact_damage": 1,
+        "max_hp": 6, "speed": 75, "size": 40, "contact_damage": 25,
         "preferred_distance": 480,  # between the Shooter (320) and the Sniper (650)
         "back_off": 100,
         "close_in": 60,

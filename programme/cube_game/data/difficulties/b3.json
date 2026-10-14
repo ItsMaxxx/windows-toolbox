@@ -1,0 +1,43 @@
+{
+  "name": "B3",
+  "description": "from afar, evolved: Lasers join the Snipers",
+  "order": 13,
+  "goal": 330,
+  "core_chance": 0.045,
+  "unlock": { "requires": "b2" },
+  "hints": ["Many ranged units", "Lasers: get out of the thick line before it fires", "Cannoneers keep their distance"],
+  "arena": { "start_size": [800, 560], "shrink_speed": 12, "shrink_growth": 2, "max_shrink_speed": 24, "armor": 5 },
+  "spawning": { "first_spawn": 2, "start_interval": 2.7, "min_interval": 1.1, "interval_drop": 0.01 },
+  "enemies": [
+    { "type": "basic",     "weight": 35, "after": 0 },
+    { "type": "shooter",   "weight": 30, "after": 0,   "growth": 4 },
+    { "type": "sniper",    "weight": 20, "after": 20,  "growth": 4 },
+    { "type": "artillery", "weight": 10, "after": 60,  "growth": 2 },
+    { "type": "charger",   "weight": 8,  "after": 60 },
+    { "type": "carrier",   "weight": 6,  "after": 120, "growth": 1 }
+  ],
+  "evolutions": [
+    { "type": "basic",   "chance": 0.15, "after": 0,  "growth": 0.03, "max_chance": 0.35 },
+    { "type": "shooter", "chance": 0.15, "after": 0,  "growth": 0.04, "max_chance": 0.35 },
+    { "type": "charger", "chance": 0.12, "after": 60, "growth": 0.03, "max_chance": 0.3 },
+    { "type": "sniper",  "chance": 0.08, "after": 40, "growth": 0.05, "max_chance": 0.35 }
+  ],
+  "swarms": {
+    "type": "basic", "after": 60,
+    "start_chance": 0.015, "chance_growth": 0.0006, "max_chance": 0.1,
+    "start_size": 5, "growth_time": 15, "max_size": 20, "min_gap": 10
+  },
+  "phases": [
+    { "from": 70, "to": 100, "weights": { "sniper": "x3" }, "announce": "Snipers incoming!" },
+    { "from": 110, "enemy_stats": { "all": { "contact_damage": "x1.25", "shot_damage": "x1.25", "blast_damage": "x1.25" } }, "announce": "Enemies hit harder!" },
+    { "from": 150, "arena": { "armor": "+15" }, "announce": "The walls harden!" },
+    { "from": 180, "to": 210, "weights": { "shooter": "x2", "sniper": "x2" }, "announce": "Long range incoming!" },
+    { "from": 210, "enemy_stats": { "all": { "max_hp": "+1" } } },
+    { "from": 280, "enemy_stats": { "all": { "contact_damage": "x1.2", "shot_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
+    { "from": 360, "enemy_stats": { "all": { "max_hp": "+1" } } },
+    { "from": 390, "arena": { "armor": "+15" }, "announce": "The walls harden!" }
+  ],
+  "enemy_stats": {
+    "all": { "max_hp": "+1" }
+  }
+}

@@ -14,6 +14,9 @@ charger, …), each with its own chance and timing. A swarm appears further away
 the edge of the map (the desktop), so part of it is still beyond the edge and walks in from there – and even its
 nearest enemy is at least SWARM_GAP away from the window.
 
+Evolutions: every enemy the spawner makes – alone or in a swarm – may come as its evolution instead (a Fat Guy instead
+of a Basic, …), with the chance the level gives for its type right now (its "evolutions", growing over time).
+
 The extra windows (watchtowers, radar) count as part of what the player sees: no enemy appears inside one, and swarms
 keep SWARM_GAP from them, too.
 
@@ -26,8 +29,9 @@ import random
 
 import pygame
 
+from game.difficulty import evolution_chance
 from game.enemies.buff import Buff
-from game.enemies.roster import apply
+from game.enemies.roster import EVOLUTIONS, apply
 
 SPAWN_DISTANCE = (250, 500) # pixels beyond the window's corners
 SWARM_SPACING = 14          # how tightly packed a swarm is (pixels)
@@ -45,6 +49,7 @@ class Spawner:
         self.enemies = difficulty.enemies
         self.swarms = difficulty.swarms
         self.phases = difficulty.phases
+        self.evolutions = difficulty.evolutions
         self.timer = self.spawning.first_spawn
         self.elapsed = 0.0
         self.swarm_timer = 1.0                  # next swarm roll in … seconds
@@ -95,8 +100,16 @@ class Spawner:
             weights = self.weights()
             if weights:
                 key = random.choices(list(weights), weights=list(weights.values()))[0]
-                new.append(self.roster.create(key, self.spawn_point(arena)))
+                new.append(self.create(key, self.spawn_point(arena)))
         return new
+
+    def create(self, key, position):
+        """An enemy of type key – or, with the level's chance for that type right now, its evolution."""
+        chance = max((evolution_chance(entry, self.elapsed) for entry in self.evolutions if entry.type == key),
+                     default=0.0)
+        if chance and random.random() < chance:
+            key = EVOLUTIONS[key]
+        return self.roster.create(key, position)
 
     def start_phases(self):
         """Phases whose time has come: their buffs go on all enemies (until the phase ends), their text is shown."""
@@ -132,7 +145,7 @@ class Spawner:
             center = self.swarm_point(arena, radius)
             for _ in range(size):
                 point = center + pygame.Vector2(random.uniform(0, radius), 0).rotate(random.uniform(0, 360))
-                new.append(self.roster.create(swarms.type, point))         # beyond the map's edge is fine
+                new.append(self.create(swarms.type, point))         # beyond the map's edge is fine
         return new
 
     def swarm_point(self, arena, radius):

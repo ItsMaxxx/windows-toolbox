@@ -1,41 +1,55 @@
 {
   "basic": {
-    "max_hp": 2, "speed": 110, "size": 26, "contact_damage": 1
+    "max_hp": 2, "speed": 110, "size": 26, "contact_damage": 25
   },
   "charger": {
-    "max_hp": 3, "speed": 85, "size": 34, "contact_damage": 2,
+    "max_hp": 3, "speed": 85, "size": 34, "contact_damage": 50,
     "charge_range": 280, "windup_time": 0.55, "charge_speed": 700, "charge_time": 0.5, "recover_time": 0.8,
     "charge_mass": 20
   },
   "shooter": {
-    "max_hp": 2, "speed": 95, "size": 28, "contact_damage": 1,
+    "max_hp": 2, "speed": 95, "size": 28, "contact_damage": 25,
     "shooting_distance": 320, "fire_range": 520, "fire_interval": 1.5, "turn_speed": 140, "fire_cone": 20,
-    "shot_damage": 1, "shot_speed": 380, "shot_size": 10
+    "shot_damage": 25, "shot_speed": 380, "shot_size": 10
   },
   "sniper": {
-    "max_hp": 1, "speed": 80, "size": 22, "contact_damage": 1,
+    "max_hp": 1, "speed": 80, "size": 22, "contact_damage": 25,
     "preferred_distance": 650, "back_off": 150, "close_in": 80,
     "fire_range": 650, "aim_time": 1.2, "lock_time": 0.3, "reload_time": 2.2, "turn_speed": 70, "fire_cone": 30,
-    "shot_damage": 2, "shot_speed": 1400, "shot_size": 6
+    "shot_damage": 50, "shot_speed": 1400, "shot_size": 6
   },
   "carrier": {
-    "max_hp": 6, "speed": 75, "size": 40, "contact_damage": 1,
+    "max_hp": 6, "speed": 75, "size": 40, "contact_damage": 25,
     "preferred_distance": 480, "back_off": 100, "close_in": 60,
     "spawn_range": 900, "spawn_interval": 0.9, "max_critters": 8, "first_wave": 5
   },
   "critter": {
-    "max_hp": 1, "speed": 175, "size": 12, "contact_damage": 1
+    "max_hp": 1, "speed": 175, "size": 12, "contact_damage": 25
   },
   "artillery": {
-    "max_hp": 3, "speed": 60, "size": 32, "contact_damage": 1,
+    "max_hp": 3, "speed": 60, "size": 32, "contact_damage": 25,
     "fire_range": 750, "min_range": 220, "setup_time": 1.0, "pack_time": 0.8, "reload_time": 3.5,
     "turn_speed": 60, "fire_cone": 16, "fill_time": 1.5, "aim_spread": 60,
-    "blast_radius": 80, "blast_damage": 2
+    "blast_radius": 80, "blast_damage": 50
   },
   "shield": {
-    "max_hp": 4, "speed": 55, "size": 30, "contact_damage": 2,
+    "max_hp": 4, "speed": 55, "size": 30, "contact_damage": 50,
     "turn_speed": 40, "shield_width": 54, "shield_arc": 150,
     "dash_range": 300, "dash_cone": 20, "windup_time": 0.7, "dash_speed": 650, "dash_time": 0.5, "recover_time": 1.2,
     "dash_mass": 30, "knockback": 70, "stun_time": 0.5
+  },
+  "fat": {
+    "max_hp": 8, "speed": 90, "size": 38, "contact_damage": 25
+  },
+  "cannoneer": {
+    "max_hp": 5, "speed": 45, "size": 36, "contact_damage": 25,
+    "shooting_distance": 380, "fire_range": 650, "fire_interval": 4.0, "turn_speed": 60, "fire_cone": 14,
+    "shot_damage": 100, "shot_speed": 140, "shot_size": 44
+  },
+  "laser": {
+    "max_hp": 2, "speed": 70, "size": 26, "contact_damage": 25,
+    "preferred_distance": 650, "back_off": 150, "close_in": 80,
+    "fire_range": 900, "aim_time": 1.5, "lock_time": 0.4, "reload_time": 3.0, "turn_speed": 60, "fire_cone": 30,
+    "shot_damage": 50, "beam_time": 0.5, "beam_width": 16
   }
 }

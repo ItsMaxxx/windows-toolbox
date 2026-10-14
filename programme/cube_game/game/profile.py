@@ -1,7 +1,7 @@
 """
 What stays between runs and after closing the game: cores, bought skill tree nodes, the loadout (which weapon is in
-which slot), the card collection and the card shop's offers, the chosen difficulty and the best time on each
-difficulty (which also decides which difficulties are unlocked).
+which slot), the card collection and the card shop's offers, the chosen level ("difficulty") and the best time on each
+level (which also decides which levels are cleared and so which are unlocked).
 
 Saved as daten\\cube_game.json in the toolbox's main folder, like every toolbox program (see toolbox\\daten.py). A
 missing or broken file simply means a fresh start; values that don't make sense are ignored.
@@ -134,8 +134,13 @@ class Profile:
     # --- difficulties and runs ---
 
     def difficulty_unlocked(self, key):
-        unlock = DIFFICULTIES[key].unlock
-        return unlock.requires is None or self.best_times.get(unlock.requires, 0) >= unlock.survive
+        requires = DIFFICULTIES[key].unlock.requires
+        return requires is None or self.cleared(requires)
+
+    def cleared(self, key):
+        """True once a run on level key lasted its goal (never for an endless level)."""
+        goal = DIFFICULTIES[key].goal
+        return goal is not None and self.best_times.get(key, 0) >= goal
 
     def record(self, seconds):
         """A run on the current difficulty ended after seconds. True if that's a new best time. Saved to 1/100 s

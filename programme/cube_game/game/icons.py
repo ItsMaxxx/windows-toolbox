@@ -51,3 +51,67 @@ def draw_watchtower_icon(surface, center, color):
     rect.center = center
     pygame.draw.rect(surface, color, rect, border_radius=2)
     pygame.draw.circle(surface, (0, 0, 0), rect.center, 3)
+
+
+# --- level indicators (game menu, Levels tab) – size: about the icon's width in pixels ---
+
+def draw_swarm_icon(surface, center, color, size=14):
+    """A swarm: a small cluster of squares."""
+    x, y = center
+    side = max(3, round(size * 0.3))
+    for dx, dy in ((-0.35, -0.3), (0.3, -0.35), (0, 0.05), (-0.38, 0.38), (0.35, 0.35)):
+        square = pygame.Rect(0, 0, side, side)
+        square.center = (x + dx * size, y + dy * size)
+        pygame.draw.rect(surface, color, square)
+
+
+def draw_wave_icon(surface, center, color, size=14):
+    """A wave of one type (a phase with more of it): a warning triangle with an exclamation mark."""
+    x, y = center
+    half = size / 2
+    pygame.draw.polygon(surface, color, [(x, y - half), (x + half, y + half * 0.8), (x - half, y + half * 0.8)], 2)
+    pygame.draw.line(surface, color, (x, y - half * 0.25), (x, y + half * 0.25), 2)
+    pygame.draw.rect(surface, color, (x - 1, y + half * 0.45, 2, 2))
+
+
+def draw_damage_icon(surface, center, color, size=14):
+    """Enemies hit harder: a spiky burst."""
+    center = pygame.Vector2(center)
+    points = [center + pygame.Vector2(0, -size / 2 * (1 if index % 2 == 0 else 0.45)).rotate(index * 22.5)
+              for index in range(16)]
+    pygame.draw.polygon(surface, color, points)
+
+
+def draw_hp_icon(surface, center, color, size=14):
+    """Enemies get more hit points: a thick plus."""
+    x, y = center
+    long, thick = size, max(3, round(size * 0.32))
+    pygame.draw.rect(surface, color, (x - long / 2, y - thick / 2, long, thick))
+    pygame.draw.rect(surface, color, (x - thick / 2, y - long / 2, thick, long))
+
+
+def draw_wall_icon(surface, center, color, size=14):
+    """Harder walls: a little brick wall – a block with dark mortar lines (two rows of bricks, offset)."""
+    wall = pygame.Rect(0, 0, size, round(size * 0.8))
+    wall.center = center
+    pygame.draw.rect(surface, color, wall)
+    mortar = [round(channel * 0.3) for channel in color]
+    middle = wall.centery
+    pygame.draw.line(surface, mortar, (wall.left, middle), (wall.right - 1, middle))
+    pygame.draw.line(surface, mortar, (wall.centerx, wall.top), (wall.centerx, middle))
+    for x in (wall.left + wall.width // 4, wall.right - wall.width // 4):
+        pygame.draw.line(surface, mortar, (x, middle), (x, wall.bottom - 1))
+
+
+def draw_notice_icon(surface, center, color, size=14):
+    """Something else is announced: a diamond."""
+    x, y = center
+    half = size / 2
+    pygame.draw.polygon(surface, color, [(x, y - half), (x + half, y), (x, y + half), (x - half, y)])
+
+
+def draw_check(surface, center, color, size=14):
+    """A tick: cleared."""
+    x, y = center
+    pygame.draw.lines(surface, color, False, [(x - size / 2, y), (x - size / 8, y + size * 0.38),
+                                               (x + size / 2, y - size * 0.4)], 3)

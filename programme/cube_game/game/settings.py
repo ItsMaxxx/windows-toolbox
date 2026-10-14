@@ -16,11 +16,10 @@ PUSH_SPEED = 600                # a hit pushes its edge out smoothly at this spe
 
 # The ship itself – its weapons and energy have their own values (data/weapons.json)
 SHIP_SIZE = 30                  # hitbox (square) and size of the ship
-SHIP_SPEED = 320
+SHIP_SPEED = 280
 
-# Getting hit: the window is your health – every point of damage squeezes each edge in by HIT_SHRINK at once,
-# then the ship can't be hit for a moment (it blinks)
-HIT_SHRINK = 25
+# Getting hit: the window is your health – an enemy's damage is in pixels: the edges move in that far at once (on
+# average – width and height each get 2 × damage smaller), then the ship can't be hit for a moment (it blinks) …
 # … but not evenly: the edges far from the ship move in more, the near ones less. 0 = every edge the same, 1 = with the
 # ship right at the left edge, the left edge doesn't move at all and the right one twice as far (the total stays)
 HIT_SIDE_BIAS = 1.0

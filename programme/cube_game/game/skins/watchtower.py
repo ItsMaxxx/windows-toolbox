@@ -1,7 +1,7 @@
 """
 How the watchtower looks: a light blue square base (the player's side is blue) with a dark lens in the middle and a
 radar line sweeping round it – it's watching. In the air it's drawn bigger the higher it is, with its shadow on the
-ground below. Health pips once it's damaged, like on enemies.
+ground below. A health bar once it's damaged.
 """
 
 import math
@@ -13,7 +13,7 @@ LENS = (12, 24, 48)
 SWEEP_SPEED = 2.5           # how fast the radar line turns (radians per second)
 FLASH_COLOR = (255, 255, 255)
 SHADOW = (30, 30, 36)
-PIP_SIZE = (6, 4)
+BAR_SIZE = (30, 4)         # the health bar once it is damaged
 PIP_EMPTY = (70, 70, 70)
 
 
@@ -41,9 +41,9 @@ class WatchtowerSkin:
                 self.draw_health(surface, tower, body, max_hp)
 
     def draw_health(self, surface, tower, rect, max_hp):
-        width, height = PIP_SIZE
-        total = max_hp * width + (max_hp - 1) * 2
-        left = rect.centerx - total / 2
-        for index in range(max_hp):
-            color = self.color if index < math.ceil(tower.hp) else PIP_EMPTY
-            pygame.draw.rect(surface, color, (left + index * (width + 2), rect.top - height - 4, width, height))
+        """A bar above it: the part still filled is the HP left."""
+        width, height = BAR_SIZE
+        bar = pygame.Rect(0, 0, width, height)
+        bar.midbottom = (rect.centerx, rect.top - 4)
+        pygame.draw.rect(surface, PIP_EMPTY, bar)
+        pygame.draw.rect(surface, self.color, (bar.left, bar.top, round(width * max(0.0, tower.hp) / max_hp), height))

@@ -1,10 +1,24 @@
-# Schwierigkeitsstufen
+# Levels
 
-Jede `.json`-Datei hier ist eine Schwierigkeitsstufe. Der Dateiname (ohne `.json`) ist ihr Schlüssel: Er steht im
-Spielstand und in `unlock.requires` anderer Stufen – darum Dateien nicht einfach umbenennen.
+Jede `.json`-Datei hier ist ein Level (im Code heißen sie noch „difficulty“). Der Dateiname (ohne `.json`) ist sein
+Schlüssel: Er steht im Spielstand und in `unlock.requires` anderer Levels – darum Dateien nicht einfach umbenennen.
+
+**Aufbau:** A1 bis A6 führen nach und nach alle Tier-1-Gegner und Ereignisse ein, jedes mit eigenem Schwerpunkt
+(A2 Nahkampf, A3 Fernkampf, A4 Artillerie und Carrier, A5 harte Wände, A6 alles). B1 bis B6 bringen die
+**Evolutionen** (Tier 2) dazu, immer wahrscheinlicher (B1 Fat Guy und Cannoneer, B2 Shield, B3 Laser, B6 alles).
+Wer B6 schafft, schaltet **Survival** frei: endlos, erst Basics, dann alle Typen, ab 4:00 die Evolutionen.
+
+**Geschafft** ist ein Level, wenn man sein `goal` überlebt hat – das schaltet das nächste frei. Der Run läuft danach
+weiter, bis das Schiff zerquetscht wird (die Bestzeit zählt trotzdem).
 
 **Ändern:** Datei bearbeiten, speichern, im Spiel ins Spielmenü wechseln – die Dateien werden jedes Mal neu gelesen,
-ein Neustart ist nicht nötig. **Neue Stufe:** eine Datei kopieren, umbenennen, `order` und `unlock` anpassen.
+ein Neustart ist nicht nötig. **Neues Level:** eine Datei kopieren, umbenennen, `order` und `unlock` anpassen.
+
+**Im Spielmenü** (Reiter *Levels*) steht jedes Level als Knopf. Eine neue Zeile beginnt, wenn sich die Zehnerstelle
+von `order` ändert (1–6: A, 11–16: B, 20: Survival). Die kleinen Anzeigen auf den Knöpfen und die Details darunter
+ergeben sich aus der Datei: ein Quadrat pro Gegnertyp (Evolutionen mit dunklem Rahmen), ein Symbol pro Art von
+Ereignis (Schwarm, Welle eines Typs, mehr Schaden, mehr HP, härtere Wände, sonstige Ansage). Nur `hints` schreibt man
+selbst.
 
 **Fehler sind kein Absturz:** Fehlt ein Wert oder ist er ungültig, gilt der Standardwert (siehe `game/difficulty.py`),
 und das Spielmenü zeigt die Probleme rot über den Knöpfen an. JSON kennt keine Kommentare – Erklärungen stehen hier.
@@ -16,16 +30,17 @@ Zeiten in Sekunden, Größen in Pixeln, Chancen von 0 bis 1 (0.01 = 1 %).
 | Schlüssel | Bedeutung |
 |---|---|
 | `name` | Name im Spiel |
-| `description` | kurze Beschreibung unter den Knöpfen im Spielmenü |
-| `order` | Reihenfolge im Spielmenü, kleinste zuerst; die erste ist die Startstufe eines neuen Spielstands |
+| `description` | kurze Beschreibung neben dem Namen im Spielmenü |
+| `order` | Reihenfolge im Spielmenü, kleinste zuerst; das erste ist das Start-Level eines neuen Spielstands. Die Zehnerstelle ist die Zeile im Reiter *Levels* |
+| `goal` | so viele Sekunden überleben = Level geschafft (schaltet das nächste frei). `null` = endlos (Survival), kann nicht geschafft werden |
+| `hints` | Liste kurzer Texte für das Spielmenü (*What to expect*), z. B. `["Many ranged units", "Very hard walls"]` |
 | `core_chance` | Chance, dass ein getöteter Gegner einen Core fallen lässt (der Skilltree-Knoten *Core luck* kommt dazu) |
 
-## `unlock` – wann die Stufe freigeschaltet ist
+## `unlock` – wann das Level freigeschaltet ist
 
 | Schlüssel | Bedeutung |
 |---|---|
-| `requires` | Schlüssel der Stufe, auf der man zuerst überleben muss – `null` = von Anfang an offen |
-| `survive` | so lange muss man dort überleben (Standard 240 = 4:00) |
+| `requires` | Schlüssel des Levels, das man zuerst schaffen muss (dessen `goal` überleben) – `null` = von Anfang an offen |
 
 ## `arena` – das Fenster
 
@@ -37,8 +52,8 @@ Zeiten in Sekunden, Größen in Pixeln, Chancen von 0 bis 1 (0.01 = 1 %).
 | `max_shrink_speed` | … höchstens so viel (Standard 60) |
 | `armor` | Panzerung am Anfang in Prozent (Standard 0): jeder Stoß gegen eine Kante schiebt sie so viel Prozent weniger weit, höchstens 90 % (`MAX_ARMOR` in `settings.py`). Phasen können sie erhöhen |
 
-Beispiel Normal: 14 px/s am Anfang, + 2 pro Minute – nach 5 Minuten 24 px/s, ab 6 Minuten die Obergrenze 26 px/s.
-Fehlen `shrink_growth` und `max_shrink_speed` (wie gerade auf Hard), schrumpft die Arena immer gleich schnell.
+Beispiel A5: 10 px/s am Anfang, + 2 pro Minute – nach 5 Minuten 20 px/s, das ist auch die Obergrenze.
+Fehlen `shrink_growth` und `max_shrink_speed`, schrumpft die Arena immer gleich schnell.
 
 Panzerung: Die Gun schiebt mit 18 px; bei `armor` 20 sind es noch 14,4, die Rakete 120 → 96. Jede Waffe verliert
 denselben Anteil – auch der Laser mit seinen vielen kleinen Stößen.
@@ -59,7 +74,7 @@ ist – mit `weight` gewichtet (50 gegen 10 = fünfmal so oft).
 
 | Schlüssel | Bedeutung |
 |---|---|
-| `type` | `basic`, `charger`, `shooter`, `sniper`, `carrier`, `artillery`, `shield` oder `critter` |
+| `type` | `basic`, `charger`, `shooter`, `sniper`, `carrier`, `artillery`, `critter` – oder direkt eine Evolution: `fat`, `cannoneer`, `shield`, `laser` (meist besser über `evolutions`) |
 | `weight` | wie häufig im Vergleich zu den anderen … |
 | `after` | … ab dieser Spielzeit … |
 | `growth` | … plus so viel Gewicht pro Minute danach (optional, Standard 0) |
@@ -68,7 +83,39 @@ ist – mit `weight` gewichtet (50 gegen 10 = fünfmal so oft).
 Spielzeit (4 Minuten nach seinem Start) Gewicht 10 + 4 × 3 = 22. Basics ohne `growth` bleiben bei 50, werden also
 anteilig seltener.
 
-## `enemy_stats` – eigene Gegnerwerte auf dieser Stufe (optional)
+## `evolutions` – Tier-2-Gegner statt Tier 1 (optional)
+
+Es wird weiter nur der normale Typ gespawnt – aber jeder Gegner dieses Typs (einzeln oder im Schwarm) kommt mit
+einer Chance als seine Evolution:
+
+| Tier 1 | wird zu (Tier 2) |
+|---|---|
+| `basic` | `fat` – Fat Guy: größer, viel mehr HP |
+| `shooter` | `cannoneer` – sehr langsam, riesige langsame Kanonenkugel mit massivem Schaden |
+| `charger` | `shield` – der Schild-Gegner |
+| `sniper` | `laser` – dickere Ziellinie, dann ein Strahl für eine halbe Sekunde statt einer Kugel |
+
+Eine Liste, ein Eintrag pro Typ:
+
+| Schlüssel | Bedeutung |
+|---|---|
+| `type` | der Tier-1-Typ (`basic`, `shooter`, `charger`, `sniper`) |
+| `chance` | Chance am Anfang (0.1 = jeder zehnte) … |
+| `after` | … ab dieser Spielzeit (vorher nie) … |
+| `growth` | … plus so viel pro Minute danach (optional, Standard 0) … |
+| `max_chance` | … höchstens so viel (Standard 1) |
+
+```json
+"evolutions": [
+  { "type": "basic",   "chance": 0.08, "after": 0,  "growth": 0.03, "max_chance": 0.2 },
+  { "type": "shooter", "chance": 0.08, "after": 20, "growth": 0.03, "max_chance": 0.2 }
+]
+```
+
+Auf B1: Am Anfang ist jeder 12. Basic ein Fat Guy, nach 4 Minuten jeder fünfte (8 % + 4 × 3 % = 20 %, die Obergrenze).
+Chargers und Sniper bleiben dort immer Tier 1, weil sie in der Liste fehlen.
+
+## `enemy_stats` – eigene Gegnerwerte auf diesem Level (optional)
 
 Wie im StarCraft-2-Editor, wo jede Map ihre eigenen Einheitenwerte hat: Hier lassen sich alle Werte aus
 `data/enemies.json` nur für diese Stufe ändern (welche es gibt: `data/README.md`). Pro Gegnertyp ein Eintrag, `all`
@@ -135,7 +182,7 @@ Mehrere Phasen ohne `to` stapeln sich: zweimal `"x1.25"` und `"x1.2"` ergibt das
 
 Einmal pro Sekunde wird gewürfelt, ob ein ganzer Schwarm an einer Stelle auftaucht. `swarms` ist entweder **ein**
 Eintrag `{ … }` oder eine **Liste** davon – dann würfelt jede Schwarmart für sich, mit eigener Chance und eigenem
-`min_gap` (auf Hard z. B. Basic- und Charger-Schwärme). `[]` = keine Schwärme.
+`min_gap` (auf A6 z. B. Basic- und Charger-Schwärme). `[]` = keine Schwärme.
 
 | Schlüssel | Bedeutung |
 |---|---|

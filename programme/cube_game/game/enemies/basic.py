@@ -11,4 +11,4 @@ class BasicEnemy(Enemy):
     name = "Basic"
     melee = True
     skin = BasicSkin()
-    stats = {"max_hp": 2, "speed": 110, "size": 26, "contact_damage": 1}    # fallback – see data/enemies.json
+    stats = {"max_hp": 2, "speed": 110, "size": 26, "contact_damage": 25}    # fallback – see data/enemies.json

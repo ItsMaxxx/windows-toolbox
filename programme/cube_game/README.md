@@ -365,3 +365,34 @@ Notizen / offene Fragen:
   energy), Sniper (+100 % Projectile speed / −25 % Attack speed), Short fuse (−40 % Raketen-Cooldown / −30 % Blast
   radius), Afterburner (+50 % Dash-Distanz / +50 % Dash-Cooldown), **Greed** (höhere Core-Chance / Arena schrumpft
   15 % schneller), Heavy hull (Treffer quetschen 25 % weniger / −15 % Move speed).
+
+**14.10.2026 (Claude, auf Wunsch gebaut): Levels statt Schwierigkeiten, Gegner-Evolutionen (Tier 2), Level-Anzeigen.**
+- **Levels** A1–A6, B1–B6, Survival ersetzen Easy/Normal/Hard (`data/difficulties/a1.json` …; im Code weiter
+  „difficulty“). Jedes Level hat ein `goal` (Sekunden überleben = geschafft, schaltet das nächste frei, `unlock.requires`);
+  der Run läuft danach weiter, oben steht bis dahin „01:23 / 03:00“. Survival (`goal: null`) ist endlos, frei nach B6.
+  Alte Bestzeiten auf Easy/Normal/Hard gelten nicht mehr – man startet bei A1.
+- A-Reihe mit Schwerpunkten: A1 nur Basic + Shooter, A2 Nahkampf, A3 Fernkampf, A4 Artillerie + Carrier, A5 sehr harte
+  Wände, A6 alles. B-Reihe genauso, plus Evolutionen mit steigender Chance (B1 Fat Guy + Cannoneer, B2 Shield, B3
+  Laser, B4–B6 alle). Gegnerzahl, Grund-HP (`enemy_stats`) und Dauer steigen mit.
+- **Evolutionen** (`evolutions` im Level, `roster.EVOLUTIONS`, `Spawner.create`): es wird weiter Tier 1 gespawnt, aber
+  mit einer Chance (wachsend pro Minute) kommt stattdessen Tier 2 – auch in Schwärmen. Tier-2-Skins haben einen dunklen
+  Innenrahmen (`Enemy.tier`, `draw_tier_frame`).
+  - **Fat Guy** (`fat`, aus Basic): größer, 8 HP.
+  - **Cannoneer** (`cannoneer`, aus Shooter): sehr langsam, riesige langsame Kanonenkugel (`CannonBall`), 4 Schaden.
+  - **Shield** (aus Charger): der bestehende Schild-Gegner, jetzt nur noch als Evolution.
+  - **Laser** (`laser`, aus Sniper): dickere Ziellinie, dann ein Strahl für 0,5 s (`game/laser_beam.py`); Berührung
+    = Schaden (einmal pro Strahl, auch Wachtürme). Stirbt der Laser, erlischt der Strahl.
+- **Reiter *Levels*** im Spielmenü (`game/level_panel.py`, jetzt der erste Reiter): ein Knopf pro Level mit kleinen
+  Anzeigen (Farbquadrat pro Gegnertyp, Symbol pro Art von Ereignis, Haken = geschafft), darunter Details zum Level unter
+  der Maus: `hints` aus der Datei, Gegner ab wann (Evolutionen mit Chance), Ereignisse mit Zeit. Symbole in
+  `game/icons.py`.
+- **Gegnerschaden in Pixeln** (`contact_damage`, `shot_damage`, `blast_damage`): so weit rücken die Kanten bei einem
+  Treffer im Schnitt ein (`Arena.hit`). Vorher Punkte × `HIT_SHRINK` (25) – die Werte sind umgerechnet (Basic 25,
+  Sniper 50, Kanonenkugel 100), im Spiel ändert sich nichts. Wachtürme: 150 HP statt 6, Lebensbalken statt Kästchen.
+- Ziele verlängert: A1 3:00, A2/A3 3:30, A4/A5 4:00, A6/B1 5:00, B2/B3 5:30, B4/B5 6:00, B6 7:00. Die Phasen (mehr
+  HP, mehr Schaden, härtere Wände, Wellen) sind über das Level verteilt, die letzte kurz vor dem Ziel; zwei weitere
+  kommen danach für alle, die weiterspielen.
+- **Karten erst über den Skilltree:** neuer Knoten *Card shop* (4 Cores, unter *Core luck*, `skill_tree.CARD_SHOP`).
+  Ohne ihn ist der Reiter *Cards* gesperrt und aktive Karten wirken nicht (`start_ship`).
+- Grundwerte gesenkt: Schiff 320 → 280 px/s (`SHIP_SPEED`), Gun 1 → 0,8 Schuss/s (`data/weapons.json`).
+- Offen: **Boss** (T1 bei A6, T2 bei B2 mit mehr Fähigkeiten) – kommt als eigener Schritt.
