@@ -8,20 +8,20 @@ env/
 .pytest_cache/
 .mypy_cache/
 
-# --- Editoren / Windows ---
+# --- Editors / Windows ---
 .vscode/
 .idea/
 Thumbs.db
 desktop.ini
 
-# --- Einstellungen und Logs (entstehen beim Ausführen) ---
-daten/
+# --- Settings and logs (created while running) ---
+/data/
 *.log
 
-# --- Eigenes Python, Starter-.exe und Downloads der Programme (legt Setup.exe an) ---
+# --- Own Python, starter .exe files and downloads of the programs (created by Setup.exe) ---
 runtime/
-programme/*/lhm/
+programs/*/lhm/
 
-# --- Claude Code (nur lokal) ---
+# --- Claude Code (local only) ---
 CLAUDE.md
 .claude/

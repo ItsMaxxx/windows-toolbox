@@ -1,33 +1,33 @@
 """
-Baukasten für Programmseiten in der Toolbox. Eine Seite wird – ähnlich wie HTML – nur beschrieben:
+Building blocks for program pages in the Toolbox. A page is – similar to HTML – only described:
 
-    ORDNER = Path(__file__).parent
+    FOLDER = Path(__file__).parent
 
-    class MeineSeite(ToolPage):
-        defaults = {"rate": 2, "farbe": "blau"}
+    class MyPage(ToolPage):
+        defaults = {"rate": 2, "color": "blue"}
 
         def layout(self):
             return [
-                Section("Aktualisierung",
-                        Text("Wie oft gemessen wird."),
+                Section("Refresh",
+                        Text("How often to measure."),
                         Choice("Rate", "rate", {"1 s": 1, "2 s": 2, "5 s": 5})),
-                Section("Erweitert",
-                        Buttons(Button("Ordner öffnen", lambda: self.open(ORDNER), ziel=ORDNER))),
+                Section("Advanced",
+                        Buttons(Button("Open folder", lambda: self.open(FOLDER), target=FOLDER))),
             ]
 
-    SEITE = MeineSeite
+    PAGE = MyPage
 
-Name, Tab und Beschreibung stehen nicht hier, sondern in programm.json daneben – daraus baut die Toolbox das ToolInfo.
-Läuft ein Tool als eigenes Programm weiter (wie der Hardware-Monitor), sagt PROGRAMM = Programm(laeuft, beenden,
-starten) der Toolbox, wie sie es abfragt, beendet und startet. Dann gilt „Toolbox und alle Programme beenden
-bzw. neu starten“ in den Einstellungen der Toolbox automatisch auch dafür.
+Name, tab and description are not here but in program.json next to it – the Toolbox builds the ToolInfo from it.
+If a tool keeps running as its own program (like the Hardware Monitor), PROGRAM = Program(is_running, stop, start)
+tells the Toolbox how to query, stop and start it. Then "Toolbox and all programs – quit or restart" in the Toolbox
+settings automatically applies to it as well.
 
-Bausteine mit key zeigen den Wert self.data[key] an und speichern Änderungen sofort in settings_file – ohne Angabe
-ist das daten\\<programm>.json (eine Datei pro Programm, siehe daten.py).
-Bausteine mit name sind danach als self.w[name] erreichbar, z. B. um eine Statuszeile zu ändern.
-Knöpfe, die etwas außerhalb der Toolbox öffnen (Website, Datei, Ordner, Programm), bekommen ziel=… – das steht dann
-beim Drüberfahren unten links im Fenster, wie im Browser.
-Die Toolbox findet jedes Programm über programme/<programm>/programm.json; dessen "seite" ist die Datei mit SEITE.
+Building blocks with key show the value self.data[key] and save changes immediately to settings_file – by default
+that is data\\<program>.json (one file per program, see storage.py).
+Building blocks with name are then reachable as self.w[name], e.g. to change a status line.
+Buttons that open something outside the Toolbox (website, file, folder, program) get target=… – it then shows at the
+bottom left of the window while hovering, like in a browser.
+The Toolbox finds each program via programs/<program>/program.json; its "page" is the file with PAGE.
 """
 
 import copy
@@ -40,39 +40,39 @@ from pathlib import Path
 
 import customtkinter as ctk
 
-import daten
 import i18n
+import storage
 
-t = i18n.Texte(Path(__file__).with_name("i18n.json"))     # Texte der Toolbox selbst: t("id") in der gewählten Sprache
+t = i18n.Texts(Path(__file__).with_name("i18n.json"))     # texts of the Toolbox itself: t("id") in the chosen language
 
-# Farben jeweils als (hell, dunkel) – CustomTkinter nimmt automatisch die passende.
-# Dunkel = Stil der PROOFM-Website (Navy-Hintergrund, grüner Akzent), hell = dieselben Töne auf hellem Grund.
-BG = ("#eef2f6", "#0a1d2c")             # Fensterhintergrund
-BAR = ("#f8fafc", "#071822")            # Kopf- und Seitenleiste
+# Colors each as (light, dark) – CustomTkinter picks the matching one automatically.
+# Dark = style of the PROOFM website (navy background, green accent), light = the same tones on a light background.
+BG = ("#eef2f6", "#0a1d2c")             # window background
+BAR = ("#f8fafc", "#071822")            # header and sidebar
 CARD = ("#ffffff", "#152736")
 BORDER = ("#d8e1ea", "#213443")
-FIELD = ("#f4f7fa", "#101d29")          # Eingabefelder, Auswahlknöpfe
+FIELD = ("#f4f7fa", "#101d29")          # input fields, segmented buttons
 TEXT = ("#0f2333", "#e2e8f0")
 MUTED = ("#5b6f84", "#8fa3b8")
-ACCENT = ("#3ddc97", "#3ddc97")         # Hauptknöpfe
+ACCENT = ("#3ddc97", "#3ddc97")         # main buttons
 ACCENT_HOVER = ("#5ce8aa", "#5ce8aa")
-ACCENT_DEEP = ("#1f9e6a", "#3ddc97")    # Schalter, Regler, Häkchen (auf hellem Grund etwas dunkler)
-ON_ACCENT = ("#062016", "#062016")      # Text auf grünen Knöpfen
-SELECTED = ("#c6eedb", "#1d4f47")       # gewählter Tab, Eintrag oder Auswahlknopf
-HOVER = ("#e6edf3", "#13242d")          # Maus über Tab oder Eintrag
-BUTTON = ("#e6edf3", "#233443")         # graue Knöpfe
+ACCENT_DEEP = ("#1f9e6a", "#3ddc97")    # switches, sliders, checkmarks (a bit darker on a light background)
+ON_ACCENT = ("#062016", "#062016")      # text on green buttons
+SELECTED = ("#c6eedb", "#1d4f47")       # selected tab, entry or segmented button
+HOVER = ("#e6edf3", "#13242d")          # mouse over tab or entry
+BUTTON = ("#e6edf3", "#233443")         # gray buttons
 BUTTON_HOVER = ("#d8e1ea", "#31414f")
-BUTTON_OFF = ("#e6edf3", "#1b2c3a")     # Farbe für gerade nicht nutzbare Knöpfe
-TRACK = ("#c5d1dc", "#2a3b4a")          # Bahn von Schaltern und Reglern
+BUTTON_OFF = ("#e6edf3", "#1b2c3a")     # color for buttons that can't be used right now
+TRACK = ("#c5d1dc", "#2a3b4a")          # track of switches and sliders
 GOOD = ("#1f9e6a", "#3ddc97")
 BAD = ("#d64545", "#ff6464")
 WARN = ("#b7791f", "#f5c451")
-FONTS = ("Inter", "Segoe UI")           # erste installierte Schrift wird genommen
+FONTS = ("Inter", "Segoe UI")           # the first installed font is used
 
 
 def apply_theme():
-    """Farben und Formen aller CustomTkinter-Bausteine – vor dem ersten Fenster aufrufen."""
-    ctk.set_default_color_theme("blue")                     # Grundlage, die Farben kommen von hier
+    """Colors and shapes of all CustomTkinter widgets – call before the first window."""
+    ctk.set_default_color_theme("blue")                     # base, the colors come from here
     t = ctk.ThemeManager.theme
     t["CTk"]["fg_color"] = t["CTkToplevel"]["fg_color"] = BG
     t["CTkFrame"].update(fg_color=CARD, top_fg_color=CARD, border_color=BORDER)
@@ -98,109 +98,109 @@ def apply_theme():
 
 
 def apply_font(root):
-    """Schrift der Website (Inter), falls installiert – sonst Segoe UI. Braucht ein schon erstelltes Fenster."""
+    """Font of the website (Inter) if installed – otherwise Segoe UI. Needs an already created window."""
     families = set(tkfont.families(root))
     ctk.ThemeManager.theme["CTkFont"]["family"] = next((f for f in FONTS if f in families), FONTS[-1])
 
 
 @dataclass
-class Programm:
-    """Ein eigenständiges Programm eines Tools, das auch ohne die Toolbox weiterläuft (z. B. der Hardware-Monitor).
-    Darüber kann die Toolbox es in ihren Einstellungen mit beenden und neu starten („Toolbox und alle Programme“).
+class Program:
+    """A standalone program of a tool that keeps running even without the Toolbox (e.g. the Hardware Monitor).
+    Through it the Toolbox can stop and restart it along with itself in its settings ("Toolbox and all programs").
 
-    Alle drei laufen im Hintergrund (nicht im GUI-Thread) und dürfen etwas dauern:
-      laeuft()  -> True, wenn es gerade läuft
-      beenden() -> True, wenn es danach wirklich beendet ist (auf das Prozessende warten!)
-      starten() -> True, wenn der Start geklappt hat
+    All three run in the background (not in the GUI thread) and may take a while:
+      is_running() -> True if it is running right now
+      stop()       -> True if it is really stopped afterwards (wait for the process to end!)
+      start()      -> True if the start worked
     Optional:
-      neu_laden() -> Einstellungen und Sprache neu einlesen lassen – ruft die Toolbox nach einem Sprachwechsel auf
+      reload()     -> have it read its settings and language again – the Toolbox calls this after a language change
     """
-    laeuft: Callable
-    beenden: Callable
-    starten: Callable
-    neu_laden: Callable | None = None
+    is_running: Callable
+    stop: Callable
+    start: Callable
+    reload: Callable | None = None
 
 
 @dataclass
 class ToolInfo:
-    id: str               # eindeutiger Kurzname, z. B. "hardware_monitor"
-    name: str             # Anzeige in der Seitenleiste
-    category: str         # Tab, in dem das Programm erscheint
-    description: str      # Untertitel auf der Programmseite
-    page: type            # Klasse der Programmseite (Unterklasse von ToolPage)
-    programm: Programm | None = None     # nur bei Tools mit eigenständig laufendem Programm (siehe Programm)
+    id: str               # unique short name, e.g. "hardware_monitor"
+    name: str             # shown in the sidebar
+    category: str         # tab in which the program appears
+    description: str      # subtitle on the program page
+    page: type            # class of the program page (subclass of ToolPage)
+    program: Program | None = None      # only for tools with a standalone running program (see Program)
 
 
-# ---------- Bausteine ----------
+# ---------- Building blocks ----------
 class Section:
-    """Ein Bereich (Karte) mit Überschrift; darin die Bausteine untereinander."""
+    """An area (card) with a heading; inside it the building blocks one below the other."""
 
     def __init__(self, title, *elements):
         self.title, self.elements = title, elements
 
 
 class Tooltip:
-    """Kleines Hinweisfenster, solange die Maus über widget ist. text darf mehrere Zeilen haben (z. B. „•“-Punkte)."""
+    """Small hint window while the mouse is over widget. text may have several lines (e.g. "•" bullets)."""
 
     def __init__(self, widget, text):
-        self.widget, self.text, self.fenster = widget, text, None
-        widget.bind("<Enter>", self.zeigen, add="+")
-        widget.bind("<Leave>", self.verstecken, add="+")
+        self.widget, self.text, self.window = widget, text, None
+        widget.bind("<Enter>", self.show, add="+")
+        widget.bind("<Leave>", self.hide, add="+")
 
-    def zeigen(self, event=None):
-        if self.fenster:
+    def show(self, event=None):
+        if self.window:
             return
-        dunkel = ctk.get_appearance_mode() == "Dark"                 # Farben passend zu Hell/Dunkel
-        farbe = lambda paar: paar[1] if dunkel else paar[0]         # noqa: E731
-        # Schlichtes tk statt CustomTkinter: CTkToplevel setzt verzögert Symbol und Titelleiste, und CTk-Widgets in
-        # einem tk.Toplevel verträgt die DPI-Überwachung von CustomTkinter nicht – beides unnötig für ein Hinweisfenster
-        self.fenster = fenster = tk.Toplevel(self.widget)
-        fenster.withdraw()
-        fenster.overrideredirect(True)                              # ohne Titelleiste
-        fenster.attributes("-topmost", True)
-        fenster.configure(bg=farbe(BORDER))                         # 1 px Rand
-        # Größen wie bei den CTk-Bausteinen mit der Windows-Skalierung malnehmen (negative Schriftgröße = Pixel)
+        dark = ctk.get_appearance_mode() == "Dark"                  # colors matching light/dark
+        color = lambda pair: pair[1] if dark else pair[0]           # noqa: E731
+        # Plain tk instead of CustomTkinter: CTkToplevel sets icon and title bar with a delay, and CustomTkinter's DPI
+        # tracking can't handle CTk widgets in a tk.Toplevel – both unnecessary for a hint window
+        self.window = window = tk.Toplevel(self.widget)
+        window.withdraw()
+        window.overrideredirect(True)                               # without title bar
+        window.attributes("-topmost", True)
+        window.configure(bg=color(BORDER))                          # 1 px border
+        # Multiply sizes by the Windows scaling like the CTk widgets do (negative font size = pixels)
         s = ctk.ScalingTracker.get_widget_scaling(self.widget)
-        schrift = (ctk.ThemeManager.theme["CTkFont"]["family"], -round(12 * s))
-        tk.Label(fenster, text=self.text, justify="left", anchor="w", wraplength=round(400 * s), bg=farbe(CARD),
-                 fg=farbe(TEXT), font=schrift, padx=round(10 * s), pady=round(8 * s)).pack(padx=1, pady=1)
-        fenster.update_idletasks()
+        font = (ctk.ThemeManager.theme["CTkFont"]["family"], -round(12 * s))
+        tk.Label(window, text=self.text, justify="left", anchor="w", wraplength=round(400 * s), bg=color(CARD),
+                 fg=color(TEXT), font=font, padx=round(10 * s), pady=round(8 * s)).pack(padx=1, pady=1)
+        window.update_idletasks()
         x, y = self.widget.winfo_rootx(), self.widget.winfo_rooty() + self.widget.winfo_height() + 6
-        x = min(x, self.widget.winfo_screenwidth() - fenster.winfo_reqwidth() - 8)   # nicht über den Bildschirmrand
-        fenster.geometry(f"+{x}+{y}")
-        fenster.deiconify()
+        x = min(x, self.widget.winfo_screenwidth() - window.winfo_reqwidth() - 8)    # not past the screen edge
+        window.geometry(f"+{x}+{y}")
+        window.deiconify()
 
-    def verstecken(self, event=None):
-        if self.fenster:
-            self.fenster.destroy()
-            self.fenster = None
+    def hide(self, event=None):
+        if self.window:
+            self.window.destroy()
+            self.window = None
 
 
-def info_symbol(master, text):
-    """Rundes „i“, das beim Drüberfahren text als Tooltip zeigt."""
-    symbol = ctk.CTkLabel(master, text="i", width=18, height=18, corner_radius=9, fg_color=BUTTON, text_color=MUTED,
-                          font=ctk.CTkFont(size=11, weight="bold"), cursor="question_arrow")
-    Tooltip(symbol, text)
-    return symbol
+def info_icon(master, text):
+    """Round "i" that shows text as a tooltip while hovering."""
+    icon = ctk.CTkLabel(master, text="i", width=18, height=18, corner_radius=9, fg_color=BUTTON, text_color=MUTED,
+                        font=ctk.CTkFont(size=11, weight="bold"), cursor="question_arrow")
+    Tooltip(icon, text)
+    return icon
 
 
 class Element:
-    """Grundform: Beschriftung links (falls label), Bedienelement rechts – ohne label über die ganze Breite.
-    info: Erklärung, die beim Drüberfahren über ein „i“ hinter der Beschriftung erscheint."""
+    """Basic form: label on the left (if label), control on the right – without label across the full width.
+    info: explanation that appears while hovering over an "i" after the label."""
     sticky = "w"
 
     def __init__(self, label=None, key=None, name=None, info=None):
         self.label, self.key, self.name, self.info = label, key, name, info
 
     def place(self, page, card, row):
-        """Baut den Baustein ab Zeile row ein und gibt die Zahl der belegten Zeilen zurück."""
+        """Places the building block starting at row and returns the number of rows used."""
         self.widget = self.create(page, card)
         if self.label:
-            beschriftung = ctk.CTkFrame(card, fg_color="transparent")
-            ctk.CTkLabel(beschriftung, text=self.label, anchor="w").pack(side="left")
+            caption = ctk.CTkFrame(card, fg_color="transparent")
+            ctk.CTkLabel(caption, text=self.label, anchor="w").pack(side="left")
             if self.info:
-                info_symbol(beschriftung, self.info).pack(side="left", padx=(6, 0))
-            beschriftung.grid(row=row, column=0, sticky="w", padx=(18, 12), pady=4)
+                info_icon(caption, self.info).pack(side="left", padx=(6, 0))
+            caption.grid(row=row, column=0, sticky="w", padx=(18, 12), pady=4)
             self.widget.grid(row=row, column=1, sticky=self.sticky, padx=(0, 18), pady=4)
         else:
             self.widget.grid(row=row, column=0, columnspan=2, sticky=self.sticky, padx=18, pady=4)
@@ -210,11 +210,11 @@ class Element:
         raise NotImplementedError
 
     def refresh(self, page):
-        """Den Wert aus page.data anzeigen (nur bei Bausteinen mit key)."""
+        """Show the value from page.data (only for building blocks with key)."""
 
 
 class Text(Element):
-    """Text über die ganze Breite. hidden=True blendet ihn anfangs aus (später page.show(name))."""
+    """Text across the full width. hidden=True hides it at first (later page.show(name))."""
     sticky = "ew"
 
     def __init__(self, text="", name=None, color=MUTED, size=12, hidden=False):
@@ -233,28 +233,28 @@ class Text(Element):
 
 
 class Button:
-    """Ein Knopf in Buttons(...). style: "normal" (grün), "grau", "rahmen" oder "gefahr" (roter Text)."""
+    """A button in Buttons(...). style: "normal" (green), "gray", "outline" or "danger" (red text)."""
     STYLES = {
         "normal": {},
-        "grau": {"fg_color": BUTTON, "hover_color": BUTTON_HOVER, "border_width": 1, "text_color": TEXT},
-        "rahmen": {"fg_color": "transparent", "hover_color": BUTTON, "border_width": 1, "text_color": TEXT},
-        "gefahr": {"fg_color": "transparent", "hover_color": BUTTON, "border_width": 1, "text_color": BAD},
+        "gray": {"fg_color": BUTTON, "hover_color": BUTTON_HOVER, "border_width": 1, "text_color": TEXT},
+        "outline": {"fg_color": "transparent", "hover_color": BUTTON, "border_width": 1, "text_color": TEXT},
+        "danger": {"fg_color": "transparent", "hover_color": BUTTON, "border_width": 1, "text_color": BAD},
     }
 
-    def __init__(self, text, command, name=None, width=110, style="normal", ziel=None):
+    def __init__(self, text, command, name=None, width=110, style="normal", target=None):
         self.text, self.command, self.name, self.width, self.style = text, command, name, width, style
-        self.ziel = ziel        # was der Knopf öffnet (Website, Datei, Ordner, Programm) – siehe ziel_anzeigen()
+        self.target = target    # what the button opens (website, file, folder, program) – see show_target()
 
 
-def ziel_anzeigen(widget, app, ziel):
-    """Wie im Browser: Solange die Maus über widget ist, steht unten links im Fenster, was es öffnet. ziel ist eine
-    Adresse, ein Pfad oder eine Funktion, die eins davon liefert (wird erst beim Drüberfahren gefragt)."""
-    widget.bind("<Enter>", lambda e: app.link_zeigen(str(ziel() if callable(ziel) else ziel)), add="+")
-    widget.bind("<Leave>", lambda e: app.link_verstecken(), add="+")
+def show_target(widget, app, target):
+    """Like in a browser: while the mouse is over widget, the bottom left of the window shows what it opens. target is
+    an address, a path or a function that returns one of them (only asked when hovering)."""
+    widget.bind("<Enter>", lambda e: app.show_link(str(target() if callable(target) else target)), add="+")
+    widget.bind("<Leave>", lambda e: app.hide_link(), add="+")
 
 
 class Buttons(Element):
-    """Eine Reihe Knöpfe nebeneinander – mit label wie die anderen Bausteine mit Beschriftung links."""
+    """A row of buttons side by side – with label like the other building blocks with a caption on the left."""
 
     def __init__(self, *buttons, label=None, info=None):
         super().__init__(label=label, info=info)
@@ -264,17 +264,17 @@ class Buttons(Element):
         row = ctk.CTkFrame(card, fg_color="transparent")
         for b in self.buttons:
             button = ctk.CTkButton(row, text=b.text, width=b.width, command=b.command, **Button.STYLES[b.style])
-            button.farbe = Button.STYLES[b.style].get("fg_color")      # für page.enable(): wieder diese Farbe
+            button.base_color = Button.STYLES[b.style].get("fg_color")      # for page.enable(): this color again
             button.pack(side="left", padx=(0, 8))
-            if b.ziel:
-                ziel_anzeigen(button, page.app, b.ziel)
+            if b.target:
+                show_target(button, page.app, b.target)
             if b.name:
                 page.w[b.name] = button
         return row
 
 
 class Choice(Element):
-    """Auswahlknöpfe nebeneinander. options: {"Anzeige": Wert} oder eine Liste, wenn Anzeige = Wert."""
+    """Segmented buttons side by side. options: {"Display": value} or a list if display = value."""
 
     def __init__(self, label, key, options, name=None, info=None):
         super().__init__(label, key, name, info)
@@ -290,8 +290,8 @@ class Choice(Element):
 
 
 class Combo(Element):
-    """Aufklappliste, in die man auch selbst etwas eintippen kann.
-    names übersetzt gespeicherte Werte in Anzeigetexte, z. B. {"auto": "Automatisch"}."""
+    """Drop-down list you can also type into yourself.
+    names translates saved values into display texts, e.g. {"auto": "Automatic"}."""
 
     def __init__(self, label, key, values, names=None, name=None, width=240):
         super().__init__(label, key, name)
@@ -306,7 +306,7 @@ class Combo(Element):
     def apply(self, page):
         text = self.widget.get().strip()
         value = next((v for v, shown in self.names.items() if shown == text), text)
-        value = value or page.defaults.get(self.key, "")           # leer = Startwert
+        value = value or page.defaults.get(self.key, "")           # empty = default
         if value != page.data.get(self.key):
             page.set(self.key, value)
 
@@ -316,15 +316,15 @@ class Combo(Element):
 
 
 class Entry(Element):
-    """Eingabefeld. Mit key wird der Wert gespeichert, sonst bekommt command(text) ihn beim Verlassen/Enter.
-    geheim=True zeigt Punkte statt des Texts (z. B. für ein Passwort oder Client-Secret)."""
+    """Input field. With key the value is saved, otherwise command(text) gets it on leaving/Enter.
+    secret=True shows dots instead of the text (e.g. for a password or client secret)."""
 
-    def __init__(self, label, key=None, value="", command=None, name=None, width=240, geheim=False, info=None):
+    def __init__(self, label, key=None, value="", command=None, name=None, width=240, secret=False, info=None):
         super().__init__(label, key, name, info)
-        self.value, self.command, self.width, self.geheim = value, command, width, geheim
+        self.value, self.command, self.width, self.secret = value, command, width, secret
 
     def create(self, page, card):
-        entry = ctk.CTkEntry(card, width=self.width, show="•" if self.geheim else "")
+        entry = ctk.CTkEntry(card, width=self.width, show="•" if self.secret else "")
         entry.insert(0, self.value)
         entry.bind("<Return>", lambda e: self.apply(page))
         entry.bind("<FocusOut>", lambda e: self.apply(page))
@@ -344,7 +344,7 @@ class Entry(Element):
 
 
 class Switch(Element):
-    """Schalter. Mit key wird der Zustand gespeichert, sonst wird command() aufgerufen."""
+    """Switch. With key the state is saved, otherwise command() is called."""
 
     def __init__(self, text, key=None, command=None, name=None):
         super().__init__(key=key, name=name)
@@ -361,7 +361,7 @@ class Switch(Element):
 
 
 class Slider(Element):
-    """Schieberegler für ganze Zahlen. text steht links, {} darin wird durch den Wert ersetzt."""
+    """Slider for whole numbers. text is on the left, {} in it is replaced by the value."""
 
     def __init__(self, text, key, start, end, color=None, name=None):
         super().__init__(key=key, name=name)
@@ -381,20 +381,20 @@ class Slider(Element):
         self.text_label.configure(text=self.text.format(value))
 
 
-# ---------- Seite ----------
+# ---------- Page ----------
 class ToolPage(ctk.CTkScrollableFrame):
-    """Eine scrollbare Seite im Hauptbereich: Titel, Untertitel und die Bereiche aus layout()."""
-    settings_file = None      # JSON-Datei mit den Einstellungen (Path) – ohne Angabe daten\<programm>.json
-    defaults = {}             # Startwerte für alles, was die Bausteine per key anzeigen
+    """A scrollable page in the main area: title, subtitle and the sections from layout()."""
+    settings_file = None      # JSON file with the settings (Path) – by default data\<program>.json
+    defaults = {}             # defaults for everything the building blocks show via key
 
     def __init__(self, master, app, info):
         super().__init__(master, fg_color="transparent")
         self.app = app
         self.info = info
         if self.settings_file is None:
-            self.settings_file = daten.einstellungen(info.id)
-        self.w = {}                              # Bausteine mit name
-        self.elements = []                       # alle Bausteine (zum Auffrischen)
+            self.settings_file = storage.settings_file(info.id)
+        self.w = {}                              # building blocks with name
+        self.elements = []                       # all building blocks (for refreshing)
         self.save_job = None
         self.data = self.load()
         self.columnconfigure(0, weight=1)
@@ -420,24 +420,24 @@ class ToolPage(ctk.CTkScrollableFrame):
             if element.name:
                 self.w[element.name] = element.widget
             self.elements.append(element)
-        card.grid_rowconfigure(row, minsize=12)  # etwas Abstand zum unteren Rand
+        card.grid_rowconfigure(row, minsize=12)  # a bit of space to the bottom edge
 
-    # --- Werte ---
+    # --- Values ---
     def load(self):
-        """Startwerte, überschrieben mit dem, was in settings_file steht (unbekannte Schlüssel bleiben erhalten)."""
-        return daten.lesen(self.settings_file, self.defaults)
+        """Defaults, overwritten with what is in settings_file (unknown keys are kept)."""
+        return storage.load(self.settings_file, self.defaults)
 
     def save(self):
         try:
-            daten.schreiben(self.settings_file, self.data)
+            storage.save(self.settings_file, self.data)
         except OSError as error:
-            self.app.toast(t("toast.speichern_fehler", fehler=error.strerror or error), error=True)
+            self.app.toast(t("toast.save_error", error=error.strerror or error), error=True)
             return
-        self.app.toast(t("toast.gespeichert"))
+        self.app.toast(t("toast.saved"))
         self.on_saved()
 
     def set(self, key, value, later=False):
-        """Wert ändern, anzeigen und speichern – bei later (Schieberegler) erst kurz nach dem Loslassen."""
+        """Change, show and save a value – with later (slider) only shortly after releasing."""
         self.data[key] = value
         self.on_change(key, value)
         self.refresh(key)
@@ -450,7 +450,7 @@ class ToolPage(ctk.CTkScrollableFrame):
             self.save()
 
     def refresh(self, *keys):
-        """Bausteine neu anzeigen – alle oder nur die zu den genannten keys."""
+        """Show building blocks again – all or only those for the given keys."""
         for element in self.elements:
             if element.key and (not keys or element.key in keys):
                 element.refresh(self)
@@ -460,39 +460,39 @@ class ToolPage(ctk.CTkScrollableFrame):
         self.refresh()
         self.save()
 
-    # --- Hilfen ---
+    # --- Helpers ---
     def show(self, name, visible=True):
         self.w[name].grid() if visible else self.w[name].grid_remove()
 
     def enable(self, name, enabled=True):
-        """Knopf an/aus – ausgeschaltete Knöpfe werden grau, damit man den Unterschied sofort sieht.
-        Beim Einschalten bekommt er wieder seine Farbe (grün bzw. die seines Stils, z. B. "grau")."""
-        knopf = self.w[name]
-        farbe = getattr(knopf, "farbe", None) or ctk.ThemeManager.theme["CTkButton"]["fg_color"]
-        knopf.configure(state="normal" if enabled else "disabled", fg_color=farbe if enabled else BUTTON_OFF)
+        """Button on/off – disabled buttons turn gray so you see the difference right away.
+        When enabled it gets its color back (green or that of its style, e.g. "gray")."""
+        button = self.w[name]
+        color = getattr(button, "base_color", None) or ctk.ThemeManager.theme["CTkButton"]["fg_color"]
+        button.configure(state="normal" if enabled else "disabled", fg_color=color if enabled else BUTTON_OFF)
 
     def open(self, path):
-        """Datei oder Ordner mit dem passenden Programm öffnen."""
+        """Open a file or folder with the matching program."""
         try:
             os.startfile(path)
         except OSError:
-            self.app.toast(t("toast.nicht_gefunden", name=path.name), error=True)
+            self.app.toast(t("toast.not_found", name=path.name), error=True)
 
-    # --- Wird von der Toolbox bzw. von set() aufgerufen; Unterklassen können das überschreiben ---
+    # --- Called by the Toolbox or by set(); subclasses can override this ---
     def layout(self):
-        """Liste der Bereiche (Section) dieser Seite."""
+        """List of the sections (Section) of this page."""
         return []
 
     def on_change(self, key, value):
-        """Ein Wert wurde geändert, kurz bevor er gespeichert wird."""
+        """A value was changed, shortly before it is saved."""
 
     def on_saved(self):
-        """Nach dem Speichern, z. B. dem Programm sagen, dass es die Einstellungen neu laden soll."""
+        """After saving, e.g. tell the program to reload its settings."""
 
     def on_show(self):
-        """Seite wird sichtbar: Einstellungen neu einlesen (das Programm kann sie selbst geändert haben)."""
+        """Page becomes visible: read the settings again (the program may have changed them itself)."""
         self.data = self.load()
         self.refresh()
 
     def on_hide(self):
-        """Seite wird verlassen oder das Fenster versteckt (z. B. Abfragen stoppen)."""
+        """Page is left or the window is hidden (e.g. stop polling)."""

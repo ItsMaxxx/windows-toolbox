@@ -1,0 +1,13 @@
+{
+  "id": "discord_plus",
+  "name": "Discord Plus",
+  "version": "1.0",
+  "category": "General",
+  "description": "Extensions for Discord. Call status: shows “In a call” as soon as you're on a call or in a voice chat – even for friends who can't see the server or call (discord_plus).",
+  "page": "discord_plus_gui.py",
+  "script": "discord_plus.py",
+  "starter": "DiscordPlus.exe",
+  "icon": "discord_plus.ico",
+  "port": 47817,
+  "autostart": "WindowsToolbox DiscordPlus"
+}

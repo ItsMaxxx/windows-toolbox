@@ -1,0 +1,446 @@
+{
+  "program.name": {
+    "de": "Discord Plus",
+    "en": "Discord Plus"
+  },
+  "program.description": {
+    "de": "Erweiterungen für Discord. Call-Status: zeigt „Im Call“ an, sobald du telefonierst oder in einem Voice-Chat bist – auch für Freunde, die den Server oder Anruf nicht sehen können (discord_plus).",
+    "en": "Extensions for Discord. Call status: shows “In a call” as soon as you're on a call or in a voice chat – even for friends who can't see the server or call (discord_plus)."
+  },
+
+  "seite.status": {
+    "de": "Status",
+    "en": "Status"
+  },
+  "seite.status.pruefe": {
+    "de": "Prüfe …",
+    "en": "Checking …"
+  },
+  "seite.status.laeuft": {
+    "de": "Läuft  ·  {meldung}",
+    "en": "Running  ·  {meldung}"
+  },
+  "seite.status.gestoppt": {
+    "de": "Gestoppt – ohne das Programm zeigt Discord nichts an",
+    "en": "Stopped – without the program, Discord shows nothing"
+  },
+  "seite.status.startet": {
+    "de": "Wird gestartet …",
+    "en": "Starting …"
+  },
+  "seite.status.beendet": {
+    "de": "Wird beendet …",
+    "en": "Stopping …"
+  },
+  "seite.status.neustart": {
+    "de": "Wird neu gestartet …",
+    "en": "Restarting …"
+  },
+  "seite.erkannt": {
+    "de": "Discord meldet: {text}",
+    "en": "Discord reports: {text}"
+  },
+  "seite.starten": {
+    "de": "Starten",
+    "en": "Start"
+  },
+  "seite.beenden": {
+    "de": "Beenden",
+    "en": "Stop"
+  },
+  "seite.neu_starten": {
+    "de": "Neu starten",
+    "en": "Restart"
+  },
+  "seite.einrichtung": {
+    "de": "Einrichtung (einmalig)",
+    "en": "Setup (one-time)"
+  },
+  "seite.einrichtung.text": {
+    "de": "Discord zeigt deinen Status nur an, wenn er von einer eigenen „App“ kommt. Die legst du einmal an (etwa 3 Minuten, kostenlos):\n\n1.  „Developer Portal öffnen“, mit deinem Discord-Konto anmelden, oben rechts „New Application“. Der Name, den du dort eingibst, steht später hinter „Spielt“ – z. B. „Telefonat“ oder „Voice-Chat“. Unter „General Information“ kannst du auch ein Bild hochladen (App Icon).\n2.  Links „OAuth2“: die „Client ID“ kopieren und unten einfügen. Das „Client Secret“ zeigt Discord nur einmal – bis dahin steht dort „Hidden for security“ und Kopieren ist gesperrt. Also „Reset Secret“ klicken (bestätigen, ggf. Code aus der Authenticator-App), dann erscheint es: sofort kopieren und unten einfügen. Es bleibt nur auf diesem PC (data\\discord_plus.json).\n3.  Auf derselben Seite unter „Redirects“ → „Add Redirect“: http://localhost eintragen (Knopf „Kopieren“) und unten „Save Changes“.\n4.  Hier „Verbinden“ klicken. Discord fragt in der App einmal, ob deine App auf dein Konto zugreifen darf → „Autorisieren“. Danach fragt es nie wieder von selbst.\n5.  In Discord unter Einstellungen → Aktivitätsprivatsphäre (Activity Privacy) muss „Meine Aktivität teilen“ (Share my activity) an sein – sonst sieht niemand die Anzeige. Freunde sehen sie dann immer; darunter (Where I Share Activity) stellst du ein, auf welchen Servern sie auch andere sehen.\n\nTesten: Ruf jemanden an oder geh in einen Voice-Chat. Oben unter „Status“ steht dann, was Discord meldet.",
+    "en": "Discord only shows your status if it comes from your own “app”. You create it once (about 3 minutes, free):\n\n1.  “Open Developer Portal”, sign in with your Discord account, “New Application” at the top right. The name you enter there will later appear after “Playing” – e.g. “Phone call” or “Voice chat”. Under “General Information” you can also upload a picture (App Icon).\n2.  On the left, “OAuth2”: copy the “Client ID” and paste it below. Discord shows the “Client Secret” only once – until then it says “Hidden for security” and copying is blocked. So click “Reset Secret” (confirm, possibly with a code from your authenticator app), then it appears: copy it right away and paste it below. It stays on this PC only (data\\discord_plus.json).\n3.  On the same page under “Redirects” → “Add Redirect”: enter http://localhost (button “Copy http://localhost”) and click “Save Changes” at the bottom.\n4.  Click “Connect” here. Discord asks once in the app whether your app may access your account → “Authorize”. After that it never asks again by itself.\n5.  In Discord under Settings → Activity Privacy, “Share my activity” must be on – otherwise nobody sees the status. Friends then always see it; below (Where I Share Activity) you choose on which servers others see it too.\n\nTesting: call someone or join a voice chat. Under “Status” above you'll see what Discord reports."
+  },
+  "seite.portal": {
+    "de": "Developer Portal öffnen",
+    "en": "Open Developer Portal"
+  },
+  "seite.localhost_kopieren": {
+    "de": "http://localhost kopieren",
+    "en": "Copy http://localhost"
+  },
+  "seite.client_id": {
+    "de": "Client ID",
+    "en": "Client ID"
+  },
+  "seite.client_secret": {
+    "de": "Client Secret",
+    "en": "Client Secret"
+  },
+  "seite.verbinden": {
+    "de": "Verbinden",
+    "en": "Connect"
+  },
+  "seite.abmelden": {
+    "de": "Abmelden",
+    "en": "Sign out"
+  },
+  "seite.verbunden": {
+    "de": "Verbunden als {nutzer}",
+    "en": "Connected as {nutzer}"
+  },
+  "seite.verbunden_app": {
+    "de": "Verbunden als {nutzer} – App „{app}“",
+    "en": "Connected as {nutzer} – app “{app}”"
+  },
+  "seite.nicht_eingerichtet": {
+    "de": "Noch nicht eingerichtet – Client ID und Client Secret fehlen.",
+    "en": "Not set up yet – Client ID and Client Secret are missing."
+  },
+  "seite.nicht_verbunden": {
+    "de": "Noch nicht verbunden – „Verbinden“ klicken.",
+    "en": "Not connected yet – click “Connect”."
+  },
+  "seite.muss_laufen": {
+    "de": "Zum Verbinden muss das Programm laufen – „Verbinden“ startet es.",
+    "en": "The program has to be running to connect – “Connect” starts it."
+  },
+  "seite.autorisieren": {
+    "de": "Bitte in Discord „Autorisieren“ klicken …",
+    "en": "Please click “Authorize” in Discord …"
+  },
+  "seite.call_status": {
+    "de": "Call-Status",
+    "en": "Call status"
+  },
+  "seite.call_status.text": {
+    "de": "Zeigt in Discord „Im Call“ an, sobald du telefonierst oder in einem Voice-Chat bist – auch für Freunde, die den Server oder Anruf nicht sehen können.",
+    "en": "Shows “In a call” in Discord as soon as you're on a call or in a voice chat – even for friends who can't see the server or call."
+  },
+  "seite.anzeigen": {
+    "de": "Anzeigen, wenn ich im Call bin",
+    "en": "Show when I'm in a call"
+  },
+  "seite.anzeigen_bei": {
+    "de": "Anzeigen bei",
+    "en": "Show for"
+  },
+  "seite.anzeigen_bei.beide": {
+    "de": "Anrufe und Server",
+    "en": "Calls and servers"
+  },
+  "seite.anzeigen_bei.privat": {
+    "de": "Nur Anrufe",
+    "en": "Calls only"
+  },
+  "seite.anzeigen_bei.server": {
+    "de": "Nur Server",
+    "en": "Servers only"
+  },
+  "seite.text_privat": {
+    "de": "Text bei Anrufen",
+    "en": "Text for calls"
+  },
+  "seite.text_server": {
+    "de": "Text auf Servern",
+    "en": "Text on servers"
+  },
+  "seite.namen": {
+    "de": "Namen anzeigen („… mit Anna“)",
+    "en": "Show names (“… with Anna”)"
+  },
+  "seite.namen.warnung": {
+    "de": "Das sehen alle deine Freunde – auch die, die die andere Person nicht kennen. Frag im Zweifel vorher.",
+    "en": "All your friends see this – including those who don't know the other person. If in doubt, ask first."
+  },
+  "seite.ort": {
+    "de": "Server und Kanal bzw. Gruppenname anzeigen",
+    "en": "Show server and channel or group name"
+  },
+  "seite.anzahl": {
+    "de": "Personenzahl anzeigen (ab 3 Personen und auf Servern)",
+    "en": "Show number of people (from 3 people and on servers)"
+  },
+  "seite.dauer": {
+    "de": "Dauer anzeigen",
+    "en": "Show duration"
+  },
+  "seite.art": {
+    "de": "Art",
+    "en": "Type"
+  },
+  "seite.neben_namen": {
+    "de": "Neben deinem Namen",
+    "en": "Next to your name"
+  },
+  "seite.neben_namen.app": {
+    "de": "Name der App",
+    "en": "App name"
+  },
+  "seite.neben_namen.text": {
+    "de": "Text",
+    "en": "Text"
+  },
+  "seite.neben_namen.info": {
+    "de": "Was in der Mitgliederliste und Freundesliste kurz neben deinem Namen steht:\n\n•  Name der App: z. B. „Spielt Telefonat“\n•  Text: deine erste Zeile, z. B. „Im Call“\n\nIm Profil steht immer alles.",
+    "en": "What appears briefly next to your name in the member list and friends list:\n\n•  App name: e.g. “Playing Phone call”\n•  Text: your first line, e.g. “In a call”\n\nYour profile always shows everything."
+  },
+  "seite.vorschau": {
+    "de": "Vorschau Call-Status",
+    "en": "Call status preview"
+  },
+  "seite.vorschau.text": {
+    "de": "Ungefähr – wie es genau aussieht, entscheidet Discord.",
+    "en": "Approximate – Discord decides exactly how it looks."
+  },
+  "seite.autostart": {
+    "de": "Autostart",
+    "en": "Autostart"
+  },
+  "seite.autostart.text": {
+    "de": "Startet Discord Plus beim Anmelden an Windows (ohne Adminrechte, ohne Nachfrage). Es wartet dann im Hintergrund, bis Discord läuft.",
+    "en": "Starts Discord Plus when you sign in to Windows (without admin rights, without asking). It then waits in the background until Discord is running."
+  },
+  "seite.autostart.schalter": {
+    "de": "Beim Anmelden automatisch starten",
+    "en": "Start automatically at sign-in"
+  },
+  "seite.autostart.anderer_ort": {
+    "de": "Der Eintrag startet einen anderen Ort: {ziel}\nAus- und wieder einschalten stellt ihn auf diesen Ordner um.",
+    "en": "The entry starts a different location: {ziel}\nSwitching it off and on again points it to this folder."
+  },
+  "seite.autostart.deaktiviert": {
+    "de": "Im Task-Manager unter „Autostart“ deaktiviert – Einschalten erlaubt ihn wieder.",
+    "en": "Disabled in Task Manager under “Startup apps” – switching it on allows it again."
+  },
+  "seite.starter_fehlt": {
+    "de": "{starter} fehlt – bitte Setup.exe ausführen.",
+    "en": "{starter} is missing – please run Setup.exe."
+  },
+  "seite.gut_zu_wissen": {
+    "de": "Gut zu wissen",
+    "en": "Good to know"
+  },
+  "seite.hinweise": {
+    "de": "•  Funktioniert nur mit der Discord-App auf diesem PC (nicht im Browser) – sie muss laufen.\n•  Die Anzeige sehen alle, die auch sonst sehen, was du spielst: Freunde und Leute auf gemeinsamen Servern.\n•  Läuft gleichzeitig ein Spiel, zeigt Discord beide Aktivitäten; neben deinem Namen steht meist das Spiel.\n•  Die Dauer zählt ab dem Moment, in dem das Programm den Call bemerkt (spätestens nach 3 Sekunden).",
+    "en": "•  Only works with the Discord app on this PC (not in the browser) – it has to be running.\n•  Everyone who otherwise sees what you're playing sees it: friends and people on shared servers.\n•  If a game is running at the same time, Discord shows both activities; next to your name it usually shows the game.\n•  The duration counts from the moment the program notices the call (after 3 seconds at the latest)."
+  },
+  "seite.erweitert": {
+    "de": "Erweitert",
+    "en": "Advanced"
+  },
+  "seite.log_oeffnen": {
+    "de": "Log öffnen",
+    "en": "Open log"
+  },
+  "seite.einstellungsdatei_oeffnen": {
+    "de": "Einstellungsdatei öffnen",
+    "en": "Open settings file"
+  },
+  "seite.ordner_oeffnen": {
+    "de": "Ordner öffnen",
+    "en": "Open folder"
+  },
+  "seite.zuruecksetzen": {
+    "de": "Alles zurücksetzen",
+    "en": "Reset everything"
+  },
+  "seite.toast.kopiert": {
+    "de": "{text} kopiert ✓",
+    "en": "Copied {text} ✓"
+  },
+  "seite.toast.start_fehlgeschlagen": {
+    "de": "Start fehlgeschlagen – siehe Log",
+    "en": "Start failed – see log"
+  },
+  "seite.toast.reagiert_nicht": {
+    "de": "Programm reagiert nicht",
+    "en": "Program is not responding"
+  },
+  "seite.toast.zugang_fehlt": {
+    "de": "Erst Client ID und Client Secret eintragen (Schritt 2)",
+    "en": "Enter the Client ID and Client Secret first (step 2)"
+  },
+  "seite.toast.startet_nicht": {
+    "de": "Programm startet nicht – siehe Log",
+    "en": "Program doesn't start – see log"
+  },
+  "seite.toast.aendern_fehlgeschlagen": {
+    "de": "Ändern fehlgeschlagen",
+    "en": "Change failed"
+  },
+
+  "art.0": {
+    "de": "Spielt",
+    "en": "Playing"
+  },
+  "art.2": {
+    "de": "Hört",
+    "en": "Listening to"
+  },
+  "art.3": {
+    "de": "Schaut",
+    "en": "Watching"
+  },
+  "art.5": {
+    "de": "Tritt an in",
+    "en": "Competing in"
+  },
+
+  "vorschau.app": {
+    "de": "‹Name deiner App›",
+    "en": "‹your app's name›"
+  },
+  "vorschau.anruf": {
+    "de": "Anruf mit Anna",
+    "en": "Call with Anna"
+  },
+  "vorschau.server": {
+    "de": "Voice-Chat auf einem Server",
+    "en": "Voice chat on a server"
+  },
+  "vorschau.kanal": {
+    "de": "Allgemein",
+    "en": "General"
+  },
+  "vorschau.server_name": {
+    "de": "Mein Server",
+    "en": "My server"
+  },
+  "vorschau.nicht_angezeigt": {
+    "de": "{titel}:  wird nicht angezeigt",
+    "en": "{titel}:  not shown"
+  },
+  "vorschau.vergangen": {
+    "de": "12:34 vergangen",
+    "en": "12:34 elapsed"
+  },
+  "vorschau.profilbild": {
+    "de": "(mit Annas Profilbild)",
+    "en": "(with Anna's profile picture)"
+  },
+  "vorschau.neben": {
+    "de": "neben deinem Namen: {verb} {neben}",
+    "en": "next to your name: {verb} {neben}"
+  },
+
+  "standard.text_privat": {
+    "de": "Im Call",
+    "en": "In a call"
+  },
+  "standard.text_server": {
+    "de": "Im Voice-Chat",
+    "en": "In a voice chat"
+  },
+
+  "anzeige.mit": {
+    "de": "{text} mit {namen}",
+    "en": "{text} with {namen}"
+  },
+  "anzeige.und": {
+    "de": "{vorne} und {letzter}",
+    "en": "{vorne} and {letzter}"
+  },
+  "anzeige.weitere": {
+    "de": "{namen} und {n} weitere",
+    "en": "{namen} and {n} more"
+  },
+  "anzeige.allein": {
+    "de": "allein",
+    "en": "alone"
+  },
+  "anzeige.personen": {
+    "de": "{n} Personen",
+    "en": "{n} people"
+  },
+
+  "kanal.keiner": {
+    "de": "in keinem Anruf oder Voice-Chat",
+    "en": "not in a call or voice chat"
+  },
+  "kanal.niemand": {
+    "de": "niemand sonst",
+    "en": "nobody else"
+  },
+  "kanal.server": {
+    "de": "Voice-Chat {ort} – mit {namen}",
+    "en": "Voice chat {ort} – with {namen}"
+  },
+  "kanal.privat": {
+    "de": "Privater Anruf mit {namen}",
+    "en": "Private call with {namen}"
+  },
+  "kanal.gruppe": {
+    "de": "Gruppenanruf mit {namen}",
+    "en": "Group call with {namen}"
+  },
+
+  "meldung.startet": {
+    "de": "Startet …",
+    "en": "Starting …"
+  },
+  "meldung.zugang_fehlt": {
+    "de": "Client-ID und Client-Secret fehlen (Toolbox-Seite, Einrichtung)",
+    "en": "Client ID and Client Secret are missing (Toolbox page, setup)"
+  },
+  "meldung.discord_starten": {
+    "de": "Discord läuft nicht – erst die Discord-App starten",
+    "en": "Discord isn't running – start the Discord app first"
+  },
+  "meldung.client_id_abgelehnt": {
+    "de": "Discord lehnt die Client-ID ab: {fehler}",
+    "en": "Discord rejects the Client ID: {fehler}"
+  },
+  "meldung.autorisieren": {
+    "de": "Bitte in Discord „Autorisieren“ klicken …",
+    "en": "Please click “Authorize” in Discord …"
+  },
+  "meldung.einrichtung": {
+    "de": "Einrichtung fehlt – Anleitung auf der Toolbox-Seite",
+    "en": "Setup missing – instructions on the Toolbox page"
+  },
+  "meldung.verbinden_fehlgeschlagen": {
+    "de": "Verbinden fehlgeschlagen: {fehler}",
+    "en": "Connecting failed: {fehler}"
+  },
+  "meldung.nicht_verbunden": {
+    "de": "Nicht verbunden – auf der Toolbox-Seite „Verbinden“ klicken",
+    "en": "Not connected – click “Connect” on the Toolbox page"
+  },
+  "meldung.discord_fehler": {
+    "de": "Discord meldet: {fehler} (Code {code})",
+    "en": "Discord reports: {fehler} (code {code})"
+  },
+  "meldung.discord_fehlt": {
+    "de": "Discord läuft nicht – wartet auf die Discord-App",
+    "en": "Discord isn't running – waiting for the Discord app"
+  },
+  "meldung.pausiert": {
+    "de": "Pausiert – zeigt in Discord nichts an",
+    "en": "Paused – shows nothing in Discord"
+  },
+  "meldung.zeigt_an": {
+    "de": "Zeigt an: {text}",
+    "en": "Showing: {text}"
+  },
+  "meldung.nicht_angezeigt": {
+    "de": "Im Call – laut Einstellung nicht angezeigt",
+    "en": "In a call – not shown due to settings"
+  },
+  "meldung.kein_call": {
+    "de": "Verbunden – du bist in keinem Call",
+    "en": "Connected – you're not in a call"
+  },
+
+  "menue.einstellungen": {
+    "de": "Einstellungen öffnen",
+    "en": "Open settings"
+  },
+  "menue.call_status": {
+    "de": "Call-Status anzeigen",
+    "en": "Show call status"
+  },
+  "menue.beenden": {
+    "de": "Beenden",
+    "en": "Quit"
+  }
+}

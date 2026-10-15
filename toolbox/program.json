@@ -1,0 +1,10 @@
+{
+  "id": "toolbox",
+  "name": "Toolbox",
+  "version": "1.0",
+  "description": "The interface for all programs – always included.",
+  "script": "toolbox.py",
+  "starter": "../Toolbox.exe",
+  "icon": "toolbox.ico",
+  "port": 47816
+}

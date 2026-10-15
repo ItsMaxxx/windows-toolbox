@@ -1,35 +1,35 @@
 """
-Sprachen: Texte stehen nicht im Code, sondern in einer Tabelle i18n.json neben dem Programm – je ID ein Block, darin
-jede Sprache in einer eigenen Zeile (neue Sprache = in jedem Block eine Zeile mehr):
+Languages: texts are not in the code but in a table i18n.json next to the program – one block per ID, inside it
+each language on its own line (new language = one more line in every block):
 
     {
-      "status.laeuft": {
+      "status.running": {
         "de": "Läuft",
         "en": "Running"
       },
-      "aufgabe.fehlt": {
+      "task.missing": {
         "de": "Aufgabe „{task}“ gibt es noch nicht.",
         "en": "Task \\"{task}\\" does not exist yet."
       }
     }
 
-Im Code steht dann nur die ID:
+The code then only contains the ID:
 
-    t = i18n.Texte(ORDNER / "i18n.json")
-    t("status.laeuft")                   -> „Läuft“ bzw. „Running“
-    t("aufgabe.fehlt", task="X")         -> {task} wird ersetzt
+    t = i18n.Texts(FOLDER / "i18n.json")
+    t("status.running")                  -> "Läuft" or "Running"
+    t("task.missing", task="X")          -> {task} gets replaced
 
-Fehlt eine Übersetzung, kommt der englische Text; fehlt auch der, die ID selbst (einmal je ID im Log) – es stürzt
-also nichts ab, wenn eine Zelle leer ist.
+If a translation is missing, you get the English text; if that is missing too, the ID itself (once per ID in the
+log) – so nothing crashes when a cell is empty.
 
-Welche Sprachen es gibt, steht in sprachen.json hier daneben – Code und Name, z. B. "fr": "Français". Daraus bauen
-die Toolbox ihre Knöpfe (DE | EN | FR) und Setup.exe seine Optionsfelder, beide in dieser Reihenfolge. Neue Sprache:
-dort eine Zeile ergänzen und in den i18n.json der Programme je ID eine Zeile – sonst nichts.
+Which languages exist is in languages.json right next to this file – code and name, e.g. "fr": "Français". From it
+the Toolbox builds its buttons (DE | EN | FR) and Setup.exe its radio buttons, both in this order. New language:
+add one line there and one line per ID in the programs' i18n.json files – nothing else.
 
-Welche Sprache gilt, steht in daten\\toolbox.json ("sprache": ein Code aus SPRACHEN) – gewählt im Setup oder in den
-Einstellungen der Toolbox, gilt für die Toolbox und alle Programme. Fehlt der Eintrag: die Anzeigesprache von Windows,
-wenn es sie gibt, sonst RUECKFALL. Eigenständige Programme lesen sie mit laden() – beim Start und wenn die Toolbox
-„reload“ schickt; die Toolbox selbst setzt sie mit setzen().
+Which language applies is in data\\toolbox.json ("language": a code from LANGUAGES) – chosen in the setup or in the
+Toolbox settings, applies to the Toolbox and all programs. If the entry is missing: the Windows display language,
+if it exists, otherwise FALLBACK. Standalone programs read it with reload() – at startup and when the Toolbox sends
+"reload"; the Toolbox itself sets it with set_language().
 """
 
 import ctypes
@@ -38,80 +38,80 @@ import locale
 import logging
 from pathlib import Path
 
-import daten
+import storage
 
-# sprachen.json liest auch setup\setup.ps1 (Sprachen) – deshalb JSON und nicht Python
-SPRACHEN_DATEI = Path(__file__).with_name("sprachen.json")
+# languages.json is also read by setup\setup.ps1 (Languages) – that's why it's JSON and not Python
+LANGUAGES_FILE = Path(__file__).with_name("languages.json")
 try:
-    _liste = json.loads(SPRACHEN_DATEI.read_text(encoding="utf-8"))
-    NAMEN = dict(_liste["sprachen"])            # Code -> Name in der Sprache selbst, z. B. {"de": "Deutsch", …}
-    RUECKFALL = _liste["rueckfall"]             # fehlt eine Übersetzung, gilt diese Sprache
+    _list = json.loads(LANGUAGES_FILE.read_text(encoding="utf-8"))
+    NAMES = dict(_list["languages"])            # code -> name in the language itself, e.g. {"de": "Deutsch", …}
+    FALLBACK = _list["fallback"]                # if a translation is missing, this language applies
 except (OSError, ValueError, KeyError, TypeError):
-    logging.exception("%s konnte nicht gelesen werden – nur Englisch", SPRACHEN_DATEI)
-    NAMEN, RUECKFALL = {"en": "English"}, "en"
-SPRACHEN = tuple(NAMEN)                         # alle Codes, die man wählen kann, z. B. ("de", "en")
+    logging.exception("%s could not be read – English only", LANGUAGES_FILE)
+    NAMES, FALLBACK = {"en": "English"}, "en"
+LANGUAGES = tuple(NAMES)                        # all codes you can choose, e.g. ("de", "en")
 
-TOOLBOX_DATEI = daten.einstellungen("toolbox")
+TOOLBOX_FILE = storage.settings_file("toolbox")
 
 
-def systemsprache():
-    """Anzeigesprache von Windows, wenn sie in SPRACHEN steht (z. B. "de") – sonst RUECKFALL."""
+def system_language():
+    """Windows display language if it is in LANGUAGES (e.g. "de") – otherwise FALLBACK."""
     try:
-        kennung = ctypes.windll.kernel32.GetUserDefaultUILanguage()      # z. B. 0x0407 = Deutsch (Deutschland)
+        lang_id = ctypes.windll.kernel32.GetUserDefaultUILanguage()      # e.g. 0x0407 = German (Germany)
     except (AttributeError, OSError):
-        return RUECKFALL
-    sprache = (locale.windows_locale.get(kennung) or "")[:2]            # "de_DE" -> "de"
-    return sprache if sprache in SPRACHEN else RUECKFALL
+        return FALLBACK
+    language = (locale.windows_locale.get(lang_id) or "")[:2]           # "de_DE" -> "de"
+    return language if language in LANGUAGES else FALLBACK
 
 
-def gewaehlte():
-    """Die Sprache aus daten\\toolbox.json – oder die Systemsprache, wenn dort (noch) keine gültige steht."""
-    sprache = daten.lesen(TOOLBOX_DATEI, {}).get("sprache")
-    return sprache if sprache in SPRACHEN else systemsprache()
+def chosen():
+    """The language from data\\toolbox.json – or the system language if there is no valid one there (yet)."""
+    language = storage.load(TOOLBOX_FILE, {}).get("language")
+    return language if language in LANGUAGES else system_language()
 
 
-SPRACHE = gewaehlte()           # gilt für alle Texte dieses Prozesses
+LANGUAGE = chosen()             # applies to all texts of this process
 
 
-def setzen(sprache):
-    """Sprache für diesen Prozess umstellen. True, wenn sie sich geändert hat."""
-    global SPRACHE
-    if sprache not in SPRACHEN or sprache == SPRACHE:
+def set_language(language):
+    """Switch the language for this process. True if it changed."""
+    global LANGUAGE
+    if language not in LANGUAGES or language == LANGUAGE:
         return False
-    SPRACHE = sprache
+    LANGUAGE = language
     return True
 
 
-def laden():
-    """Sprache neu aus daten\\toolbox.json lesen (z. B. nach „reload“ von der Toolbox). True, wenn sie sich geändert hat."""
-    return setzen(gewaehlte())
+def reload():
+    """Read the language again from data\\toolbox.json (e.g. after "reload" from the Toolbox). True if it changed."""
+    return set_language(chosen())
 
 
-class Texte:
-    """Die Texte eines Programms aus seiner i18n.json. Aufruf: t("id") oder t("id", name=wert) für {name}."""
+class Texts:
+    """The texts of a program from its i18n.json. Call: t("id") or t("id", name=value) for {name}."""
 
-    def __init__(self, datei):
-        self.datei = datei
-        self.fehlend = set()                     # schon im Log gemeldete IDs
+    def __init__(self, file):
+        self.file = file
+        self.missing = set()                     # IDs already reported in the log
         try:
-            self.tabelle = json.loads(datei.read_text(encoding="utf-8"))
+            self.table = json.loads(file.read_text(encoding="utf-8"))
         except (OSError, ValueError):
-            logging.exception("Texte aus %s konnten nicht geladen werden", datei)
-            self.tabelle = {}
+            logging.exception("Texts from %s could not be loaded", file)
+            self.table = {}
 
-    def __call__(self, id, **werte):
-        zeile = self.tabelle.get(id) or {}
-        text = zeile.get(SPRACHE) or zeile.get(RUECKFALL)
+    def __call__(self, id, **values):
+        row = self.table.get(id) or {}
+        text = row.get(LANGUAGE) or row.get(FALLBACK)
         if not text:
-            if id not in self.fehlend:
-                self.fehlend.add(id)
-                logging.warning("Text fehlt in %s: %s (%s)", self.datei.name, id, SPRACHE)
+            if id not in self.missing:
+                self.missing.add(id)
+                logging.warning("Text missing in %s: %s (%s)", self.file.name, id, LANGUAGE)
             return id
-        return text.format(**werte) if werte else text
+        return text.format(**values) if values else text
 
     def __contains__(self, id):
-        return id in self.tabelle
+        return id in self.table
 
-    def alle(self, id):
-        """Der Text in allen Sprachen, z. B. {"Im Call", "In a call"} – um Standardtexte wiederzuerkennen."""
-        return set((self.tabelle.get(id) or {}).values())
+    def all(self, id):
+        """The text in all languages, e.g. {"Im Call", "In a call"} – to recognize default texts."""
+        return set((self.table.get(id) or {}).values())

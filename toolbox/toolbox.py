@@ -1,21 +1,21 @@
 """
-Toolbox – eine Oberfläche für die selbst geschriebenen kleinen Windows-Tools.
+Toolbox – one interface for the self-written small Windows tools.
 
-Aufbau:
-  oben     Tabs für die Arten von Programmen + Zahnrad für die Einstellungen der Toolbox selbst
-  links    alle Programme des gewählten Tabs, alphabetisch
-  rechts   die Einstellungen des gewählten Programms
+Layout:
+  top      tabs for the kinds of programs + gear for the settings of the Toolbox itself
+  left     all programs of the selected tab, alphabetically
+  right    the settings of the selected program
 
-Start:          Doppelklick auf Toolbox.exe im Hauptordner (oder: pythonw toolbox\\toolbox.py)
-Voraussetzung:  einmal Setup.exe (legt runtime\\ und die Starter-.exe an)
+Start:          double-click Toolbox.exe in the main folder (or: pythonw toolbox\\toolbox.py)
+Requirement:    run Setup.exe once (creates runtime\\ and the starter .exe files)
 
-Programme werden automatisch gefunden: jeder Ordner programme\\<programm>\\ mit einer programm.json (Name, Tab,
-Beschreibung, Version …); deren "seite" ist die Datei mit der Programmseite (SEITE, optional PROGRAMM).
-Links erscheinen nur die eingerichteten (daten\\installiert.json, schreibt Setup.exe); einrichten und entfernen lassen
-sie sich in den Einstellungen unter „Programme“.
-Einstellungen der Toolbox: daten\\toolbox.json, Fehler: daten\\logs\\toolbox.log (siehe daten.py).
-Alle Texte stehen in toolbox\\i18n.json – hier steht nur ihre ID: t("…") (siehe i18n.py). Name und Beschreibung eines
-Programms kommen aus seiner i18n.json (programm.name, programm.beschreibung), sonst aus seiner programm.json.
+Programs are found automatically: every folder programs\\<program>\\ with a program.json (name, tab,
+description, version …); its "page" is the file with the program page (PAGE, optionally PROGRAM).
+Only the installed ones appear on the left (data\\installed.json, written by Setup.exe); they can be installed and
+removed in the settings under "Programs".
+Toolbox settings: data\\toolbox.json, errors: data\\logs\\toolbox.log (see storage.py).
+All texts are in toolbox\\i18n.json – only their ID is here: t("…") (see i18n.py). Name and description of a
+program come from its i18n.json (program.name, program.description), otherwise from its program.json.
 """
 
 import ctypes
@@ -38,149 +38,149 @@ from tkinter import messagebox
 import customtkinter as ctk
 from PIL import Image
 
-sys.dont_write_bytecode = True             # keine __pycache__-Ordner im Projekt anlegen
+sys.dont_write_bytecode = True             # don't create __pycache__ folders in the project
 
 APP_DIR = Path(__file__).resolve().parent
-ROOT = APP_DIR.parent                      # Hauptordner (Toolbox.exe, runtime\, programme\, daten\)
-PROGRAMME_DIR = ROOT / "programme"         # hier liegt je Programm ein Ordner (hardware_monitor\, …)
-sys.path.insert(0, str(APP_DIR))           # damit base, winutil usw. gefunden werden – auch von den Programmseiten
+ROOT = APP_DIR.parent                      # main folder (Toolbox.exe, runtime\, programs\, data\)
+PROGRAMS_DIR = ROOT / "programs"           # one folder per program lives here (hardware_monitor\, …)
+sys.path.insert(0, str(APP_DIR))           # so that base, winutil etc. are found – also by the program pages
 
-import daten  # noqa: E402
 import i18n  # noqa: E402
+import storage  # noqa: E402
 import winutil  # noqa: E402
 from base import (BAD, BAR, BORDER, CARD, GOOD, HOVER, MUTED, SELECTED, TEXT, Button, Buttons, Choice,  # noqa: E402
-                  Section, Switch, Text, ToolInfo, ToolPage, Tooltip, apply_font, apply_theme, t, ziel_anzeigen)
+                  Section, Switch, Text, ToolInfo, ToolPage, Tooltip, apply_font, apply_theme, show_target, t)
 
-# Tabs oben, in dieser Reihenfolge – wie "kategorie" in programm.json; angezeigt wird t("kategorie.<klein>")
-CATEGORIES = ["Allgemein", "Games"]
+# Tabs at the top, in this order – like "category" in program.json; shown is t("category.<lower>")
+CATEGORIES = ["General", "Games"]
 
-AUSWEIS = json.loads((APP_DIR / "programm.json").read_text(encoding="utf-8"))    # wie bei jedem Programm
-VERSION = AUSWEIS["version"]
-SETTINGS_FILE = daten.einstellungen("toolbox")
-ICON_FILE = APP_DIR / "toolbox.ico"        # blauer Werkzeugkoffer – die Programme haben programm.ico (⚒ auf Grün)
-GITHUB_URL = "https://github.com/ItsMaxxx/windows-toolbox"     # Knopf „Windows Toolbox“ oben links
-# Von Setup.exe angelegt: pythonw.exe mit Namen „Toolbox“ und eigenem Symbol (für den Task-Manager). Diese
-# startet auch der Starter Toolbox.exe im Hauptordner; für den Neustart geht es direkt, ohne den Umweg.
+MANIFEST = json.loads((APP_DIR / "program.json").read_text(encoding="utf-8"))    # like for every program
+VERSION = MANIFEST["version"]
+SETTINGS_FILE = storage.settings_file("toolbox")
+ICON_FILE = APP_DIR / "toolbox.ico"        # blue toolbox – the programs have program.ico (⚒ on green)
+GITHUB_URL = "https://github.com/ItsMaxxx/windows-toolbox"     # button "Windows Toolbox" at the top left
+# Created by Setup.exe: pythonw.exe with the name "Toolbox" and its own icon (for the Task Manager). The starter
+# Toolbox.exe in the main folder starts this one too; for the restart it goes directly, without the detour.
 TOOLBOX_EXE = ROOT / "runtime" / "Toolbox.exe"
 SETUP_EXE = ROOT / "Setup.exe"
 UNINSTALL_EXE = ROOT / "Uninstall.exe"
-# Welche Programme eingerichtet sind – schreibt setup.ps1 (Installierte-Speichern), die Toolbox liest nur
-INSTALLIERT_FILE = daten.einstellungen("installiert")
-GUI_PORT = AUSWEIS["port"]       # ein zweiter Start holt nur das laufende Fenster nach vorne; setup.ps1 sagt "quit"
+# Which programs are installed – written by setup.ps1 (Save-Installed), the Toolbox only reads it
+INSTALLED_FILE = storage.settings_file("installed")
+GUI_PORT = MANIFEST["port"]      # a second start only brings the running window to the front; setup.ps1 says "quit"
 
-# Gespeicherter Wert -> Modus von CustomTkinter; angezeigt wird t("einstellungen.design.<klein>")
-APPEARANCE = {"Hell": "light", "Dunkel": "dark", "System": "system"}
-ZOOM_STUFEN = [0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0]    # Strg + Mausrad, Stufen wie im Browser
-# Knöpfe DE | EN | … in den Einstellungen, automatisch aus toolbox\sprachen.json; gilt für Toolbox und alle Programme
-SPRACHEN = {sprache.upper(): sprache for sprache in i18n.SPRACHEN}
+# Saved value -> CustomTkinter mode; shown is t("settings.theme.<lower>")
+APPEARANCE = {"Light": "light", "Dark": "dark", "System": "system"}
+ZOOM_STEPS = [0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0]     # Ctrl + mouse wheel, steps like a browser
+# Buttons DE | EN | … in the settings, automatically from toolbox\languages.json; applies to Toolbox and all programs
+LANGUAGE_BUTTONS = {language.upper(): language for language in i18n.LANGUAGES}
 DEFAULT_SETTINGS = {
-    "appearance": "Dunkel",
+    "appearance": "Dark",
     "close_to_tray": True,
     "zoom": 1.0,
-    "sprache": i18n.SPRACHE,             # setzt Setup.exe; fehlt sie: die Anzeigesprache von Windows (siehe i18n.py)
+    "language": i18n.LANGUAGE,           # set by Setup.exe; if missing: the Windows display language (see i18n.py)
 }
 
-logging.basicConfig(filename=daten.log("toolbox"), level=logging.INFO,
+logging.basicConfig(filename=storage.log_file("toolbox"), level=logging.INFO,
                     format="%(asctime)s %(levelname)s %(message)s")
 
 
-# ---------- Programme finden ----------
-def find_ausweise():
-    """Alle programme\\<programm>\\programm.json – eingerichtet oder nicht. "ordner" ergänzt den Programmordner.
-    Ein kaputter Ausweis wird nur protokolliert, damit die übrigen trotzdem erscheinen."""
-    ausweise = []
-    for ausweis_datei in sorted(PROGRAMME_DIR.glob("*/programm.json")):
+# ---------- Find programs ----------
+def find_manifests():
+    """All programs\\<program>\\program.json – installed or not. "folder" adds the program folder.
+    A broken manifest is only logged so the others still appear."""
+    manifests = []
+    for manifest_file in sorted(PROGRAMS_DIR.glob("*/program.json")):
         try:
-            ausweis = json.loads(ausweis_datei.read_text(encoding="utf-8"))
-            ausweis["ordner"] = ausweis_datei.parent
-            texte = ausweis_datei.with_name("i18n.json")
-            ausweis["texte"] = i18n.Texte(texte) if texte.exists() else None     # Name und Beschreibung je Sprache
-            ausweise.append(ausweis)
+            manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
+            manifest["folder"] = manifest_file.parent
+            texts = manifest_file.with_name("i18n.json")
+            manifest["texts"] = i18n.Texts(texts) if texts.exists() else None     # name and description per language
+            manifests.append(manifest)
         except (OSError, ValueError):
-            logging.exception("Ausweis %s konnte nicht gelesen werden", ausweis_datei)
-    return ausweise
+            logging.exception("Manifest %s could not be read", manifest_file)
+    return manifests
 
 
-def anzeige(ausweis, feld):
-    """Name ("name") bzw. Beschreibung ("beschreibung") eines Programms in der gewählten Sprache – aus seiner
-    i18n.json (programm.name, programm.beschreibung), sonst so, wie es in programm.json steht."""
-    texte, id = ausweis.get("texte"), f"programm.{feld}"
-    return texte(id) if texte and id in texte else ausweis.get(feld, "")
+def display_text(manifest, field):
+    """Name ("name") or description ("description") of a program in the chosen language – from its
+    i18n.json (program.name, program.description), otherwise as it is in program.json."""
+    texts, id = manifest.get("texts"), f"program.{field}"
+    return texts(id) if texts and id in texts else manifest.get(field, "")
 
 
-def installierte_ids(ausweise):
-    """IDs der eingerichteten Programme laut daten\\installiert.json. Fehlt die Datei (oder ist sie kaputt): alle –
-    so war es, bevor man Programme einzeln einrichten konnte. Dieselbe Regel hat setup.ps1 (Installierte)."""
-    ids = daten.lesen(INSTALLIERT_FILE, {"programme": None})["programme"]
-    return {a["id"] for a in ausweise if not isinstance(ids, list) or a["id"] in ids}
+def installed_ids(manifests):
+    """IDs of the installed programs according to data\\installed.json. If the file is missing (or broken): all –
+    that's how it was before programs could be installed individually. setup.ps1 has the same rule (Installed)."""
+    ids = storage.load(INSTALLED_FILE, {"programs": None})["programs"]
+    return {m["id"] for m in manifests if not isinstance(ids, list) or m["id"] in ids}
 
 
-def find_tools(ausweise):
-    """Lädt zu jedem Ausweis die darin genannte Seite und baut daraus das ToolInfo.
-    Ein fehlerhaftes Programm wird nur protokolliert, damit die übrigen trotzdem erscheinen."""
+def find_tools(manifests):
+    """Loads the page named in each manifest and builds the ToolInfo from it.
+    A faulty program is only logged so the others still appear."""
     tools = []
-    for ausweis in ausweise:
+    for manifest in manifests:
         try:
-            file = ausweis["ordner"] / ausweis["seite"]
+            file = manifest["folder"] / manifest["page"]
             spec = importlib.util.spec_from_file_location(file.stem, file)
             module = importlib.util.module_from_spec(spec)
             sys.modules[file.stem] = module
             spec.loader.exec_module(module)
-            tools.append(ToolInfo(ausweis["id"], anzeige(ausweis, "name"), ausweis["kategorie"],
-                                  anzeige(ausweis, "beschreibung"), module.SEITE, getattr(module, "PROGRAMM", None)))
+            tools.append(ToolInfo(manifest["id"], display_text(manifest, "name"), manifest["category"],
+                                  display_text(manifest, "description"), module.PAGE, getattr(module, "PROGRAM", None)))
         except Exception:
-            logging.exception("Programm %s konnte nicht geladen werden", ausweis["ordner"])
+            logging.exception("Program %s could not be loaded", manifest["folder"])
     return tools
 
 
-AUSWEISE = find_ausweise()
-INSTALLIERT = installierte_ids(AUSWEISE)                 # ändert sich nur über setup.ps1 – das startet die Toolbox neu
-TOOLS = find_tools([a for a in AUSWEISE if a["id"] in INSTALLIERT])
+MANIFESTS = find_manifests()
+INSTALLED = installed_ids(MANIFESTS)                 # only changes via setup.ps1 – which restarts the Toolbox
+TOOLS = find_tools([m for m in MANIFESTS if m["id"] in INSTALLED])
 
 
-def namen_setzen():
-    """Name und Beschreibung aller Programme in der gerade gewählten Sprache (nach einem Sprachwechsel)."""
-    ausweis_von = {a["id"]: a for a in AUSWEISE}
+def update_names():
+    """Name and description of all programs in the currently chosen language (after a language change)."""
+    manifest_of = {m["id"]: m for m in MANIFESTS}
     for tool in TOOLS:
-        tool.name = anzeige(ausweis_von[tool.id], "name")
-        tool.description = anzeige(ausweis_von[tool.id], "beschreibung")
+        tool.name = display_text(manifest_of[tool.id], "name")
+        tool.description = display_text(manifest_of[tool.id], "description")
 
 
-# ---------- Einstellungen ----------
+# ---------- Settings ----------
 def load_settings():
-    """Gespeicherte Einstellungen – Ungültiges bekommt den Startwert."""
-    settings = daten.lesen(SETTINGS_FILE, DEFAULT_SETTINGS)
+    """Saved settings – anything invalid gets the default."""
+    settings = storage.load(SETTINGS_FILE, DEFAULT_SETTINGS)
     if settings["appearance"] not in APPEARANCE:
         settings["appearance"] = DEFAULT_SETTINGS["appearance"]
     if not isinstance(settings["close_to_tray"], bool):
         settings["close_to_tray"] = DEFAULT_SETTINGS["close_to_tray"]
-    if settings["zoom"] not in ZOOM_STUFEN:
+    if settings["zoom"] not in ZOOM_STEPS:
         settings["zoom"] = DEFAULT_SETTINGS["zoom"]
-    if settings["sprache"] not in i18n.SPRACHEN:
-        settings["sprache"] = DEFAULT_SETTINGS["sprache"]
+    if settings["language"] not in i18n.LANGUAGES:
+        settings["language"] = DEFAULT_SETTINGS["language"]
     return settings
 
 
 def save_settings(settings):
     try:
-        daten.schreiben(SETTINGS_FILE, settings)
+        storage.save(SETTINGS_FILE, settings)
         return True
     except OSError:
-        logging.exception("Einstellungen der Toolbox konnten nicht gespeichert werden")
+        logging.exception("Toolbox settings could not be saved")
         return False
 
 
-# ---------- Aktualisieren (git pull, danach Setup.exe) ----------
-# Alle drei blockieren eine Weile – nur im Hintergrund aufrufen (app.run_async).
+# ---------- Update (git pull, then Setup.exe) ----------
+# All three block for a while – only call them in the background (app.run_async).
 def git(*args, timeout=30):
-    """git im Hauptordner ausführen (ohne Konsolenfenster). Ergebnis – oder None, wenn git fehlt oder hängt."""
+    """Run git in the main folder (without a console window). Result – or None if git is missing or hangs."""
     exe = shutil.which("git")
     return winutil.run_hidden([exe, "-C", str(ROOT), *args], timeout) if exe else None
 
 
-def git_stand():
-    """Stand des Ordners für die Anzeige: (Commit, Datum), z. B. ("6c3fccf", "10.10.2026") – oder None ohne git bzw.
-    ohne Repo."""
+def git_version():
+    """Version of the folder for display: (commit, date), e.g. ("6c3fccf", "10.10.2026") – or None without git or
+    without a repo."""
     if not (ROOT / ".git").exists():
         return None
     result = git("log", "-1", "--format=%h %cd", "--date=format:%d.%m.%Y")
@@ -189,30 +189,30 @@ def git_stand():
     return tuple(result.stdout.strip().split(" ", 1))
 
 
-def git_holen():
-    """Holt neue Commits von GitHub – nur als Fast-Forward, eigene Änderungen werden nie überschrieben.
-    Rückgabe (neue Commits, Fehlermeldung oder None); 0 neue Commits = schon aktuell."""
-    def fehler(result, text):
-        zeilen = result.stderr.strip().splitlines() if result is not None else []
-        return 0, f"{text}: {zeilen[-1]}" if zeilen else text
+def git_fetch():
+    """Gets new commits from GitHub – only as a fast-forward, your own changes are never overwritten.
+    Returns (new commits, error message or None); 0 new commits = already up to date."""
+    def error(result, text):
+        lines = result.stderr.strip().splitlines() if result is not None else []
+        return 0, f"{text}: {lines[-1]}" if lines else text
 
     result = git("fetch", "--quiet", timeout=120)
     if result is None or result.returncode != 0:
-        return fehler(result, t("git.abrufen"))
+        return error(result, t("git.fetch"))
     result = git("rev-list", "--count", "HEAD..@{upstream}")
     if result is None or result.returncode != 0:
-        return fehler(result, t("git.kein_zweig"))
-    neu = int(result.stdout.strip() or 0)
-    if neu:
+        return error(result, t("git.no_branch"))
+    new = int(result.stdout.strip() or 0)
+    if new:
         result = git("pull", "--ff-only", "--quiet", timeout=120)
         if result is None or result.returncode != 0:
-            return fehler(result, t("git.pull"))
-    return neu, None
+            return error(result, t("git.pull"))
+    return new, None
 
 
-# ---------- Nur eine Toolbox gleichzeitig ----------
+# ---------- Only one Toolbox at a time ----------
 def bring_existing_to_front():
-    """Läuft die Toolbox schon? Dann deren Fenster zeigen lassen und True zurückgeben."""
+    """Is the Toolbox already running? Then have it show its window and return True."""
     try:
         with socket.create_connection(("127.0.0.1", GUI_PORT), timeout=0.5) as conn:
             conn.sendall(b"show\n")
@@ -221,9 +221,9 @@ def bring_existing_to_front():
         return False
 
 
-# ---------- Einstellungsseite (Zahnrad) ----------
+# ---------- Settings page (gear) ----------
 class GuiSettingsPage(ToolPage):
-    """Einstellungen der Toolbox selbst – liegen in self.app.settings (daten\\toolbox.json)."""
+    """Settings of the Toolbox itself – live in self.app.settings (data\\toolbox.json)."""
 
     def load(self):
         return self.app.settings
@@ -233,38 +233,39 @@ class GuiSettingsPage(ToolPage):
 
     def layout(self):
         return [
-            Section(t("einstellungen.darstellung"),
-                    Choice(t("einstellungen.sprache"), "sprache", SPRACHEN),
-                    Choice(t("einstellungen.design"), "appearance",
-                           {t(f"einstellungen.design.{wert.lower()}"): wert for wert in APPEARANCE}),
-                    Text(t("einstellungen.darstellung.text"))),
-            Section(t("einstellungen.fenster"),
-                    Switch(t("einstellungen.fenster.tray"), key="close_to_tray"),
-                    Text(t("einstellungen.fenster.text"))),
-            Section(t("einstellungen.programme"),
-                    Text(t("einstellungen.programme.text")),
-                    *[self.programm_zeile(a) for a in AUSWEISE]),
-            Section(t("einstellungen.beenden"),
-                    Text(f"●  {t('einstellungen.programme.pruefe')}", name="programme"),
-                    Buttons(Button(t("knopf.neu_starten"), self.app.neu_starten, name="nur_neu"),
-                            Button(t("knopf.beenden"), self.app.quit_app, name="nur_ende", style="grau"),
-                            label=t("einstellungen.nur_toolbox"), info=t("info.nur_toolbox")),
-                    Buttons(Button(t("knopf.neu_starten"), lambda: self.alle(neu=True), name="alle_neu"),
-                            Button(t("knopf.beenden"), lambda: self.alle(neu=False), name="alle_ende", style="grau"),
-                            label=t("einstellungen.alle"), info=t("info.alle"))),
-            Section(t("einstellungen.aktualisieren"),
-                    Text(f"●  {t('einstellungen.stand.pruefe')}", name="stand"),
-                    Buttons(Button(t("knopf.aktualisieren"), self.aktualisieren, name="update"),
-                            label=t("einstellungen.aktualisieren.label"), info=t("info.update")),
-                    Buttons(Button(t("knopf.neu_einrichten"), self.neu_einrichten, name="setup", style="grau",
-                                   ziel=f"{SETUP_EXE} -Neustart"),
-                            label=t("einstellungen.neu_einrichten.label"), info=t("info.neu_einrichten"))),
-            Section(t("einstellungen.deinstallieren"),
-                    Buttons(Button(t("knopf.deinstallieren"), self.deinstallieren, name="deinstallieren",
-                                   style="gefahr", ziel=UNINSTALL_EXE),
-                            label=t("einstellungen.alle"), info=t("info.deinstallieren"))),
-            Section(t("einstellungen.info"),
-                    Text(t("einstellungen.info.text", version=VERSION, ordner=daten.DATEN_DIR))),
+            Section(t("settings.appearance"),
+                    Choice(t("settings.language"), "language", LANGUAGE_BUTTONS),
+                    Choice(t("settings.theme"), "appearance",
+                           {t(f"settings.theme.{value.lower()}"): value for value in APPEARANCE}),
+                    Text(t("settings.appearance.text"))),
+            Section(t("settings.window"),
+                    Switch(t("settings.window.tray"), key="close_to_tray"),
+                    Text(t("settings.window.text"))),
+            Section(t("settings.programs"),
+                    Text(t("settings.programs.text")),
+                    *[self.program_row(m) for m in MANIFESTS]),
+            Section(t("settings.quit"),
+                    Text(f"●  {t('settings.programs.checking')}", name="programs"),
+                    Buttons(Button(t("button.restart"), self.app.restart, name="only_restart"),
+                            Button(t("button.quit"), self.app.quit_app, name="only_quit", style="gray"),
+                            label=t("settings.toolbox_only"), info=t("info.toolbox_only")),
+                    Buttons(Button(t("button.restart"), lambda: self.all_programs(restart=True), name="all_restart"),
+                            Button(t("button.quit"), lambda: self.all_programs(restart=False), name="all_quit",
+                                   style="gray"),
+                            label=t("settings.all"), info=t("info.all"))),
+            Section(t("settings.update"),
+                    Text(f"●  {t('settings.version.checking')}", name="version"),
+                    Buttons(Button(t("button.update"), self.run_update, name="update"),
+                            label=t("settings.update.label"), info=t("info.update")),
+                    Buttons(Button(t("button.repair"), self.repair, name="setup", style="gray",
+                                   target=f"{SETUP_EXE} -Restart"),
+                            label=t("settings.repair.label"), info=t("info.repair"))),
+            Section(t("settings.uninstall"),
+                    Buttons(Button(t("button.uninstall"), self.uninstall, name="uninstall",
+                                   style="danger", target=UNINSTALL_EXE),
+                            label=t("settings.all"), info=t("info.uninstall"))),
+            Section(t("settings.info"),
+                    Text(t("settings.info.text", version=VERSION, folder=storage.DATA_DIR))),
         ]
 
     def on_change(self, key, value):
@@ -272,358 +273,359 @@ class GuiSettingsPage(ToolPage):
             ctk.set_appearance_mode(APPEARANCE[value])
         elif key == "close_to_tray" and not value:
             self.app.stop_tray()
-        elif key == "sprache":
-            self.app.sprache_wechseln(value)
+        elif key == "language":
+            self.app.change_language(value)
 
-    # --- Programme ---
-    def programm_zeile(self, ausweis):
-        """Eine Zeile je Programm: Name und Version, die Beschreibung im „i“, daneben Installieren bzw. Entfernen."""
-        knopf = f"programm_{ausweis['id']}"
-        if ausweis["id"] in INSTALLIERT:
-            button = Button(t("knopf.entfernen"), lambda: self.einrichten(ausweis, False), name=knopf, style="gefahr",
-                            ziel=f"{UNINSTALL_EXE} -Programme {ausweis['id']}")
+    # --- Programs ---
+    def program_row(self, manifest):
+        """One row per program: name and version, the description in the "i", next to it Install or Remove."""
+        button_name = f"program_{manifest['id']}"
+        if manifest["id"] in INSTALLED:
+            button = Button(t("button.remove"), lambda: self.install(manifest, False), name=button_name,
+                            style="danger", target=f"{UNINSTALL_EXE} -Programs {manifest['id']}")
         else:
-            button = Button(t("knopf.installieren"), lambda: self.einrichten(ausweis, True), name=knopf,
-                            ziel=f"{SETUP_EXE} -Programme {ausweis['id']}")
-        return Buttons(button, label=f"{anzeige(ausweis, 'name')} {ausweis.get('version', '')}".strip(),
-                       info=anzeige(ausweis, "beschreibung") or None)
+            button = Button(t("button.install"), lambda: self.install(manifest, True), name=button_name,
+                            target=f"{SETUP_EXE} -Programs {manifest['id']}")
+        return Buttons(button, label=f"{display_text(manifest, 'name')} {manifest.get('version', '')}".strip(),
+                       info=display_text(manifest, "description") or None)
 
-    def einrichten(self, ausweis, an):
-        """Setup.exe bzw. Uninstall.exe -Programme <id> in einem eigenen Fenster. Beide beenden die Toolbox und
-        starten sie am Ende neu – dann mit der geänderten Liste links."""
-        if not an and not messagebox.askyesno(t("entfernen.titel"), t("entfernen.frage", name=anzeige(ausweis, "name")),
+    def install(self, manifest, on):
+        """Setup.exe or Uninstall.exe -Programs <id> in a separate window. Both quit the Toolbox and
+        restart it at the end – then with the changed list on the left."""
+        if not on and not messagebox.askyesno(t("remove.title"),
+                                              t("remove.question", name=display_text(manifest, "name")),
                                               icon="warning", parent=self):
             return
-        exe = SETUP_EXE if an else UNINSTALL_EXE
+        exe = SETUP_EXE if on else UNINSTALL_EXE
         try:
-            os.startfile(str(exe), arguments=f"-Programme {ausweis['id']}", cwd=str(ROOT))
+            os.startfile(str(exe), arguments=f"-Programs {manifest['id']}", cwd=str(ROOT))
         except OSError:
-            logging.exception("%s konnte nicht gestartet werden", exe.name)
-            self.app.toast(t("toast.startete_nicht", name=exe.name), error=True)
+            logging.exception("%s could not be started", exe.name)
+            self.app.toast(t("toast.did_not_start", name=exe.name), error=True)
             return
-        self.enable(f"programm_{ausweis['id']}", False)
+        self.enable(f"program_{manifest['id']}", False)
 
-    # --- Beenden und Neustart ---
+    # --- Quit and restart ---
     def on_show(self):
         super().on_show()
-        self.programme_pruefen()
-        self.stand_pruefen()
+        self.check_programs()
+        self.check_version()
 
-    def programme_pruefen(self):
-        """Zeigt, welche Programme gerade laufen (die Abfrage läuft im Hintergrund)."""
-        tools = [tool for tool in TOOLS if tool.programm]
+    def check_programs(self):
+        """Shows which programs are running right now (the query runs in the background)."""
+        tools = [tool for tool in TOOLS if tool.program]
         if not tools:
-            self.w["programme"].configure(text=t("programme.keine"), text_color=MUTED)
+            self.w["programs"].configure(text=t("programs.none"), text_color=MUTED)
             return
 
-        def zeigen(zustaende):
+        def show(states):
             if not self.winfo_exists():
-                return                           # Seite inzwischen neu gebaut (Sprachwechsel)
-            zeilen = [f"●  {t('programme.laeuft' if an else 'programme.gestoppt', name=tool.name)}"
-                      for tool, an in zip(tools, zustaende or [])]
-            self.w["programme"].configure(text="\n".join(zeilen), text_color=MUTED)
+                return                           # page rebuilt in the meantime (language change)
+            lines = [f"●  {t('programs.running' if on else 'programs.stopped', name=tool.name)}"
+                     for tool, on in zip(tools, states or [])]
+            self.w["programs"].configure(text="\n".join(lines), text_color=MUTED)
 
-        self.app.run_async(lambda: [tool.programm.laeuft() for tool in tools], zeigen)
+        self.app.run_async(lambda: [tool.program.is_running() for tool in tools], show)
 
-    def alle(self, neu):
-        """Erst jedes laufende Programm beenden (und bei neu wieder starten), dann die Toolbox selbst.
-        Klappt bei einem Programm etwas nicht, bleibt die Toolbox offen und zeigt den Fehler."""
-        tools = [tool for tool in TOOLS if tool.programm]
-        knoepfe = ("nur_neu", "nur_ende", "alle_neu", "alle_ende")
-        for name in knoepfe:
+    def all_programs(self, restart):
+        """First stop every running program (and start it again with restart), then the Toolbox itself.
+        If something goes wrong with a program, the Toolbox stays open and shows the error."""
+        tools = [tool for tool in TOOLS if tool.program]
+        buttons = ("only_restart", "only_quit", "all_restart", "all_quit")
+        for name in buttons:
             self.enable(name, False)
-        self.w["programme"].configure(text=f"●  {t('programme.neu_gestartet' if neu else 'programme.beendet')}")
+        self.w["programs"].configure(text=f"●  {t('programs.restarting' if restart else 'programs.quitting')}")
 
         def work():
-            fehler = []
+            failed = []
             for tool in tools:
-                p = tool.programm
-                if not p.laeuft():
-                    continue                     # gestoppte Programme bleiben gestoppt – auch beim Neustart
-                if not p.beenden() or (neu and not p.starten()):
-                    fehler.append(tool.name)
-            return fehler
+                p = tool.program
+                if not p.is_running():
+                    continue                     # stopped programs stay stopped – also on restart
+                if not p.stop() or (restart and not p.start()):
+                    failed.append(tool.name)
+            return failed
 
-        def done(fehler):
-            if fehler is None or fehler:
-                for name in knoepfe:
+        def done(failed):
+            if failed is None or failed:
+                for name in buttons:
                     self.enable(name, True)
-                self.app.toast(t("toast.nicht_geklappt", namen=", ".join(fehler or [t("fehler.unbekannt")])),
+                self.app.toast(t("toast.failed", names=", ".join(failed or [t("error.unknown")])),
                                error=True)
-                self.programme_pruefen()
-            elif neu:
-                self.app.neu_starten()
+                self.check_programs()
+            elif restart:
+                self.app.restart()
             else:
                 self.app.quit_app()
 
         self.app.run_async(work, done)
 
-    # --- Aktualisieren ---
-    def stand_pruefen(self):
-        def zeigen(stand):
+    # --- Update ---
+    def check_version(self):
+        def show(version):
             if not self.winfo_exists():
-                return                           # Seite inzwischen neu gebaut (Sprachwechsel)
-            text = f"●  {t('stand.text', hash=stand[0], datum=stand[1]) if stand else t('stand.kein_git')}"
-            self.w["stand"].configure(text=text, text_color=MUTED)
-            self.enable("update", bool(stand))
+                return                           # page rebuilt in the meantime (language change)
+            text = f"●  {t('version.text', hash=version[0], date=version[1]) if version else t('version.no_git')}"
+            self.w["version"].configure(text=text, text_color=MUTED)
+            self.enable("update", bool(version))
 
-        self.app.run_async(git_stand, zeigen)
+        self.app.run_async(git_version, show)
 
-    def aktualisieren(self):
-        """git pull; gab es Neues, danach Setup.exe (setup_starten)."""
+    def run_update(self):
+        """git pull; if there was something new, then Setup.exe (start_setup)."""
         self.enable("update", False)
-        self.w["stand"].configure(text=f"●  {t('stand.suche')}", text_color=MUTED)
+        self.w["version"].configure(text=f"●  {t('version.searching')}", text_color=MUTED)
 
-        def done(ergebnis):
-            neu, fehler = ergebnis or (0, t("fehler.unbekannt"))
-            if fehler:
-                self.w["stand"].configure(text=f"●  {fehler}", text_color=BAD)
+        def done(result):
+            new, error = result or (0, t("error.unknown"))
+            if error:
+                self.w["version"].configure(text=f"●  {error}", text_color=BAD)
                 self.enable("update", True)
-            elif not neu:
-                self.app.toast(t("toast.aktuell"))
-                self.stand_pruefen()
+            elif not new:
+                self.app.toast(t("toast.up_to_date"))
+                self.check_version()
             else:
-                self.setup_starten(f"●  {t('stand.geholt', n=neu)}")
+                self.start_setup(f"●  {t('version.fetched', n=new)}")
 
-        self.app.run_async(git_holen, done)
+        self.app.run_async(git_fetch, done)
 
-    def neu_einrichten(self):
-        """Wie nach einem Update, nur ohne git pull (siehe NEU_EINRICHTEN_INFO)."""
-        self.setup_starten(f"●  {t('stand.setup_laeuft')}")
+    def repair(self):
+        """Like after an update, just without git pull (see info.repair)."""
+        self.start_setup(f"●  {t('version.setup_running')}")
 
-    def deinstallieren(self):
-        """Uninstall.exe in einem eigenen Fenster – dasselbe wie ein Doppelklick darauf. Es beendet die Toolbox
-        selbst."""
-        if not messagebox.askyesno(t("deinstallieren.titel"), t("deinstallieren.frage", ordner=ROOT),
+    def uninstall(self):
+        """Uninstall.exe in a separate window – the same as double-clicking it. It quits the Toolbox
+        itself."""
+        if not messagebox.askyesno(t("uninstall.title"), t("uninstall.question", folder=ROOT),
                                    icon="warning", parent=self):
             return
         try:
             os.startfile(str(UNINSTALL_EXE), cwd=str(ROOT))
         except OSError:
-            logging.exception("Uninstall.exe konnte nicht gestartet werden")
-            self.app.toast(t("toast.startete_nicht", name=UNINSTALL_EXE.name), error=True)
+            logging.exception("Uninstall.exe could not be started")
+            self.app.toast(t("toast.did_not_start", name=UNINSTALL_EXE.name), error=True)
             return
-        self.enable("deinstallieren", False)
+        self.enable("uninstall", False)
 
-    def setup_starten(self, text):
-        """Setup.exe -Neustart in einem eigenen Fenster. Das beendet die Toolbox, bringt runtime\\ auf den Stand von
-        requirements.txt, stellt alles wie vorher (Autostart, Einstellungen) und startet neu, was lief."""
-        self.w["stand"].configure(text=text, text_color=GOOD)
+    def start_setup(self, text):
+        """Setup.exe -Restart in a separate window. It quits the Toolbox, brings runtime\\ up to date with
+        requirements.txt, restores everything as before (autostart, settings) and restarts what was running."""
+        self.w["version"].configure(text=text, text_color=GOOD)
         try:
-            os.startfile(str(SETUP_EXE), arguments="-Neustart", cwd=str(SETUP_EXE.parent))
+            os.startfile(str(SETUP_EXE), arguments="-Restart", cwd=str(SETUP_EXE.parent))
         except OSError:
-            logging.exception("Setup.exe konnte nicht gestartet werden")
-            self.w["stand"].configure(text=f"●  {t('stand.setup_fehler')}", text_color=BAD)
+            logging.exception("Setup.exe could not be started")
+            self.w["version"].configure(text=f"●  {t('version.setup_error')}", text_color=BAD)
 
 
-# ---------- Seite mit der Maus scrollen (zusätzlich zum Mausrad) ----------
-class Scrollen:
-    """Zwei Arten, die sichtbare Seite mit der Maus zu scrollen:
+# ---------- Scroll the page with the mouse (in addition to the mouse wheel) ----------
+class Scrolling:
+    """Two ways to scroll the visible page with the mouse:
 
-    Mausrad-Klick wie im Browser: Ein Symbol markiert die Stelle; je weiter die Maus darüber bzw. darunter steht,
-    desto schneller scrollt die Seite.
-      kurz klicken                scrollt weiter bis zum nächsten Klick (oder Esc bzw. Mausrad)
-      gedrückt halten + ziehen    scrollt nur, bis die Taste losgelassen wird
-    Solange es läuft, gehen alle Mausklicks an das Symbol (grab) – der Klick zum Beenden löst also nichts aus.
+    Middle-click like in a browser: an icon marks the spot; the further the mouse is above or below it,
+    the faster the page scrolls.
+      short click                 keeps scrolling until the next click (or Esc or mouse wheel)
+      hold + drag                 scrolls only until the button is released
+    While it runs, all mouse clicks go to the icon (grab) – so the click that ends it doesn't trigger anything.
 
-    Linksklick + ziehen wie am Handy: Die Seite folgt der Maus; mit Schwung losgelassen gleitet sie noch etwas weiter.
-    Nur auf freien Flächen und Texten – Knöpfe, Schalter, Regler, Eingabefelder usw. funktionieren wie gewohnt."""
-    TOTZONE = 12            # px um die Startstelle, in denen nichts scrollt bzw. ein Klick noch kein Ziehen ist
-    TEMPO = 0.12            # Mausrad-Klick: px pro Schritt je px Abstand außerhalb der Totzone
-    TAKT = 16               # ms je Schritt (~60 pro Sekunde)
-    ANLAUF = 0.3            # s – so lange darf der Fokus nach dem Klick noch fehlen (Fenster wird gerade aktiv)
-    REIBUNG = 0.94          # Schwung: so viel Tempo bleibt pro Schritt übrig
-    MIN_SCHWUNG = 300       # px/s – langsamer losgelassen bleibt die Seite einfach stehen
-    DURCHSICHTIG = "#010203"    # Hintergrund des Symbols, wird unsichtbar – so bleibt nur der Kreis
-    # Darauf startet Linksklick + ziehen nicht – die brauchen die Maus selbst
-    BEDIENELEMENTE = (ctk.CTkButton, ctk.CTkSegmentedButton, ctk.CTkSwitch, ctk.CTkSlider, ctk.CTkEntry,
-                      ctk.CTkComboBox, ctk.CTkOptionMenu, ctk.CTkCheckBox, ctk.CTkRadioButton, ctk.CTkTextbox,
-                      tk.Entry, tk.Text, tk.Button, tk.Scale)
+    Left-click + drag like on a phone: the page follows the mouse; released with momentum it glides on a bit.
+    Only on empty areas and texts – buttons, switches, sliders, input fields etc. work as usual."""
+    DEAD_ZONE = 12          # px around the start point where nothing scrolls or a click isn't a drag yet
+    SPEED = 0.12            # middle-click: px per step per px of distance outside the dead zone
+    TICK = 16               # ms per step (~60 per second)
+    GRACE = 0.3             # s – focus may still be missing this long after the click (window is becoming active)
+    FRICTION = 0.94         # momentum: this much speed remains per step
+    MIN_MOMENTUM = 300      # px/s – released slower, the page simply stays put
+    TRANSPARENT = "#010203"     # background of the icon, becomes invisible – so only the circle remains
+    # Left-click + drag doesn't start on these – they need the mouse themselves
+    CONTROLS = (ctk.CTkButton, ctk.CTkSegmentedButton, ctk.CTkSwitch, ctk.CTkSlider, ctk.CTkEntry,
+                ctk.CTkComboBox, ctk.CTkOptionMenu, ctk.CTkCheckBox, ctk.CTkRadioButton, ctk.CTkTextbox,
+                tk.Entry, tk.Text, tk.Button, tk.Scale)
 
     def __init__(self, app):
         self.app = app
-        self.symbol = None                       # Symbol des Mausrad-Klicks, solange der läuft
-        self.job = None                          # nächster Schritt (Mausrad-Klick oder Schwung)
-        self.gefasst = False                     # Linksklick auf der Seite, Taste noch unten
-        self.zieht = False                       # … und schon weiter als die Totzone gezogen
-        app.bind_all("<ButtonPress-2>", self.mitte_druecken, add="+")
-        app.bind_all("<ButtonRelease-2>", self.mitte_loslassen, add="+")
-        app.bind_all("<ButtonPress-1>", self.links_druecken, add="+")
-        app.bind_all("<B1-Motion>", self.links_ziehen, add="+")
-        app.bind_all("<ButtonRelease-1>", self.links_loslassen, add="+")
-        app.bind_all("<ButtonPress>", lambda e: self.stop(), add="+")         # z. B. Rechtsklick beendet
+        self.icon = None                         # icon of the middle-click while it runs
+        self.job = None                          # next step (middle-click or momentum)
+        self.grabbed = False                     # left-click on the page, button still down
+        self.dragging = False                    # … and already dragged further than the dead zone
+        app.bind_all("<ButtonPress-2>", self.middle_press, add="+")
+        app.bind_all("<ButtonRelease-2>", self.middle_release, add="+")
+        app.bind_all("<ButtonPress-1>", self.left_press, add="+")
+        app.bind_all("<B1-Motion>", self.left_drag, add="+")
+        app.bind_all("<ButtonRelease-1>", self.left_release, add="+")
+        app.bind_all("<ButtonPress>", lambda e: self.stop(), add="+")         # e.g. right-click ends it
         app.bind_all("<MouseWheel>", lambda e: self.stop(), add="+")
         app.bind_all("<Escape>", lambda e: self.stop(), add="+")
 
-    # --- gemeinsam ---
-    def canvas_unter(self, widget):
-        """Canvas der sichtbaren Seite, wenn widget darauf liegt und es etwas zu scrollen gibt – sonst None.
-        Darin verschiebt CTkScrollableFrame den Inhalt der Seite."""
-        seite = self.app.current_page
-        if not isinstance(seite, ToolPage) or isinstance(widget, str):      # str: Tk-internes Fenster
+    # --- shared ---
+    def canvas_under(self, widget):
+        """Canvas of the visible page if widget is on it and there is something to scroll – otherwise None.
+        In it CTkScrollableFrame moves the content of the page."""
+        page = self.app.current_page
+        if not isinstance(page, ToolPage) or isinstance(widget, str):      # str: Tk-internal window
             return None
-        canvas = seite._parent_canvas
+        canvas = page._parent_canvas
         w = widget
         while w is not None and w is not canvas:
             w = w.master
-        if w is None or canvas.yview() == (0.0, 1.0):     # nicht auf der Seite bzw. passt ganz ins Fenster
+        if w is None or canvas.yview() == (0.0, 1.0):     # not on the page or fits entirely into the window
             return None
         return canvas
 
-    def beginnen(self, canvas, event):
+    def begin(self, canvas, event):
         self.canvas = canvas
-        self.skalierung = ctk.ScalingTracker.get_widget_scaling(self.app)
+        self.scaling = ctk.ScalingTracker.get_widget_scaling(self.app)
         self.start_x, self.start_y = event.x_root, event.y_root
-        self.start_zeit = time.monotonic()
-        self.position = canvas.yview()[0]        # als Kommazahl mitführen – sonst bleibt langsames Scrollen hängen
+        self.start_time = time.monotonic()
+        self.position = canvas.yview()[0]        # carried as a float – otherwise slow scrolling gets stuck
 
-    def verschieben(self, px):
-        """Seite um px weiter nach unten scrollen (negativ: nach oben). False, wenn sie dabei am Ende anstößt."""
-        oben, unten = self.canvas.yview()
-        sichtbar = unten - oben                  # Anteil der Seite im Fenster – daraus: px → Anteil
-        self.position += px * sichtbar / max(self.canvas.winfo_height(), 1)
-        ziel = min(max(self.position, 0.0), 1.0 - sichtbar)
-        frei = ziel == self.position
-        self.position = ziel
-        self.canvas.yview_moveto(ziel)
-        return frei
+    def move(self, px):
+        """Scroll the page px further down (negative: up). False if it hits the end in the process."""
+        top, bottom = self.canvas.yview()
+        visible = bottom - top                   # share of the page in the window – from it: px → share
+        self.position += px * visible / max(self.canvas.winfo_height(), 1)
+        target = min(max(self.position, 0.0), 1.0 - visible)
+        free = target == self.position
+        self.position = target
+        self.canvas.yview_moveto(target)
+        return free
 
     def stop(self):
-        """Mausrad-Klick-Scrollen bzw. Schwung beenden."""
+        """End middle-click scrolling or momentum."""
         if self.job:
             self.app.after_cancel(self.job)
             self.job = None
-        if self.symbol:
-            self.symbol.grab_release()
-            self.symbol.destroy()
-            self.symbol = None
+        if self.icon:
+            self.icon.grab_release()
+            self.icon.destroy()
+            self.icon = None
             self.app.configure(cursor="")
 
-    # --- Mausrad-Klick ---
-    def mitte_druecken(self, event):
-        if self.symbol:
+    # --- Middle-click ---
+    def middle_press(self, event):
+        if self.icon:
             self.stop()
             return
         self.stop()
-        canvas = self.canvas_unter(event.widget)
+        canvas = self.canvas_under(event.widget)
         if canvas is None:
             return
-        self.beginnen(canvas, event)
-        self.bewegt = False
-        self.symbol_zeigen()
-        self.job = self.app.after(self.TAKT, self.schritt)
+        self.begin(canvas, event)
+        self.moved = False
+        self.show_icon()
+        self.job = self.app.after(self.TICK, self.step)
 
-    def mitte_loslassen(self, event):
-        if self.symbol and self.bewegt:          # gedrückt gehalten und gezogen – beim Loslassen ist Schluss
+    def middle_release(self, event):
+        if self.icon and self.moved:             # held and dragged – releasing ends it
             self.stop()
 
-    def symbol_zeigen(self):
-        """Kreis mit Pfeilen hoch/runter an der Startstelle – schlichtes tk wie beim Tooltip."""
-        dunkel = ctk.get_appearance_mode() == "Dark"
-        farbe = lambda paar: paar[1] if dunkel else paar[0]         # noqa: E731
-        g = round(30 * self.skalierung)
-        self.symbol = symbol = tk.Toplevel(self.app)
-        symbol.withdraw()
-        symbol.overrideredirect(True)
-        symbol.attributes("-topmost", True)
-        symbol.attributes("-transparentcolor", self.DURCHSICHTIG)
-        bild = tk.Canvas(symbol, width=g, height=g, bg=self.DURCHSICHTIG, highlightthickness=0,
-                         cursor="sb_v_double_arrow")
-        bild.pack()
-        bild.create_oval(1, 1, g - 2, g - 2, fill=farbe(CARD), outline=farbe(MUTED),
-                         width=max(1, round(self.skalierung)))
-        m, b = g / 2, g * 0.16                   # Mitte, halbe Pfeilbreite
-        bild.create_polygon(m, g * 0.14, m - b, g * 0.36, m + b, g * 0.36, fill=farbe(TEXT))
-        bild.create_polygon(m, g * 0.86, m - b, g * 0.64, m + b, g * 0.64, fill=farbe(TEXT))
-        symbol.geometry(f"+{self.start_x - g // 2}+{self.start_y - g // 2}")
-        symbol.deiconify()
+    def show_icon(self):
+        """Circle with arrows up/down at the start point – plain tk like the tooltip."""
+        dark = ctk.get_appearance_mode() == "Dark"
+        color = lambda pair: pair[1] if dark else pair[0]           # noqa: E731
+        g = round(30 * self.scaling)
+        self.icon = icon = tk.Toplevel(self.app)
+        icon.withdraw()
+        icon.overrideredirect(True)
+        icon.attributes("-topmost", True)
+        icon.attributes("-transparentcolor", self.TRANSPARENT)
+        image = tk.Canvas(icon, width=g, height=g, bg=self.TRANSPARENT, highlightthickness=0,
+                          cursor="sb_v_double_arrow")
+        image.pack()
+        image.create_oval(1, 1, g - 2, g - 2, fill=color(CARD), outline=color(MUTED),
+                          width=max(1, round(self.scaling)))
+        m, b = g / 2, g * 0.16                   # center, half arrow width
+        image.create_polygon(m, g * 0.14, m - b, g * 0.36, m + b, g * 0.36, fill=color(TEXT))
+        image.create_polygon(m, g * 0.86, m - b, g * 0.64, m + b, g * 0.64, fill=color(TEXT))
+        icon.geometry(f"+{self.start_x - g // 2}+{self.start_y - g // 2}")
+        icon.deiconify()
         self.app.configure(cursor="sb_v_double_arrow")
-        self.festhalten()
+        self.hold()
 
-    def festhalten(self):
-        """Alle Mausklicks ans Symbol – klappt erst, wenn Windows es angezeigt hat, sonst gleich noch mal."""
-        if not self.symbol:
+    def hold(self):
+        """All mouse clicks to the icon – only works once Windows has shown it, otherwise try again shortly."""
+        if not self.icon:
             return
         try:
-            self.symbol.grab_set()
+            self.icon.grab_set()
         except tk.TclError:
-            self.symbol.after(20, self.festhalten)
+            self.icon.after(20, self.hold)
 
-    def schritt(self):
-        if not self.app.tk.call("focus") and time.monotonic() - self.start_zeit > self.ANLAUF:
+    def step(self):
+        if not self.app.tk.call("focus") and time.monotonic() - self.start_time > self.GRACE:
             self.job = None
-            self.stop()                          # anderes Programm im Vordergrund (z. B. Alt+Tab ins Spiel)
+            self.stop()                          # another program in the foreground (e.g. Alt+Tab into a game)
             return
         x, y = self.app.winfo_pointerxy()
-        totzone = self.TOTZONE * self.skalierung
-        if abs(x - self.start_x) > totzone or abs(y - self.start_y) > totzone:
-            self.bewegt = True
-        abstand = y - self.start_y
-        tempo = max(abs(abstand) - totzone, 0) * self.TEMPO
-        if tempo:
-            self.verschieben(tempo if abstand > 0 else -tempo)
-        self.job = self.app.after(self.TAKT, self.schritt)
+        dead_zone = self.DEAD_ZONE * self.scaling
+        if abs(x - self.start_x) > dead_zone or abs(y - self.start_y) > dead_zone:
+            self.moved = True
+        distance = y - self.start_y
+        speed = max(abs(distance) - dead_zone, 0) * self.SPEED
+        if speed:
+            self.move(speed if distance > 0 else -speed)
+        self.job = self.app.after(self.TICK, self.step)
 
-    # --- Linksklick + ziehen ---
-    def links_druecken(self, event):
-        if self.symbol:                          # Mausrad-Klick-Scrollen läuft – dieser Klick beendet es nur
+    # --- Left-click + drag ---
+    def left_press(self, event):
+        if self.icon:                            # middle-click scrolling is running – this click only ends it
             self.stop()
             return
-        self.stop()                              # gleitet die Seite noch, hält ein Klick sie an
-        canvas = self.canvas_unter(event.widget)
-        if canvas is None or self.ist_bedienelement(event.widget, canvas):
+        self.stop()                              # if the page is still gliding, a click stops it
+        canvas = self.canvas_under(event.widget)
+        if canvas is None or self.is_control(event.widget, canvas):
             return
-        self.beginnen(canvas, event)
-        self.gefasst, self.zieht = True, False
-        self.letztes_y = event.y_root
-        self.verlauf = [(self.start_zeit, event.y_root)]     # letzte Mauspositionen – daraus das Tempo beim Loslassen
+        self.begin(canvas, event)
+        self.grabbed, self.dragging = True, False
+        self.last_y = event.y_root
+        self.history = [(self.start_time, event.y_root)]     # last mouse positions – the speed on release from them
 
-    def ist_bedienelement(self, widget, canvas):
+    def is_control(self, widget, canvas):
         while widget is not None and widget is not canvas:
-            if isinstance(widget, self.BEDIENELEMENTE):
+            if isinstance(widget, self.CONTROLS):
                 return True
             widget = widget.master
         return False
 
-    def links_ziehen(self, event):
-        if not self.gefasst:
+    def left_drag(self, event):
+        if not self.grabbed:
             return
-        if not self.zieht:
-            if abs(event.y_root - self.start_y) <= self.TOTZONE * self.skalierung:
-                return                           # noch ein Klick, kein Ziehen
-            self.zieht = True
+        if not self.dragging:
+            if abs(event.y_root - self.start_y) <= self.DEAD_ZONE * self.scaling:
+                return                           # still a click, not a drag
+            self.dragging = True
             self.app.configure(cursor="fleur")
-        self.verschieben(self.letztes_y - event.y_root)      # Maus runter = Inhalt runter = nach oben scrollen
-        self.letztes_y = event.y_root
-        jetzt = time.monotonic()
-        self.verlauf = [(t, y) for t, y in self.verlauf if jetzt - t < 0.1] + [(jetzt, event.y_root)]
+        self.move(self.last_y - event.y_root)    # mouse down = content down = scroll up
+        self.last_y = event.y_root
+        now = time.monotonic()
+        self.history = [(t, y) for t, y in self.history if now - t < 0.1] + [(now, event.y_root)]
 
-    def links_loslassen(self, event):
-        if not self.gefasst:
+    def left_release(self, event):
+        if not self.grabbed:
             return
-        self.gefasst = False
-        if not self.zieht:
+        self.grabbed = False
+        if not self.dragging:
             return
-        self.zieht = False
+        self.dragging = False
         self.app.configure(cursor="")
-        # Schwung: Tempo der letzten 0,1 s – aber nur, wenn die Maus beim Loslassen noch in Bewegung war
-        jetzt = time.monotonic()
-        verlauf = [(t, y) for t, y in self.verlauf if jetzt - t < 0.1]
-        if len(verlauf) >= 2 and jetzt - verlauf[-1][0] < 0.05:
-            (t0, y0), (t1, y1) = verlauf[0], verlauf[-1]
-            self.schwung = (y0 - y1) / max(t1 - t0, 0.001)           # px/s, positiv = nach unten scrollen
-            if abs(self.schwung) >= self.MIN_SCHWUNG:
-                self.job = self.app.after(self.TAKT, self.gleiten)
+        # Momentum: speed of the last 0.1 s – but only if the mouse was still moving when released
+        now = time.monotonic()
+        history = [(t, y) for t, y in self.history if now - t < 0.1]
+        if len(history) >= 2 and now - history[-1][0] < 0.05:
+            (t0, y0), (t1, y1) = history[0], history[-1]
+            self.momentum = (y0 - y1) / max(t1 - t0, 0.001)          # px/s, positive = scroll down
+            if abs(self.momentum) >= self.MIN_MOMENTUM:
+                self.job = self.app.after(self.TICK, self.glide)
 
-    def gleiten(self):
-        self.schwung *= self.REIBUNG
-        if abs(self.schwung) < 50 or not self.verschieben(self.schwung * self.TAKT / 1000):
-            self.job = None                      # ausgerollt bzw. am Ende angestoßen
+    def glide(self):
+        self.momentum *= self.FRICTION
+        if abs(self.momentum) < 50 or not self.move(self.momentum * self.TICK / 1000):
+            self.job = None                      # rolled out or hit the end
             return
-        self.job = self.app.after(self.TAKT, self.gleiten)
+        self.job = self.app.after(self.TICK, self.glide)
 
 
-# ---------- Hauptfenster ----------
+# ---------- Main window ----------
 class ToolboxApp(ctk.CTk):
     def __init__(self):
         self.settings = load_settings()
@@ -633,25 +635,25 @@ class ToolboxApp(ctk.CTk):
         super().__init__()
         apply_font(self)
 
-        # Titel = Pfad des Programms, wie beim Explorer: Im Task-Manager steht er unter „Toolbox“ und zeigt, welche
-        # Kopie gerade läuft (z. B. nach dem Verschieben des Ordners). Der Name steht ja schon im Logo.
+        # Title = path of the program, like in Explorer: in the Task Manager it shows under "Toolbox" which copy
+        # is running right now (e.g. after moving the folder). The name is already in the logo anyway.
         self.title(str(Path(__file__).resolve()))
         self.geometry("1060x720")
         self.minsize(860, 540)
         self.set_window_icon()
 
-        self.ui_queue = queue.Queue()           # Aufträge aus anderen Threads, die tkinter ausführen soll
-        self.pages = {}                         # einmal gebaute Seiten bleiben erhalten
+        self.ui_queue = queue.Queue()           # jobs from other threads that tkinter should run
+        self.pages = {}                         # pages built once are kept
         self.current_page = None
-        self.selected = {}                      # zuletzt gewähltes Programm je Tab
-        self.kategorie = CATEGORIES[0]          # Tab, dessen Programme links stehen
+        self.selected = {}                      # last selected program per tab
+        self.category = CATEGORIES[0]           # tab whose programs are on the left
         self.sidebar_buttons = {}
         self.tab_buttons = {}
         self.tray = None
         self.toast_job = None
         self.zoom_job = None
-        self.zoom_rest = 0                      # angefangene Rasten (Touchpads liefern Bruchteile davon)
-        self.scrollen = Scrollen(self)
+        self.zoom_rest = 0                      # started notches (touchpads deliver fractions of them)
+        self.scrolling = Scrolling(self)
 
         self.columnconfigure(2, weight=1)
         self.rowconfigure(2, weight=1)
@@ -661,24 +663,24 @@ class ToolboxApp(ctk.CTk):
         self.main.grid(row=2, column=2, sticky="nsew")
         self.main.columnconfigure(0, weight=1)
         self.main.rowconfigure(0, weight=1)
-        self.build_linkzeile()
+        self.build_link_bar()
 
         self.show_category(CATEGORIES[0])
         self.protocol("WM_DELETE_WINDOW", self.on_close)
-        # Strg + Mausrad ist genauer als das <MouseWheel> der Seiten – die scrollen dabei also nicht mit
-        self.bind_all("<Control-MouseWheel>", self.zoom_mausrad)
+        # Ctrl + mouse wheel is more specific than the pages' <MouseWheel> – so they don't scroll along
+        self.bind_all("<Control-MouseWheel>", self.zoom_wheel)
         threading.Thread(target=self.instance_server, daemon=True).start()
         self.after(100, self.poll_queue)
 
-    # --- Aufbau ---
+    # --- Layout ---
     def set_window_icon(self):
         try:
-            self.iconbitmap(str(ICON_FILE))      # nach iconbitmap() überschreibt CustomTkinter das Symbol nicht mehr
+            self.iconbitmap(str(ICON_FILE))      # after iconbitmap() CustomTkinter no longer overwrites the icon
         except Exception:
-            pass                                 # toolbox.ico fehlt – dann eben mit dem Standardsymbol
+            pass                                 # toolbox.ico is missing – then with the default icon
 
     def build_topbar(self):
-        """Kopfleiste wie auf der Website: Name (Knopf zum GitHub-Repo), Tabs als schlichte Links, Linie darunter."""
+        """Header like on the website: name (button to the GitHub repo), tabs as plain links, line below."""
         bar = ctk.CTkFrame(self, height=60, corner_radius=0, fg_color=BAR)
         bar.grid(row=0, column=0, columnspan=3, sticky="ew")
         bar.columnconfigure(2, weight=1)
@@ -688,13 +690,13 @@ class ToolboxApp(ctk.CTk):
                              hover_color=HOVER, text_color=TEXT, font=ctk.CTkFont(size=17, weight="bold"),
                              cursor="hand2", command=lambda: webbrowser.open(GITHUB_URL))
         name.grid(row=0, column=0, padx=(12, 20), pady=12)
-        self.github_tooltip = Tooltip(name, t("kopf.github"))
-        ziel_anzeigen(name, self, GITHUB_URL)
+        self.github_tooltip = Tooltip(name, t("header.github"))
+        show_target(name, self, GITHUB_URL)
 
         tabs = ctk.CTkFrame(bar, fg_color="transparent")
         tabs.grid(row=0, column=1, sticky="w")
         for category in CATEGORIES:
-            button = ctk.CTkButton(tabs, text=t(f"kategorie.{category.lower()}"), width=0, height=34, corner_radius=8,
+            button = ctk.CTkButton(tabs, text=t(f"category.{category.lower()}"), width=0, height=34, corner_radius=8,
                                    fg_color="transparent", hover_color=HOVER, text_color=MUTED,
                                    font=ctk.CTkFont(size=14, weight="bold"),
                                    command=lambda c=category: self.show_category(c))
@@ -710,28 +712,28 @@ class ToolboxApp(ctk.CTk):
     def build_sidebar(self):
         self.sidebar = ctk.CTkFrame(self, width=230, corner_radius=0, fg_color=BAR)
         self.sidebar.grid(row=2, column=0, sticky="nsw")
-        self.sidebar.grid_propagate(False)       # feste Breite, auch bei kurzen Namen
+        self.sidebar.grid_propagate(False)       # fixed width, even with short names
         self.sidebar.columnconfigure(0, weight=1)
         ctk.CTkFrame(self, width=1, corner_radius=0, fg_color=BORDER).grid(row=2, column=1, sticky="ns")
 
-    def build_linkzeile(self):
-        """Kästchen unten links wie im Browser: zeigt, was ein Knopf öffnet, solange die Maus darüber ist (siehe
-        base.ziel_anzeigen). Es liegt über Seitenleiste und Seite und ist nur dann zu sehen."""
-        self.linkzeile = ctk.CTkFrame(self, corner_radius=0, fg_color=BAR, border_width=1, border_color=BORDER)
-        self.link_label = ctk.CTkLabel(self.linkzeile, text="", text_color=MUTED, height=22,
+    def build_link_bar(self):
+        """Box at the bottom left like in a browser: shows what a button opens while the mouse is over it (see
+        base.show_target). It lies over sidebar and page and is only visible then."""
+        self.link_bar = ctk.CTkFrame(self, corner_radius=0, fg_color=BAR, border_width=1, border_color=BORDER)
+        self.link_label = ctk.CTkLabel(self.link_bar, text="", text_color=MUTED, height=22,
                                        font=ctk.CTkFont(size=12))
         self.link_label.pack(padx=(9, 10), pady=2)
 
-    def link_zeigen(self, text):
+    def show_link(self, text):
         self.link_label.configure(text=text)
-        self.linkzeile.place(relx=0, rely=1, anchor="sw")
-        self.linkzeile.lift()
+        self.link_bar.place(relx=0, rely=1, anchor="sw")
+        self.link_bar.lift()
 
-    def link_verstecken(self):
-        self.linkzeile.place_forget()
+    def hide_link(self):
+        self.link_bar.place_forget()
 
     def mark(self, button, active):
-        """Gewählten Tab/Eintrag hervorheben wie die aktiven Links der Website (grün getönt, heller Text)."""
+        """Highlight the selected tab/entry like the active links of the website (green tint, bright text)."""
         button.configure(fg_color=SELECTED if active else "transparent", text_color=TEXT if active else MUTED)
 
     # --- Navigation ---
@@ -739,21 +741,21 @@ class ToolboxApp(ctk.CTk):
         for name, button in self.tab_buttons.items():
             self.mark(button, name == category)
         self.mark(self.gear, False)
-        tools = self.sidebar_fuellen(category)
+        tools = self.fill_sidebar(category)
         if not tools:
             self.show_page(None)
             return
         remembered = self.selected.get(category)
         self.show_tool(next((tool for tool in tools if tool.id == remembered), tools[0]))
 
-    def sidebar_fuellen(self, category):
-        """Seitenleiste mit den Programmen des Tabs füllen (alphabetisch) – gibt sie zurück."""
-        self.kategorie = category
+    def fill_sidebar(self, category):
+        """Fill the sidebar with the programs of the tab (alphabetically) – returns them."""
+        self.category = category
         for child in self.sidebar.winfo_children():
             child.destroy()
         self.sidebar_buttons = {}
 
-        ctk.CTkLabel(self.sidebar, text=t(f"kategorie.{category.lower()}").upper(), text_color=MUTED, anchor="w",
+        ctk.CTkLabel(self.sidebar, text=t(f"category.{category.lower()}").upper(), text_color=MUTED, anchor="w",
                      font=ctk.CTkFont(size=11, weight="bold")).grid(row=0, column=0, sticky="ew", padx=14, pady=(16, 6))
         tools = sorted((tool for tool in TOOLS if tool.category == category), key=lambda tool: tool.name.casefold())
         for row, tool in enumerate(tools, start=1):
@@ -764,16 +766,16 @@ class ToolboxApp(ctk.CTk):
             button.grid(row=row, column=0, sticky="ew", padx=8, pady=2)
             self.sidebar_buttons[tool.id] = button
         if not tools:
-            # Nur auf „Installieren“ verweisen, wenn es für diesen Tab auch etwas zu installieren gibt
-            fehlt = any(a.get("kategorie") == category and a["id"] not in INSTALLIERT for a in AUSWEISE)
-            ctk.CTkLabel(self.sidebar, text=t("seitenleiste.leer_installieren" if fehlt else "seitenleiste.leer"),
+            # Only point to "Install" if there is something to install for this tab
+            missing = any(m.get("category") == category and m["id"] not in INSTALLED for m in MANIFESTS)
+            ctk.CTkLabel(self.sidebar, text=t("sidebar.empty_install" if missing else "sidebar.empty"),
                          text_color=MUTED, justify="left").grid(row=1, column=0, sticky="w", padx=12)
         return tools
 
     def show_tool(self, tool):
-        self.kategorie = tool.category
+        self.category = tool.category
         self.selected[tool.category] = tool.id
-        for name, button in self.tab_buttons.items():       # wieder grün, falls vorher das Zahnrad gewählt war
+        for name, button in self.tab_buttons.items():       # green again in case the gear was selected before
             self.mark(button, name == tool.category)
         self.mark(self.gear, False)
         for tool_id, button in self.sidebar_buttons.items():
@@ -782,9 +784,9 @@ class ToolboxApp(ctk.CTk):
             self.pages[tool.id] = tool.page(self.main, self, tool)
         self.show_page(self.pages[tool.id])
 
-    def show_programm(self, tool_id):
-        """Die Seite dieses Programms zeigen (samt Tab) – z. B. vom Zahnrad im Hardware-Monitor. Unbekannt oder nicht
-        eingerichtet: bleibt, wie es ist."""
+    def show_program(self, tool_id):
+        """Show this program's page (including the tab) – e.g. from the gear in the Hardware Monitor. Unknown or not
+        installed: stays as it is."""
         tool = next((tool for tool in TOOLS if tool.id == tool_id), None)
         if tool:
             self.show_category(tool.category)
@@ -795,7 +797,7 @@ class ToolboxApp(ctk.CTk):
             self.mark(button, False)
         self.mark(self.gear, True)
         if "_settings" not in self.pages:
-            info = ToolInfo("_settings", t("einstellungen.titel"), "", t("einstellungen.untertitel"),
+            info = ToolInfo("_settings", t("settings.title"), "", t("settings.subtitle"),
                             GuiSettingsPage)
             self.pages["_settings"] = GuiSettingsPage(self.main, self, info)
         self.show_page(self.pages["_settings"])
@@ -803,8 +805,8 @@ class ToolboxApp(ctk.CTk):
     def show_page(self, page):
         if self.current_page is page:
             return
-        self.scrollen.stop()
-        self.link_verstecken()                   # der Knopf darunter ist gleich weg – sein <Leave> kommt nicht mehr
+        self.scrolling.stop()
+        self.hide_link()                         # the button under it is gone in a moment – its <Leave> won't come
         if self.current_page is not None:
             self.current_page.on_hide()
             self.current_page.grid_forget()
@@ -814,75 +816,75 @@ class ToolboxApp(ctk.CTk):
             page.on_show()
 
     # --- Zoom ---
-    def zoom_mausrad(self, event):
-        """Strg + Mausrad: alles größer bzw. kleiner wie im Browser, wird gemerkt. Die Anzeige oben rechts kommt
-        sofort, das Umrechnen erst kurz nach der letzten Raste – alles neu zu skalieren dauert einen Moment."""
+    def zoom_wheel(self, event):
+        """Ctrl + mouse wheel: everything bigger or smaller like in a browser, is remembered. The display at the top
+        right comes immediately, the rescaling only shortly after the last notch – rescaling everything takes a moment."""
         self.zoom_rest += event.delta
-        rasten = int(self.zoom_rest / 120)        # 120 = eine Raste
-        if rasten:
-            self.zoom_rest -= rasten * 120
-            stufe = min(max(ZOOM_STUFEN.index(self.settings["zoom"]) + rasten, 0), len(ZOOM_STUFEN) - 1)
-            self.settings["zoom"] = ZOOM_STUFEN[stufe]
-            self.toast(t("toast.zoom", prozent=round(ZOOM_STUFEN[stufe] * 100)))
+        notches = int(self.zoom_rest / 120)       # 120 = one notch
+        if notches:
+            self.zoom_rest -= notches * 120
+            step = min(max(ZOOM_STEPS.index(self.settings["zoom"]) + notches, 0), len(ZOOM_STEPS) - 1)
+            self.settings["zoom"] = ZOOM_STEPS[step]
+            self.toast(t("toast.zoom", percent=round(ZOOM_STEPS[step] * 100)))
             if self.zoom_job:
                 self.after_cancel(self.zoom_job)
-            self.zoom_job = self.after(150, self.zoom_anwenden)
+            self.zoom_job = self.after(150, self.apply_zoom)
         return "break"
 
-    def zoom_anwenden(self):
+    def apply_zoom(self):
         self.zoom_job = None
         ctk.set_widget_scaling(self.settings["zoom"])
         if not save_settings(self.settings):
-            self.toast(t("toast.zoom_fehler"), error=True)
+            self.toast(t("toast.zoom_error"), error=True)
 
-    def sprache_wechseln(self, sprache):
-        """Sofort in der neuen Sprache: die Toolbox beschriftet sich neu (neu_beschriften), laufende Programme lesen
-        sie neu ein (Programm.neu_laden)."""
-        i18n.setzen(sprache)
-        # Beides erst, wenn der Klick fertig ist: set() speichert direkt nach on_change (sonst lesen die Programme noch
-        # die alte Sprache) und arbeitet danach noch mit der Einstellungsseite, die neu_beschriften ersetzt
-        self.after_idle(self.neu_beschriften)
+    def change_language(self, language):
+        """Immediately in the new language: the Toolbox relabels itself (relabel), running programs read it
+        again (Program.reload)."""
+        i18n.set_language(language)
+        # Both only once the click is done: set() saves right after on_change (otherwise the programs would still read
+        # the old language) and afterwards still works with the settings page that relabel replaces
+        self.after_idle(self.relabel)
         for tool in TOOLS:
-            if tool.programm and tool.programm.neu_laden:
-                self.after_idle(lambda p=tool.programm: self.run_async(p.neu_laden))
+            if tool.program and tool.program.reload:
+                self.after_idle(lambda p=tool.program: self.run_async(p.reload))
 
-    def neu_beschriften(self):
-        """Nach einem Sprachwechsel: Kopfleiste und Seitenleiste neu beschriften, alle Seiten neu bauen (Programmseiten
-        beim nächsten Anzeigen) – und wieder die Einstellungen zeigen, auf denen umgeschaltet wurde."""
-        namen_setzen()
+    def relabel(self):
+        """After a language change: relabel header and sidebar, rebuild all pages (program pages the next time they
+        are shown) – and show the settings again, where the switch happened."""
+        update_names()
         for category, button in self.tab_buttons.items():
-            button.configure(text=t(f"kategorie.{category.lower()}"))
-        self.github_tooltip.text = t("kopf.github")
+            button.configure(text=t(f"category.{category.lower()}"))
+        self.github_tooltip.text = t("header.github")
         if self.tray is not None:
             self.tray.update_menu()
         self.show_page(None)
         for page in self.pages.values():
             page.destroy()
         self.pages = {}
-        self.sidebar_fuellen(self.kategorie)
+        self.fill_sidebar(self.category)
         self.show_settings()
 
-    # --- Hilfen für Programmseiten ---
+    # --- Helpers for program pages ---
     def save(self):
         if save_settings(self.settings):
-            self.toast(t("toast.gespeichert"))
+            self.toast(t("toast.saved"))
         else:
-            self.toast(t("toast.speichern_fehlgeschlagen"), error=True)
+            self.toast(t("toast.save_failed"), error=True)
 
     def toast(self, text, error=False):
-        """Kurze Meldung oben rechts, verschwindet nach ein paar Sekunden."""
+        """Short message at the top right, disappears after a few seconds."""
         self.toast_label.configure(text=text, text_color=BAD if error else GOOD)
         if self.toast_job:
             self.after_cancel(self.toast_job)
         self.toast_job = self.after(2500, lambda: self.toast_label.configure(text=""))
 
     def run_async(self, func, on_done=None):
-        """func im Hintergrund ausführen (damit das Fenster nicht einfriert), on_done(ergebnis) danach im GUI-Thread."""
+        """Run func in the background (so the window doesn't freeze), on_done(result) afterwards in the GUI thread."""
         def worker():
             try:
                 result = func()
             except Exception:
-                logging.exception("Fehler in Hintergrundaufgabe")
+                logging.exception("Error in background task")
                 result = None
             if on_done:
                 self.ui_queue.put(lambda: on_done(result))
@@ -894,8 +896,8 @@ class ToolboxApp(ctk.CTk):
                 task = self.ui_queue.get_nowait()
                 if task == "show":
                     self.show_window()
-                elif isinstance(task, tuple) and task[0] == "show":         # ("show", programm-id)
-                    self.show_programm(task[1])
+                elif isinstance(task, tuple) and task[0] == "show":         # ("show", program id)
+                    self.show_program(task[1])
                     self.show_window()
                 elif task == "quit":
                     self.quit_app()
@@ -903,13 +905,13 @@ class ToolboxApp(ctk.CTk):
                 else:
                     try:
                         task()
-                    except Exception:            # ein Fehler darf die Warteschlange nicht anhalten
-                        logging.exception("Fehler nach einer Hintergrundaufgabe")
+                    except Exception:            # an error must not stop the queue
+                        logging.exception("Error after a background task")
         except queue.Empty:
             pass
         self.after(100, self.poll_queue)
 
-    # --- Schließen, Infobereich ---
+    # --- Close, notification area ---
     def on_close(self):
         if self.settings["close_to_tray"]:
             self.hide_to_tray()
@@ -917,23 +919,23 @@ class ToolboxApp(ctk.CTk):
             self.quit_app()
 
     def hide_to_tray(self):
-        self.scrollen.stop()
-        self.link_verstecken()
+        self.scrolling.stop()
+        self.hide_link()
         if self.current_page is not None:
-            self.current_page.on_hide()          # z. B. keine Status-Abfragen, solange das Fenster weg ist
+            self.current_page.on_hide()          # e.g. no status queries while the window is gone
         self.withdraw()
         if self.tray is None:
             try:
                 import pystray
                 menu = pystray.Menu(
-                    pystray.MenuItem(lambda item: t("tray.oeffnen"), lambda icon, item: self.ui_queue.put("show"),
+                    pystray.MenuItem(lambda item: t("tray.open"), lambda icon, item: self.ui_queue.put("show"),
                                      default=True),
-                    pystray.MenuItem(lambda item: t("tray.beenden"), lambda icon, item: self.ui_queue.put("quit")),
+                    pystray.MenuItem(lambda item: t("tray.quit"), lambda icon, item: self.ui_queue.put("quit")),
                 )
                 self.tray = pystray.Icon("toolbox", Image.open(ICON_FILE), "Toolbox", menu)
                 self.tray.run_detached()
             except Exception:
-                logging.exception("Tray-Symbol konnte nicht angelegt werden – Toolbox wird stattdessen beendet")
+                logging.exception("Tray icon could not be created – quitting the Toolbox instead")
                 self.quit_app()
 
     def show_window(self):
@@ -954,31 +956,31 @@ class ToolboxApp(ctk.CTk):
         self.stop_tray()
         self.destroy()
 
-    def neu_starten(self):
-        """Startet eine neue Toolbox und beendet diese. Die neue wartet mit --nach <pid>, bis diese wirklich zu ist –
-        sonst fände sie die alte noch laufend und holte nur deren Fenster nach vorne."""
+    def restart(self):
+        """Starts a new Toolbox and quits this one. The new one waits with --after <pid> until this one is really
+        closed – otherwise it would find the old one still running and only bring its window to the front."""
         exe = str(TOOLBOX_EXE) if TOOLBOX_EXE.exists() else winutil.pythonw_exe()
         try:
-            subprocess.Popen([exe, str(Path(__file__).resolve()), "--nach", str(os.getpid())],
+            subprocess.Popen([exe, str(Path(__file__).resolve()), "--after", str(os.getpid())],
                              cwd=str(ROOT), creationflags=winutil.CREATE_NO_WINDOW)
         except OSError:
-            logging.exception("Neue Toolbox konnte nicht gestartet werden")
-            self.toast(t("toast.neustart_fehler"), error=True)
+            logging.exception("New Toolbox could not be started")
+            self.toast(t("toast.restart_error"), error=True)
             return
         self.quit_app()
 
     def instance_server(self):
-        """Befehle über eine lokale Verbindung, je einer pro Verbindung, Antwort "ok":
-          show    ein zweiter Toolbox-Start holt damit dieses Fenster nach vorne
-          show <programm-id>   dasselbe, gleich auf der Seite dieses Programms (Zahnrad im Hardware-Monitor)
-          status  läuft die Toolbox? (setup.ps1 fragt vor dem Einrichten)
-          quit    beenden (setup.ps1, damit es runtime\\ erneuern bzw. löschen kann)"""
+        """Commands over a local connection, one per connection, answer "ok":
+          show    a second Toolbox start brings this window to the front with it
+          show <program id>   the same, right on this program's page (gear in the Hardware Monitor)
+          status  is the Toolbox running? (setup.ps1 asks before setting up)
+          quit    quit (setup.ps1, so it can renew or delete runtime\\)"""
         try:
             server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             server.bind(("127.0.0.1", GUI_PORT))
             server.listen()
         except OSError:
-            logging.warning("Port %s belegt – zweiter Start kann dieses Fenster nicht nach vorne holen", GUI_PORT)
+            logging.warning("Port %s in use – a second start can't bring this window to the front", GUI_PORT)
             return
         with server:
             while True:
@@ -1002,19 +1004,19 @@ class ToolboxApp(ctk.CTk):
 
 
 def main():
-    if "--nach" in sys.argv:                     # Neustart (neu_starten): erst warten, bis die alte Toolbox zu ist
+    if "--after" in sys.argv:                    # restart (restart()): first wait until the old Toolbox is closed
         try:
-            winutil.wait_for_exit(int(sys.argv[sys.argv.index("--nach") + 1]), timeout=10)
+            winutil.wait_for_exit(int(sys.argv[sys.argv.index("--after") + 1]), timeout=10)
         except (IndexError, ValueError):
             pass
     if bring_existing_to_front():
         return
-    # Eigene App-ID: sonst zeigt die Taskleiste das Python-Symbol statt des Toolbox-Symbols
+    # Own app ID: otherwise the taskbar shows the Python icon instead of the Toolbox icon
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Toolbox.Tools")
     try:
         ToolboxApp().mainloop()
     except Exception:
-        logging.exception("Unerwarteter Fehler")
+        logging.exception("Unexpected error")
         raise
 
 

@@ -1,0 +1,10 @@
+{
+  "id": "last_bastion",
+  "name": "Last Bastion",
+  "version": "0.1",
+  "category": "Games",
+  "description": "Real-time strategy survival: StarCraft's unit control, They Are Billions' hordes, Factorio's logistics – in 30-minute rounds. Still a concept (last_bastion).",
+  "page": "last_bastion_gui.py",
+  "script": "last_bastion.py",
+  "starter": "LastBastion.exe"
+}

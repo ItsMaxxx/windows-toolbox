@@ -1,0 +1,10 @@
+{
+  "id": "cube_game",
+  "name": "Cube Game",
+  "version": "0.1",
+  "category": "Games",
+  "description": "The game window itself is the arena – and it keeps shrinking. Shoot its edges to push them back out (cube_game).",
+  "page": "cube_game_gui.py",
+  "script": "cube_game.py",
+  "starter": "CubeGame.exe"
+}

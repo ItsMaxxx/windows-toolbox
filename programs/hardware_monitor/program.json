@@ -1,0 +1,22 @@
+{
+  "id": "hardware_monitor",
+  "name": "Hardware Monitor",
+  "version": "1.0",
+  "category": "General",
+  "description": "CPU and GPU temperature in the taskbar; a click on the icon shows almost all hardware values (hardware_monitor).",
+  "page": "hardware_monitor_gui.py",
+  "script": "hardware_monitor.py",
+  "starter": "HardwareMonitor.exe",
+  "port": 47815,
+  "task": "HardwareMonitor",
+  "downloads": [
+    {
+      "name": "LibreHardwareMonitor",
+      "version": "0.9.6",
+      "url": "https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/releases/download/v0.9.6/LibreHardwareMonitor.zip",
+      "sha256": "086D9F1B5A99E643EDC2CFAAAC16051685B551E4C5AC0B32A57C58C0E529C001",
+      "folder": "lhm",
+      "check_file": "LibreHardwareMonitorLib.dll"
+    }
+  ]
+}

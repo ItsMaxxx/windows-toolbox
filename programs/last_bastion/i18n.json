@@ -1,0 +1,56 @@
+{
+  "program.name": {
+    "de": "Last Bastion",
+    "en": "Last Bastion"
+  },
+  "program.description": {
+    "de": "Echtzeit-Strategie ums Überleben: Einheitensteuerung wie in StarCraft, Horden wie in They Are Billions, Logistik wie in Factorio – in Runden von 30 Minuten. Noch ein Konzept (last_bastion).",
+    "en": "Real-time strategy survival: StarCraft's unit control, They Are Billions' hordes, Factorio's logistics – in 30-minute rounds. Still a concept (last_bastion)."
+  },
+
+  "page.design": {
+    "de": "Design-Dokument",
+    "en": "Design document"
+  },
+  "page.design.hint": {
+    "de": "Das ganze Konzept in einer Datei: Säulen, Ablauf einer Runde, Wirtschaft, Gebäude, Einheiten, Zombies, Kartenerzeugung, Startbildschirm, Technik, Fahrplan für die Prototypen und offene Fragen. Es ist eine Markdown-Datei (DESIGN.md) – ergänze sie, sobald etwas entschieden ist.",
+    "en": "The whole concept in one file: pillars, how a round plays out, economy, buildings, units, zombies, map generation, home screen, tech, prototype roadmap and open questions. It's a Markdown file (DESIGN.md) – add to it whenever something gets decided."
+  },
+  "page.design.open": {
+    "de": "Design-Dokument öffnen",
+    "en": "Open design document"
+  },
+  "page.play": {
+    "de": "Spielen",
+    "en": "Play"
+  },
+  "page.play.hint": {
+    "de": "Noch gibt es keinen Prototyp – „Spielen“ zeigt bis dahin nur einen Hinweis. Sobald last_bastion.py das Spiel startet, startet dieser Knopf es.",
+    "en": "There's no prototype yet – until then, \"Play\" only shows a note. As soon as last_bastion.py starts the game, this button starts it."
+  },
+  "page.play.button": {
+    "de": "Spielen",
+    "en": "Play"
+  },
+  "page.advanced": {
+    "de": "Erweitert",
+    "en": "Advanced"
+  },
+  "page.open_folder": {
+    "de": "Ordner öffnen",
+    "en": "Open folder"
+  },
+  "page.start_failed": {
+    "de": "Last Bastion konnte nicht gestartet werden",
+    "en": "Last Bastion could not be started"
+  },
+
+  "placeholder.title": {
+    "de": "Last Bastion",
+    "en": "Last Bastion"
+  },
+  "placeholder.text": {
+    "de": "Noch gibt es keinen Prototyp.\n\nDas Konzept steht im Design-Dokument – der Knopf dafür ist auf der Seite von Last Bastion in der Toolbox.",
+    "en": "There's no prototype yet.\n\nThe concept is in the design document – its button is on Last Bastion's page in the toolbox."
+  }
+}

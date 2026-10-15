@@ -5,10 +5,10 @@ Sammlung kleiner, selbst geschriebener Windows-Tools mit einer gemeinsamen Oberf
 | Teil | Ordner | Was es macht |
 |---|---|---|
 | **Toolbox** (GUI) | `toolbox/` | Oberfläche für alle Tools: Tabs oben, Programmliste links, Einstellungen rechts, Zahnrad für die GUI selbst |
-| **Hardware-Monitor** | `programme/hardware_monitor/` | CPU- und GPU-Temperatur als Zahlen in der Taskleiste; Klick öffnet ein Fenster mit Hardware-Werten in Tabs und allen Hardwaredaten (Hersteller-/Produkt-IDs, Seriennummern) ([README](programme/hardware_monitor/README.md)) |
-| **Discord Plus** | `programme/discord_plus/` | Erweiterungen für Discord – bisher der Call-Status: zeigt „Im Call“ an, sobald du telefonierst oder in einem Voice-Chat bist – auch für Freunde ohne Zugriff auf Server oder Anruf; Einrichtung mit Anleitung auf der Toolbox-Seite ([README](programme/discord_plus/README.md)) |
-| **Cube Game** | `programme/cube_game/` | Arena-Shooter: Das Spielfenster schrumpft ständig, Schüsse gegen seine Ränder drücken sie wieder auf (WASD + Maus) ([README](programme/cube_game/README.md)) |
-| **Last Bastion** | `programme/last_bastion/` | Konzept für ein Echtzeit-Strategiespiel (StarCraft × They Are Billions × Factorio); die Toolbox-Seite öffnet das Design-Dokument ([README](programme/last_bastion/README.md), [DESIGN](programme/last_bastion/DESIGN.md)) |
+| **Hardware-Monitor** | `programs/hardware_monitor/` | CPU- und GPU-Temperatur als Zahlen in der Taskleiste; Klick öffnet ein Fenster mit Hardware-Werten in Tabs und allen Hardwaredaten (Hersteller-/Produkt-IDs, Seriennummern) ([README](programs/hardware_monitor/README.md)) |
+| **Discord Plus** | `programs/discord_plus/` | Erweiterungen für Discord – bisher der Call-Status: zeigt „Im Call“ an, sobald du telefonierst oder in einem Voice-Chat bist – auch für Freunde ohne Zugriff auf Server oder Anruf; Einrichtung mit Anleitung auf der Toolbox-Seite ([README](programs/discord_plus/README.md)) |
+| **Cube Game** | `programs/cube_game/` | Arena-Shooter: Das Spielfenster schrumpft ständig, Schüsse gegen seine Ränder drücken sie wieder auf (WASD + Maus) ([README](programs/cube_game/README.md)) |
+| **Last Bastion** | `programs/last_bastion/` | Konzept für ein Echtzeit-Strategiespiel (StarCraft × They Are Billions × Factorio); die Toolbox-Seite öffnet das Design-Dokument ([README](programs/last_bastion/README.md), [DESIGN](programs/last_bastion/DESIGN.md)) |
 
 Jedes Tool hat in seinem Ordner eine eigene `README.md` mit Einrichtung, Bedienung und Technik.
 
@@ -22,55 +22,55 @@ windows-toolbox/
 ├─ __init__.py            damit Zed die Skripte als Modul starten kann (Play-Button)
 ├─ requirements.txt       Python-Pakete mit festen Versionen
 ├─ runtime/               wegwerfbar: eigenes Python mit Paketen (legt Setup.exe an)
-├─ daten/                 gehört dir: toolbox.json, eine <programm>.json je Programm, installiert.json, logs/
+├─ data/                 gehört dir: toolbox.json, eine <programm>.json je Programm, installed.json, logs/
 ├─ setup/
 │  ├─ setup.ps1           was Setup.exe und Uninstall.exe machen
-│  ├─ setup_exe.cs        Quelltext von Setup.exe und Uninstall.exe (neu bauen: setup_exe_bauen.ps1)
+│  ├─ setup_exe.cs        Quelltext von Setup.exe und Uninstall.exe (neu bauen: build_setup_exe.ps1)
 │  ├─ starter.cs          Vorlage für die Starter-.exe (Toolbox.exe, HardwareMonitor.exe, …)
-│  ├─ argumente.cs        gemeinsamer Teil von setup_exe.cs und starter.cs (Argumente weiterreichen)
-│  └─ exe_anlegen.py      runtime\Toolbox.exe / runtime\HardwareMonitor.exe: pythonw.exe mit eigenem Namen und Symbol
+│  ├─ arguments.cs        gemeinsamer Teil von setup_exe.cs und starter.cs (Argumente weiterreichen)
+│  └─ make_exe.py      runtime\Toolbox.exe / runtime\HardwareMonitor.exe: pythonw.exe mit eigenem Namen und Symbol
 ├─ toolbox/
-│  ├─ programm.json       Ausweis der Toolbox (Version, Skript, Starter, Port)
+│  ├─ program.json       Ausweis der Toolbox (Version, Skript, Starter, Port)
 │  ├─ toolbox.py          Hauptfenster; findet die Programme automatisch
 │  ├─ base.py             Baukasten für Programmseiten (Section, Text, Choice, Slider, …)
 │  ├─ winutil.py          Windows-Helfer (UAC, Aufgabenplanung)
-│  ├─ daten.py            wo Einstellungen und Logs liegen (daten/), Lesen und Schreiben
+│  ├─ storage.py            wo Einstellungen und Logs liegen (data/), Lesen und Schreiben
 │  ├─ i18n.py             Sprachen: Texte aus der i18n.json eines Programms in der gewählten Sprache (t("id"))
 │  ├─ i18n.json           alle Texte der Toolbox und des Setup-Fensters (je ID eine Zeile pro Sprache)
-│  ├─ sprachen.json       welche Sprachen es gibt (Code und Name) – daraus bauen Toolbox und Setup ihre Auswahl
+│  ├─ languages.json       welche Sprachen es gibt (Code und Name) – daraus bauen Toolbox und Setup ihre Auswahl
 │  ├─ toolbox.ico         Symbol der Toolbox (blauer Werkzeugkoffer) – auch für Setup.exe und Uninstall.exe
-│  └─ programm.ico        Standardsymbol der Programme (⚒ auf Grün), z. B. für den Hardware-Monitor
-└─ programme/
-   ├─ cube_game/                   Spiel (pygame-ce) – Aufbau siehe programme/cube_game/README.md
+│  └─ program.ico        Standardsymbol der Programme (⚒ auf Grün), z. B. für den Hardware-Monitor
+└─ programs/
+   ├─ cube_game/                   Spiel (pygame-ce) – Aufbau siehe programs/cube_game/README.md
    ├─ last_bastion/                Spielkonzept (Echtzeit-Strategie) – Design-Dokument DESIGN.md, Aufbau siehe README.md
-   ├─ discord_plus/                Erweiterungen für Discord (Call-Status) – Aufbau siehe programme/discord_plus/README.md
+   ├─ discord_plus/                Erweiterungen für Discord (Call-Status) – Aufbau siehe programs/discord_plus/README.md
    └─ hardware_monitor/            ein Programm = ein Ordner, alles darin
-      ├─ programm.json             Ausweis: Name, Tab, Beschreibung, Version, Skript, Starter, Port, Aufgabe, Downloads
+      ├─ program.json             Ausweis: Name, Tab, Beschreibung, Version, Skript, Starter, Port, Aufgabe, Downloads
       ├─ HardwareMonitor.exe       Starter (legt Setup.exe an)
       ├─ hardware_monitor.py       Hardware-Monitor (läuft eigenständig): Sensoren, Tray-Icons, IPC
-      ├─ detailfenster_inhalt.py   WAS im Detailfenster steht – hier passt du das Fenster an
-      ├─ detailfenster.py          baut das Detailfenster daraus (wie base.py bei der Toolbox)
-      ├─ hardwaredaten.py          liest Hersteller, Modelle, IDs und Seriennummern für den Tab „Hardwaredaten“
+      ├─ detail_window_content.py   WAS im Detailfenster steht – hier passt du das Fenster an
+      ├─ detail_window.py          baut das Detailfenster daraus (wie base.py bei der Toolbox)
+      ├─ hardware_data.py          liest Hersteller, Modelle, IDs und Seriennummern für den Tab „Hardwaredaten“
       ├─ hardware_monitor_gui.py   seine Seite in der Toolbox
-      ├─ hardware_monitor_einstellungen.py   Startwerte, Laden/Speichern – gemeinsam für Monitor und Seite
+      ├─ hardware_monitor_settings.py   Startwerte, Laden/Speichern – gemeinsam für Monitor und Seite
       ├─ i18n.json                 alle Texte auf Deutsch und Englisch (je ID eine Zeile pro Sprache)
-      └─ lhm/                      LibreHardwareMonitor (Download aus programm.json, nicht im Repo)
+      └─ lhm/                      LibreHardwareMonitor (Download aus program.json, nicht im Repo)
 ```
 
-Die Aufteilung folgt einer einfachen Regel: **Code** (`toolbox/`, `programme/`, `setup/`) kommt aus dem Repo,
-**`runtime/`** lässt sich jederzeit löschen und neu einrichten, **`daten/`** gehört dir:
+Die Aufteilung folgt einer einfachen Regel: **Code** (`toolbox/`, `programs/`, `setup/`) kommt aus dem Repo,
+**`runtime/`** lässt sich jederzeit löschen und neu einrichten, **`data/`** gehört dir:
 
 ```
-daten/
+data/
 ├─ toolbox.json              Einstellungen der Toolbox – auch die Sprache (gilt für alle Programme)
 ├─ hardware_monitor.json     Einstellungen des Hardware-Monitors
-├─ installiert.json          welche Programme eingerichtet sind (schreibt Setup.exe)
+├─ installed.json          welche Programme eingerichtet sind (schreibt Setup.exe)
 └─ logs/
    ├─ toolbox.log
    └─ hardware_monitor.log
 ```
 
-Zum Sichern oder Umziehen der Einstellungen reicht `daten/`.
+Zum Sichern oder Umziehen der Einstellungen reicht `data/`.
 
 ## Einrichtung
 
@@ -83,7 +83,7 @@ Editor öffnen). Es läuft ohne Adminrechte und fragt nur für Schritt 6 einmal 
 
 Zuerst fragt ein kleines Fenster nach der **Sprache** (Deutsch/Englisch, vorausgewählt: die von Windows; später
 änderbar in der Toolbox unter ⚙ → *Darstellung*) und **welche Programme** eingerichtet werden sollen: Die Toolbox ist immer dabei, die
-übrigen per Kästchen (oder *Alle auswählen*). Die Auswahl landet in `daten\installiert.json`; die Toolbox zeigt links
+übrigen per Kästchen (oder *Alle auswählen*). Die Auswahl landet in `data\installed.json`; die Toolbox zeigt links
 nur diese Programme. Fehlt die Datei (Einrichtung von vor dieser Auswahl), gelten alle als eingerichtet. Darunter
 zwei Kästchen für **Verknüpfungen** „Windows Toolbox“ – *auf dem Desktop* und *im Startmenü* (beim ersten Einrichten
 aus; Häkchen weg löscht sie wieder). Danach:
@@ -93,16 +93,16 @@ aus; Häkchen weg löscht sie wieder). Danach:
 2. kopiert es nach `runtime\` (ohne Doku und Tests, ~90 MB) und installiert dort die Pakete aus `requirements.txt` in
    **festen Versionen** – dieses Python nutzt nur, was in `runtime\` liegt, nichts aus dem installierten Python oder
    `%APPDATA%\Python`,
-3. legt für jedes gewählte Programm (laut seiner `programm.json`) zwei `.exe` an:
+3. legt für jedes gewählte Programm (laut seiner `program.json`) zwei `.exe` an:
    - den **Starter** zum Doppelklicken – `Toolbox.exe` im Hauptordner, `HardwareMonitor.exe` im Programmordner. Er
      findet `runtime\` und sein Skript relativ zum eigenen Ort, braucht also keine Argumente und funktioniert (samt
      Verknüpfungen) auch nach dem Verschieben. Übersetzt wird er aus `setup\starter.cs` mit `csc.exe`, dem
      C#-Compiler, den Windows im .NET Framework mitbringt.
    - eine Kopie von `pythonw.exe` mit eigener Dateibeschreibung und eigenem Symbol in `runtime\`
-     (`setup\exe_anlegen.py`), die der Starter aufruft – damit die Programme im Task-Manager als „Toolbox“ und
+     (`setup\make_exe.py`), die der Starter aufruft – damit die Programme im Task-Manager als „Toolbox“ und
      „Hardware-Monitor“ erscheinen statt als „Python“,
-4. lädt die Downloads aus den `programm.json` (feste Version, Prüfsumme wird kontrolliert), z. B. LibreHardwareMonitor
-   0.9.6 nach `programme\hardware_monitor\lhm\`,
+4. lädt die Downloads aus den `program.json` (feste Version, Prüfsumme wird kontrolliert), z. B. LibreHardwareMonitor
+   0.9.6 nach `programs\hardware_monitor\lhm\`,
 5. legt die angehakten Verknüpfungen auf `Toolbox.exe` an (ohne Fenster, z. B. nach einem Update, bleiben sie, wie
    sie sind – zeigt eine nach dem Verschieben ins Leere, wird sie repariert),
 6. nur mit Hardware-Monitor: holt **einmal** Adminrechte (UAC-Abfrage) und installiert damit PawnIO (Treiber für
@@ -115,21 +115,21 @@ z. B. nach einem `git pull` (neue Pakete) oder **nach dem Verschieben des Ordner
 eingerichtet. Mit `-OhneAdmin` (im Terminal: `Setup.exe -OhneAdmin`) entfallen Schritt 6 und 7.
 
 **Programme einzeln installieren und entfernen**: In der Toolbox unter Zahnrad → *Programme* – je Programm ein Knopf
-*Installieren* bzw. *Entfernen*. Das ruft `Setup.exe -Programme <id>` bzw. `Uninstall.exe -Programme <id>` auf
+*Installieren* bzw. *Entfernen*. Das ruft `Setup.exe -Programs <id>` bzw. `Uninstall.exe -Programs <id>` auf
 (geht auch von Hand im Terminal, mehrere mit Komma). Entfernen beendet das Programm, löscht seine Aufgabe, den Starter
-und die Downloads; der Code bleibt im Repo, die Einstellungen in `daten\` auch. Wer im Auswahlfenster von `Setup.exe`
+und die Downloads; der Code bleibt im Repo, die Einstellungen in `data\` auch. Wer im Auswahlfenster von `Setup.exe`
 ein Häkchen wegnimmt, entfernt das Programm genauso.
 
 **`Setup.exe` und `Uninstall.exe`** liegen als einzige `.exe` fertig gebaut im Repo – nach dem Klonen gibt es ja noch
 nichts, was sie bauen könnte. Es sind kleine C#-Programme aus `setup\setup_exe.cs` (nach einer Änderung dort mit
-`setup\setup_exe_bauen.ps1` neu bauen und mit committen). Mit `git clone` geholt, starten sie ohne Rückfrage. Lädt man
+`setup\build_setup_exe.ps1` neu bauen und mit committen). Mit `git clone` geholt, starten sie ohne Rückfrage. Lädt man
 das Repo dagegen als ZIP herunter, kann Windows SmartScreen beim ersten Start warnen („Der Computer wurde durch
 Windows geschützt“, weil die `.exe` nicht signiert ist) – dann *Weitere Informationen → Trotzdem ausführen*.
 
 **Toolbox starten**: Doppelklick auf `Toolbox.exe` – oder die Verknüpfung „Windows Toolbox“ auf dem Desktop bzw. im
 Startmenü (Kästchen in `Setup.exe`).
 Den Hardware-Monitor startest du über die Toolbox (Windows fragt dabei nach Adminrechten) oder
-`programme\hardware_monitor\HardwareMonitor.exe` (dann ohne Adminrechte, also ohne CPU-Werte). Autostart beim
+`programs\hardware_monitor\HardwareMonitor.exe` (dann ohne Adminrechte, also ohne CPU-Werte). Autostart beim
 Anmelden ist nach dem Einrichten aus – einschalten in der Toolbox auf der Seite Hardware-Monitor; dann startet ihn
 auch „Starten“ ohne Nachfrage.
 
@@ -139,7 +139,7 @@ registriert sein), die geplante Aufgabe (speichert Windows selbst) und die Verkn
 biegt `Setup.exe` dabei auf den neuen Ort um.
 
 **Feste Versionen**: Jeder PC bekommt dieselbe Python-Version (`$PythonVersion` in `setup\setup.ps1`), dieselben
-Pakete (`requirements.txt`, mit `==`) und dieselben Downloads (Version und Prüfsumme in `programm.json`). Ein neues
+Pakete (`requirements.txt`, mit `==`) und dieselben Downloads (Version und Prüfsumme in `program.json`). Ein neues
 Release irgendwo kann so nichts kaputtmachen. Neue Versionen übernimmt man bewusst: in `runtime\` installieren,
 testen, dann mit `runtime\python.exe -m pip freeze` in `requirements.txt` eintragen.
 
@@ -148,9 +148,9 @@ testen, dann mit `runtime\python.exe -m pip freeze` in `requirements.txt` eintra
 
 **Aktualisieren**: In den Einstellungen der Toolbox (Zahnrad → *Aktualisieren*). Das holt den neuesten Stand von
 GitHub (`git pull`, nur als Fast-Forward – eigene Änderungen werden nie überschrieben; passen sie nicht dazu, bricht
-es mit einer Meldung ab) und führt danach `Setup.exe -Neustart` aus (ohne Auswahlfenster): Pakete auf den neuen
+es mit einer Meldung ab) und führt danach `Setup.exe -Restart` aus (ohne Auswahlfenster): Pakete auf den neuen
 Stand bringen, die Toolbox und die eingerichteten Programme mit dem neuen Code neu starten. Neue Programme aus dem
-Update erscheinen unter *Programme* zum Installieren. Von Hand geht dasselbe mit `git pull` und `Setup.exe -Neustart`.
+Update erscheinen unter *Programme* zum Installieren. Von Hand geht dasselbe mit `git pull` und `Setup.exe -Restart`.
 Aktualisiert wird immer alles auf einmal – der Code aller Programme kommt mit demselben `git pull`.
 
 Läuft die Toolbox beim Einrichten, wird sie vorher beendet (sie hält sonst Dateien in `runtime\` fest) und am Ende
@@ -169,13 +169,13 @@ entfernen* oben.
 ## Prüfen
 
 ```
-runtime\python.exe programme\hardware_monitor\hardware_monitor.py --list
+runtime\python.exe programs\hardware_monitor\hardware_monitor.py --list
 ```
 listet alle Sensoren auf. Läuft das im Admin-Terminal und zeigt bei der CPU echte Temperaturen, funktioniert alles.
 
 ## Detailfenster anpassen
 
-Was im Fenster steht, steht in `programme/hardware_monitor/detailfenster_inhalt.py` – Tab für Tab, eine Zeile pro Wert:
+Was im Fenster steht, steht in `programs/hardware_monitor/detail_window_content.py` – Tab für Tab, eine Zeile pro Wert:
 ```python
 Tab("tab.gpu",                                     # Titel: ID aus i18n.json (Text je Sprache)
     Gruppe("gpu",
@@ -187,8 +187,8 @@ Wert hinzufügen = Zeile schreiben, Wert weglassen = Zeile löschen. Die genauen
 
 ## Neues Tool hinzufügen
 
-1. Ordner `programme/<name>/` anlegen, darin das Programm.
-2. Daneben den Ausweis `programm.json`:
+1. Ordner `programs/<name>/` anlegen, darin das Programm.
+2. Daneben den Ausweis `program.json`:
    ```json
    {
      "id": "mein",
@@ -202,11 +202,11 @@ Wert hinzufügen = Zeile schreiben, Wert weglassen = Zeile löschen. Die genauen
    }
    ```
    `kategorie` ist der Tab oben (Allgemein oder Games – `CATEGORIES` in
-   `toolbox.py`). `skript` und `starter` braucht es nur, wenn das Tool ein eigenes Programm hat – `Setup.exe` legt dann `MeinProgramm.exe` an – mit dem grünen ⚒ (`toolbox/programm.ico`), oder mit eigenem
+   `toolbox.py`). `skript` und `starter` braucht es nur, wenn das Tool ein eigenes Programm hat – `Setup.exe` legt dann `MeinProgramm.exe` an – mit dem grünen ⚒ (`toolbox/program.ico`), oder mit eigenem
    Symbol über `"symbol": "mein.ico"`. Braucht es etwas zum Herunterladen, kommt das als `downloads` dazu (Vorbild:
-   `programme/hardware_monitor/programm.json`).
+   `programs/hardware_monitor/program.json`).
 3. Die Seite für die GUI (`seite`) wird mit den Bausteinen aus `toolbox/base.py` nur beschrieben, Laden und Speichern
-   der Einstellungen übernimmt die Toolbox – automatisch in `daten/<id>.json`:
+   der Einstellungen übernimmt die Toolbox – automatisch in `data/<id>.json`:
    ```python
    from base import Choice, Section, Text, ToolPage
 
@@ -227,14 +227,14 @@ Wert hinzufügen = Zeile schreiben, Wert weglassen = Zeile löschen. Die genauen
    Läuft das Tool als eigenes Programm weiter (wie der Hardware-Monitor), zusätzlich
    `PROGRAMM = Programm(laeuft, beenden, starten)` angeben – dann beenden bzw. starten es
    „Toolbox und alle Programme“ in den Toolbox-Einstellungen automatisch mit.
-4. Eine `programme/<name>/README.md` anlegen (was das Tool macht, Einrichtung, Bedienung, Einstellungen, Technik –
-   Vorbild ist `programme/hardware_monitor/README.md`) und das Tool oben in der Tabelle eintragen.
-5. Fertig – die Toolbox findet jede `programme/*/programm.json` beim Start automatisch, sortiert wird alphabetisch.
+4. Eine `programs/<name>/README.md` anlegen (was das Tool macht, Einrichtung, Bedienung, Einstellungen, Technik –
+   Vorbild ist `programs/hardware_monitor/README.md`) und das Tool oben in der Tabelle eintragen.
+5. Fertig – die Toolbox findet jede `programs/*/program.json` beim Start automatisch, sortiert wird alphabetisch.
 
 ## Technisches
 
-- **Einstellungen**: eine `.json` je Programm in `daten/` (`toolbox.json`, `hardware_monitor.json`, …), **Fehler** in
-  `daten/logs/` (ignoriert git).
+- **Einstellungen**: eine `.json` je Programm in `data/` (`toolbox.json`, `hardware_monitor.json`, …), **Fehler** in
+  `data/logs/` (ignoriert git).
 - **Starter**: Der Starter (`Toolbox.exe` usw.) startet `runtime\<Name>.exe` mit dem Skript und beendet sich sofort –
   im Task-Manager steht danach nur das Programm. Zusätzliche Argumente reicht er weiter, und wird er mit Adminrechten
   gestartet (Aufgabe, UAC), läuft auch das Programm mit Adminrechten.
@@ -242,7 +242,7 @@ Wert hinzufügen = Zeile schreiben, Wert weglassen = Zeile löschen. Die genauen
   Verbindung auf `127.0.0.1:47815` (Befehle `status`, `reload`, `quit`). Die GUI selbst lauscht auf Port `47816`
   (`show`, `status`, `quit`): ein zweiter Start holt damit nur das vorhandene Fenster nach vorne, `setup.ps1` beendet
   sie damit vor dem Einrichten bzw. Entfernen. `show hardware_monitor` schickt das ⚙ im Detailfenster des Monitors –
-  die Toolbox zeigt dann dessen Seite. Beide Ports stehen als `"port"` in der jeweiligen `programm.json` –
+  die Toolbox zeigt dann dessen Seite. Beide Ports stehen als `"port"` in der jeweiligen `program.json` –
   daraus lesen sie Python und `setup.ps1`, ebenso den Namen der Autostart-Aufgabe (`"aufgabe"`).
 - **Sparsam**: Bei geschlossenem oder minimiertem Detailfenster liest der Monitor nur CPU und GPU, bei offenem Fenster
   nur die Geräte des gewählten Tabs; Raten im Rechtsklick-Menü oder in der GUI.

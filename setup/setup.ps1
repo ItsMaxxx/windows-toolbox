@@ -1,431 +1,429 @@
 ﻿<#
-Einrichten und Entfernen der windows-toolbox. Aufgerufen von Setup.exe bzw. Uninstall.exe im Hauptordner – kleine
-Starter aus setup\setup_exe.cs, die fertig im Repo liegen (ein Doppelklick auf eine .ps1 würde sie nur im Editor
-öffnen). Neu bauen nach einer Änderung an setup_exe.cs: setup\setup_exe_bauen.ps1.
+Setting up and removing the windows-toolbox. Called by Setup.exe or Uninstall.exe in the main folder – small
+starters from setup\setup_exe.cs that are in the repo ready-made (double-clicking a .ps1 would only open it in the
+editor). Rebuild after a change to setup_exe.cs: setup\build_setup_exe.ps1.
 
-Welche Programme es gibt, steht in den Ausweisen: toolbox\programm.json und programme\<programm>\programm.json
-(Name, Version, Skript, Starter-.exe, Downloads). Die Schritte 3 und 4 gelten für jedes eingerichtete Programm.
+Which programs exist is in the manifests: toolbox\program.json and programs\<program>\program.json
+(name, version, script, starter .exe, downloads). Steps 3 and 4 apply to every installed program.
 
-Welche Programme eingerichtet sind, steht in daten\installiert.json (ohne die Toolbox – die ist immer dabei). Fehlt
-die Datei, gelten alle als eingerichtet: So war es, bevor man wählen konnte – und beim ersten Einrichten sind damit
-alle vorausgewählt. Die Toolbox liest dieselbe Datei und zeigt nur eingerichtete Programme.
+Which programs are installed is in data\installed.json (without the Toolbox – it is always included). If the file
+is missing, all count as installed: that's how it was before you could choose – and on the first setup all are
+preselected this way. The Toolbox reads the same file and only shows installed programs.
 
-Einrichten (ohne Parameter) – erst ein kleines Fenster: welche Sprache (aus toolbox\sprachen.json, vorausgewählt: die
-gespeicherte bzw. die von Windows – landet in daten\toolbox.json) und welche Programme? (Abgewählte, die eingerichtet
-waren, werden entfernt.) Danach alles, was nach dem Klonen fehlt:
-  1. Python $PythonVersion finden (oder per winget installieren) – genau diese Version, keine ältere oder neuere
-  2. runtime\ anlegen: eigenes Python im Projektordner, mit den Paketen aus requirements.txt (feste Versionen)
-  3. je Programm zwei .exe:
-       - runtime\<Name>.exe: Kopie von pythonw.exe mit eigenem Namen und Symbol, damit es im Task-Manager als eigenes
-         Programm erscheint statt als „Python“ (setup\exe_anlegen.py)
-       - der Starter (Toolbox.exe im Hauptordner, HardwareMonitor.exe im Programmordner): startet die Kopie mit dem
-         Skript, alle Pfade relativ – Doppelklick und Verknüpfungen funktionieren auch nach dem Verschieben
-         (setup\starter.cs, übersetzt mit csc.exe aus dem .NET Framework von Windows)
-  4. je Programm die Downloads aus programm.json (feste Version, Prüfsumme), z. B. LibreHardwareMonitor nach
-     programme\hardware_monitor\lhm\
-  5. Verknüpfungen „$VerknuepfungName“ auf Toolbox.exe – auf dem Desktop und im Startmenü, je nach Kästchen im
-     Fenster (Häkchen weg: gelöscht). Ohne Fenster („Neu einrichten“, „Aktualisieren“) bleiben sie, wie sie sind;
-     nur eine, die nach dem Verschieben des Ordners ins Leere zeigt, zeigt danach wieder hierher. Eine, die man selbst
-     gelöscht oder woandershin verschoben hat, kommt nicht wieder (zurückholen: Kästchen im Fenster).
-  6. nur mit Hardware-Monitor, mit einer UAC-Abfrage: PawnIO installieren und die geplante Aufgabe HardwareMonitor
-     einrichten
-  7. alles wie vorher: Was Einrichten anfassen könnte, wird ganz am Anfang gemerkt und am Ende wiederhergestellt –
-     auch wenn unterwegs etwas abbricht (Zustand-Merken / Zustand-Abgleichen): Autostart an/aus, ob der
-     Hardware-Monitor lief (dann läuft er danach wieder, mit dem neuen Code), die Einstellungsdateien in daten\.
-     Programme ohne Adminrechte (z. B. Discord Plus) werden vorher beendet und laufen danach wieder, wenn sie
-     liefen; ihr Autostart-Eintrag (HKCU\...\Run) zeigt nach dem Verschieben des Ordners wieder hierher.
-     Ein Update ändert so nie etwas, das man selbst eingestellt hat.
-  Jeder Schritt prüft vorher, ob er schon erledigt ist – Einrichten lässt sich also jederzeit erneut ausführen,
-  z. B. nach dem Verschieben des Ordners (dann wird nur die Aufgabe neu eingerichtet) oder nach einem git pull.
-  Eine laufende Toolbox wird dafür beendet und am Ende wieder gestartet – mit der neuen Auswahl.
+Set up (without parameters) – first a small window: which language (from toolbox\languages.json, preselected: the
+saved one or that of Windows – ends up in data\toolbox.json) and which programs? (Deselected ones that were
+installed are removed.) Then everything that is missing after cloning:
+  1. find Python $PythonVersion (or install it via winget) – exactly this version, no older or newer one
+  2. create runtime\: our own Python in the project folder, with the packages from requirements.txt (fixed versions)
+  3. two .exe files per program:
+       - runtime\<Name>.exe: copy of pythonw.exe with its own name and icon, so it appears in the Task Manager as its
+         own program instead of as "Python" (setup\make_exe.py)
+       - the starter (Toolbox.exe in the main folder, HardwareMonitor.exe in the program folder): starts the copy with
+         the script, all paths relative – double-click and shortcuts still work after moving the folder
+         (setup\starter.cs, compiled with csc.exe from the .NET Framework of Windows)
+  4. per program the downloads from program.json (fixed version, checksum), e.g. LibreHardwareMonitor into
+     programs\hardware_monitor\lhm\
+  5. shortcuts "$ShortcutName" to Toolbox.exe – on the desktop and in the Start menu, depending on the checkboxes in
+     the window (unchecked: deleted). Without the window ("Set up again", "Update") they stay as they are;
+     only one that points into nowhere after moving the folder points here again afterwards. One that you deleted
+     yourself or moved somewhere else doesn't come back (to bring it back: checkbox in the window).
+  6. only with the Hardware Monitor, with a UAC prompt: install PawnIO and set up the scheduled task HardwareMonitor
+  7. everything as before: whatever setting up might touch is noted at the very beginning and restored at the end –
+     even if something aborts on the way (Save-State / Restore-State): autostart on/off, whether the
+     Hardware Monitor was running (then it runs again afterwards, with the new code), the settings files in data\.
+     Programs without admin rights (e.g. Discord Plus) are quit beforehand and run again afterwards if they
+     were running; their autostart entry (HKCU\...\Run) points here again after moving the folder.
+     So an update never changes anything you set yourself.
+  Every step checks first whether it is already done – so setting up can be run again anytime,
+  e.g. after moving the folder (then only the task is set up again) or after a git pull.
+  A running Toolbox is quit for it and started again at the end – with the new selection.
 
-  -Programme <ids>  diese Programme zusätzlich einrichten, ohne Fenster (mit Komma getrennt, z. B.
-                    -Programme hardware_monitor – so ruft „Installieren“ in der Toolbox das Skript auf).
-                    Schritte 3–7 dann nur für diese; 1–2 (Python, runtime\) brauchen alle, die laufen immer.
-  -OhneAdmin        nur Schritte 1–5, ohne UAC-Abfrage
-  -Neustart         ohne Fenster, die eingerichteten Programme wie bisher; lief der Hardware-Monitor, ihn in
-                    Schritt 7 auf jeden Fall neu starten, damit er neuen Code lädt (nach einem Update –
-                    „Aktualisieren“ und „Neu einrichten“ in den Toolbox-Einstellungen übergeben das)
+  -Programs <ids>   set up these programs in addition, without the window (comma-separated, e.g.
+                    -Programs hardware_monitor – that's how "Install" in the Toolbox calls the script).
+                    Steps 3–7 then only for these; 1–2 (Python, runtime\) are needed by all, they always run.
+  -NoAdmin          only steps 1–5, without UAC prompt
+  -Restart          without the window, the installed programs as before; if the Hardware Monitor was running,
+                    restart it in step 7 in any case so it loads new code (after an update –
+                    "Update" and "Set up again" in the Toolbox settings pass this)
 
--Entfernen – das Gegenstück: Toolbox und alle Programme beenden, Aufgabe, Autostart-Einträge und Verknüpfungen
-  löschen, auf Wunsch
-  alles Erzeugte und Heruntergeladene löschen (runtime\, Starter, Downloads). daten\ bleibt.
-  PawnIO bleibt installiert, weil es auch andere Programme nutzen (entfernen: winget uninstall namazso.PawnIO).
-  Mit -Programme <ids> nur diese Programme: beenden, Aufgabe bzw. Autostart löschen, Starter und Downloads löschen, aus
-  daten\installiert.json streichen – ohne Rückfrage („Entfernen“ in der Toolbox fragt vorher selbst).
+-Uninstall – the counterpart: quit the Toolbox and all programs, delete task, autostart entries and shortcuts,
+  on request
+  delete everything generated and downloaded (runtime\, starters, downloads). data\ stays.
+  PawnIO stays installed because other programs use it too (to remove: winget uninstall namazso.PawnIO).
+  With -Programs <ids> only these programs: quit, delete task or autostart, delete starter and downloads, remove
+  from data\installed.json – without asking ("Remove" in the Toolbox asks itself beforehand).
 
--Admin <Schritte> – intern: der Teil mit Adminrechten. Das Skript startet sich dafür selbst nach einer UAC-Abfrage
-  noch einmal (Schritte, mit Komma getrennt: pawnio, aufgabe, autostart-an, autostart-aus, monitor-starten,
-  aufgabe-loeschen).
+-Admin <steps> – internal: the part with admin rights. The script starts itself again for it after a UAC prompt
+  (steps, comma-separated: pawnio, task, autostart-on, autostart-off, monitor-start, task-delete).
 
-Aufteilung des Ordners: Code = Repo (toolbox\, programme\, setup\), runtime\ = wegwerfbar (Python und Pakete –
-lässt sich jederzeit neu einrichten), daten\ = Einstellungen (eine .json je Programm) und Logs.
+Layout of the folder: code = repo (toolbox\, programs\, setup\), runtime\ = disposable (Python and packages –
+can be set up again anytime), data\ = settings (one .json per program) and logs.
 #>
-param([switch]$Entfernen, [string]$Programme, [switch]$OhneAdmin, [switch]$Neustart, [string]$Admin)
+param([switch]$Uninstall, [string]$Programs, [switch]$NoAdmin, [switch]$Restart, [string]$Admin)
 
 $ErrorActionPreference = 'Stop'
-$ProgressPreference = 'SilentlyContinue'         # Fortschrittsbalken bremsen Invoke-WebRequest stark aus
+$ProgressPreference = 'SilentlyContinue'         # progress bars slow Invoke-WebRequest down a lot
 
 $Root       = Split-Path -Parent $PSScriptRoot
 $Runtime    = Join-Path $Root 'runtime'
 $RuntimePy  = Join-Path $Runtime 'python.exe'
-$Symbol     = Join-Path $Root 'toolbox\programm.ico'   # Standardsymbol der Programme (⚒ auf Grün); die Toolbox hat
-                                                     # ihr eigenes ("symbol" in toolbox\programm.json)
+$Icon       = Join-Path $Root 'toolbox\program.ico'    # default icon of the programs (⚒ on green); the Toolbox has
+                                                     # its own ("icon" in toolbox\program.json)
 $Csc        = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 
-# Name der Verknüpfungen auf Toolbox.exe (Desktop, Startmenü – Schritt 5)
-$VerknuepfungName = 'Windows Toolbox'
+# Name of the shortcuts to Toolbox.exe (desktop, Start menu – step 5)
+$ShortcutName = 'Windows Toolbox'
 
-# Python: genau diese Version (Major.Minor) – mit ihr sind die festen Paketversionen in requirements.txt geprüft.
-# Zum Wechseln: hier ändern, runtime\ löschen, Setup.exe ausführen, testen, requirements.txt anpassen.
+# Python: exactly this version (major.minor) – the fixed package versions in requirements.txt are tested with it.
+# To switch: change it here, delete runtime\, run Setup.exe, test, adjust requirements.txt.
 $PythonVersion = '3.14'
 
-# Richtet die Aufgabe über winutil.task_command() ein – denselben Befehl nutzt die Toolbox bei „Aufgabe einrichten“.
-# (Ohne doppelte Anführungszeichen, die würde Windows PowerShell 5.1 bei der Übergabe an python.exe verstümmeln.)
-$PyAufgabe = 'import sys; sys.path.insert(0, sys.argv[1]); import winutil; ' +
-             'r = winutil.powershell(winutil.task_command(*sys.argv[2:4])); ok = r is not None and r.returncode == 0; ' +
-             'ok or print(r.stderr if r else None); sys.exit(0 if ok else 1)'
+# Sets up the task via winutil.task_command() – the Toolbox uses the same command for "Set up task".
+# (Without double quotes, Windows PowerShell 5.1 would mangle them when passing them to python.exe.)
+$PyTask = 'import sys; sys.path.insert(0, sys.argv[1]); import winutil; ' +
+          'r = winutil.powershell(winutil.task_command(*sys.argv[2:4])); ok = r is not None and r.returncode == 0; ' +
+          'ok or print(r.stderr if r else None); sys.exit(0 if ok else 1)'
 
 
-# ---------- Programme (aus den programm.json) ----------
-function Texte-Laden($datei) {
-    <# Inhalt einer i18n.json (ID -> Sprache -> Text) – oder $null, wenn es sie nicht gibt oder sie kaputt ist. #>
-    if (-not (Test-Path $datei)) { return $null }
-    try { Get-Content -Raw -Encoding UTF8 $datei | ConvertFrom-Json } catch { $null }
+# ---------- Programs (from the program.json files) ----------
+function Load-Texts($file) {
+    <# Content of an i18n.json (ID -> language -> text) – or $null if it doesn't exist or is broken. #>
+    if (-not (Test-Path $file)) { return $null }
+    try { Get-Content -Raw -Encoding UTF8 $file | ConvertFrom-Json } catch { $null }
 }
 
-function Lade-Programm($datei) {
-    <# Liest einen Ausweis und ergänzt die fertigen Pfade: Ordner, Skript, Starter (die .exe zum Doppelklicken) und
-       Host (die pythonw.exe-Kopie in runtime\, die der Starter aufruft – gleicher Dateiname wie der Starter). #>
-    $p = Get-Content -Raw -Encoding UTF8 $datei | ConvertFrom-Json
-    $ordner = Split-Path -Parent $datei
-    $p | Add-Member Ordner $ordner
-    $p | Add-Member Texte (Texte-Laden (Join-Path $ordner 'i18n.json'))    # Name und Beschreibung je Sprache
-    if ($p.starter) {                             # nur bei Programmen, die eigenständig laufen (nicht nur eine Seite)
-        $p | Add-Member SkriptPfad (Join-Path $ordner $p.skript)
-        $p | Add-Member StarterPfad ([IO.Path]::GetFullPath((Join-Path $ordner $p.starter)))
-        $p | Add-Member HostPfad (Join-Path $Runtime (Split-Path -Leaf $p.starter))
-        $p | Add-Member SymbolPfad $(if ($p.symbol) { Join-Path $ordner $p.symbol } else { $Symbol })
+function Load-Program($file) {
+    <# Reads a manifest and adds the finished paths: folder, script, starter (the .exe to double-click) and
+       host (the pythonw.exe copy in runtime\ that the starter calls – same file name as the starter). #>
+    $p = Get-Content -Raw -Encoding UTF8 $file | ConvertFrom-Json
+    $folder = Split-Path -Parent $file
+    $p | Add-Member Folder $folder
+    $p | Add-Member Texts (Load-Texts (Join-Path $folder 'i18n.json'))    # name and description per language
+    if ($p.starter) {                             # only for programs that run on their own (not just a page)
+        $p | Add-Member ScriptPath (Join-Path $folder $p.script)
+        $p | Add-Member StarterPath ([IO.Path]::GetFullPath((Join-Path $folder $p.starter)))
+        $p | Add-Member HostPath (Join-Path $Runtime (Split-Path -Leaf $p.starter))
+        $p | Add-Member IconPath $(if ($p.icon) { Join-Path $folder $p.icon } else { $Icon })
     }
     $p
 }
 
-$Toolbox   = Lade-Programm (Join-Path $Root 'toolbox\programm.json')
-$Alle      = @($Toolbox) + @(Get-ChildItem (Join-Path $Root 'programme\*\programm.json') | ForEach-Object { Lade-Programm $_.FullName })
-$Monitor   = $Alle | Where-Object id -eq 'hardware_monitor'
+$Toolbox   = Load-Program (Join-Path $Root 'toolbox\program.json')
+$All       = @($Toolbox) + @(Get-ChildItem (Join-Path $Root 'programs\*\program.json') | ForEach-Object { Load-Program $_.FullName })
+$Monitor   = $All | Where-Object id -eq 'hardware_monitor'
 
-# Welche Programme eingerichtet sind (ohne die Toolbox) – liest auch toolbox.py (installierte_ids)
-$InstalliertDatei = Join-Path $Root 'daten\installiert.json'
+# Which programs are installed (without the Toolbox) – also read by toolbox.py (installed_ids)
+$InstalledFile = Join-Path $Root 'data\installed.json'
 
-function Installierte {
-    <# IDs der eingerichteten Programme. Fehlt die Datei (oder ist sie kaputt): alle. #>
-    if (Test-Path $InstalliertDatei) {
-        try { return @((Get-Content -Raw -Encoding UTF8 $InstalliertDatei | ConvertFrom-Json).programme | Where-Object { $_ }) }
+function Get-Installed {
+    <# IDs of the installed programs. If the file is missing (or broken): all. #>
+    if (Test-Path $InstalledFile) {
+        try { return @((Get-Content -Raw -Encoding UTF8 $InstalledFile | ConvertFrom-Json).programs | Where-Object { $_ }) }
         catch { }
     }
-    @($Alle | Where-Object id -ne 'toolbox' | ForEach-Object id)
+    @($All | Where-Object id -ne 'toolbox' | ForEach-Object id)
 }
 
-function Installierte-Speichern($ids) {
-    New-Item -ItemType Directory -Force (Split-Path -Parent $InstalliertDatei) | Out-Null
-    $json = ConvertTo-Json @{ programme = @($ids) }
-    [IO.File]::WriteAllText($InstalliertDatei, $json, (New-Object Text.UTF8Encoding $false))   # ohne BOM, für Python
+function Save-Installed($ids) {
+    New-Item -ItemType Directory -Force (Split-Path -Parent $InstalledFile) | Out-Null
+    $json = ConvertTo-Json @{ programs = @($ids) }
+    [IO.File]::WriteAllText($InstalledFile, $json, (New-Object Text.UTF8Encoding $false))   # without BOM, for Python
 }
 
-# Sprache der Toolbox und aller Programme: "sprache" in daten\toolbox.json – liest auch toolbox\i18n.py
-$ToolboxDatei = Join-Path $Root 'daten\toolbox.json'
-# Welche Sprachen es gibt (Code -> Name, in dieser Reihenfolge) – dieselbe Liste nimmt toolbox\i18n.py
-$SprachListe = Get-Content -Raw -Encoding UTF8 (Join-Path $Root 'toolbox\sprachen.json') | ConvertFrom-Json
-$SprachCodes = @($SprachListe.sprachen.PSObject.Properties.Name)
+# Language of the Toolbox and all programs: "language" in data\toolbox.json – also read by toolbox\i18n.py
+$ToolboxFile = Join-Path $Root 'data\toolbox.json'
+# Which languages exist (code -> name, in this order) – toolbox\i18n.py takes the same list
+$LanguageList = Get-Content -Raw -Encoding UTF8 (Join-Path $Root 'toolbox\languages.json') | ConvertFrom-Json
+$LanguageCodes = @($LanguageList.languages.PSObject.Properties.Name)
 
-function Uebersetzt($texte, $id, $sonst) {
-    <# Text $id aus einer i18n.json in jeder Sprache: Tabelle Code -> Text. Fehlt eine Übersetzung, die
-       Rückfallsprache, dann $sonst bzw. die ID – wie t() in toolbox\i18n.py. #>
-    $zeile = if ($texte) { $texte.$id }
-    $ergebnis = @{}
-    foreach ($code in $SprachCodes) {
-        $text = if ($zeile) { $zeile.$code }
-        if (-not $text -and $zeile) { $text = $zeile.($SprachListe.rueckfall) }
-        if (-not $text) { $text = if ($sonst) { $sonst } else { $id } }
-        $ergebnis[$code] = $text
+function Get-Translated($texts, $id, $otherwise) {
+    <# Text $id from an i18n.json in every language: table code -> text. If a translation is missing, the
+       fallback language, then $otherwise or the ID – like t() in toolbox\i18n.py. #>
+    $row = if ($texts) { $texts.$id }
+    $result = @{}
+    foreach ($code in $LanguageCodes) {
+        $text = if ($row) { $row.$code }
+        if (-not $text -and $row) { $text = $row.($LanguageList.fallback) }
+        if (-not $text) { $text = if ($otherwise) { $otherwise } else { $id } }
+        $result[$code] = $text
     }
-    $ergebnis
+    $result
 }
 
-function Toolbox-Einstellungen {
-    <# Inhalt von daten\toolbox.json – oder ein leeres Objekt, wenn sie fehlt oder kaputt ist. #>
-    if (Test-Path $ToolboxDatei) {
-        try { $e = Get-Content -Raw -Encoding UTF8 $ToolboxDatei | ConvertFrom-Json; if ($e) { return $e } }
+function Get-ToolboxSettings {
+    <# Content of data\toolbox.json – or an empty object if it is missing or broken. #>
+    if (Test-Path $ToolboxFile) {
+        try { $s = Get-Content -Raw -Encoding UTF8 $ToolboxFile | ConvertFrom-Json; if ($s) { return $s } }
         catch { }
     }
     New-Object psobject
 }
 
-function Sprache {
-    <# Code aus sprachen.json: die gespeicherte Sprache – sonst die Anzeigesprache von Windows, wenn es sie gibt, sonst
-       die Rückfallsprache (Englisch) – genau wie gewaehlte() in toolbox\i18n.py. #>
-    $gespeichert = (Toolbox-Einstellungen).sprache
-    if ($gespeichert -in $SprachCodes) { return $gespeichert }
+function Get-Language {
+    <# Code from languages.json: the saved language – otherwise the Windows display language if it exists, otherwise
+       the fallback language (English) – exactly like chosen() in toolbox\i18n.py. #>
+    $saved = (Get-ToolboxSettings).language
+    if ($saved -in $LanguageCodes) { return $saved }
     $system = (Get-UICulture).TwoLetterISOLanguageName
-    if ($system -in $SprachCodes) { $system } else { $SprachListe.rueckfall }
+    if ($system -in $LanguageCodes) { $system } else { $LanguageList.fallback }
 }
 
-function Sprache-Speichern($sprache) {
-    <# Schreibt "sprache" in daten\toolbox.json; alles andere darin bleibt, wie es ist. #>
-    New-Item -ItemType Directory -Force (Split-Path -Parent $ToolboxDatei) | Out-Null
-    $e = Toolbox-Einstellungen
-    $e | Add-Member -NotePropertyName sprache -NotePropertyValue $sprache -Force
-    [IO.File]::WriteAllText($ToolboxDatei, ($e | ConvertTo-Json), (New-Object Text.UTF8Encoding $false))
+function Save-Language($language) {
+    <# Writes "language" into data\toolbox.json; everything else in it stays as it is. #>
+    New-Item -ItemType Directory -Force (Split-Path -Parent $ToolboxFile) | Out-Null
+    $s = Get-ToolboxSettings
+    $s | Add-Member -NotePropertyName language -NotePropertyValue $language -Force
+    [IO.File]::WriteAllText($ToolboxFile, ($s | ConvertTo-Json), (New-Object Text.UTF8Encoding $false))
 }
 
-function Programm-Ids($text) {
-    <# "a,b" aus -Programme -> geprüfte IDs. Die Toolbox gehört nicht dazu, die ist immer eingerichtet. #>
+function Get-ProgramIds($text) {
+    <# "a,b" from -Programs -> checked IDs. The Toolbox isn't part of it, it is always installed. #>
     $ids = @($text -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ -and $_ -ne 'toolbox' })
     foreach ($id in $ids) {
-        if (-not ($Alle | Where-Object id -eq $id)) {
-            throw "Unbekanntes Programm: $id (bekannt: $(($Alle | Where-Object id -ne 'toolbox' | ForEach-Object id) -join ', '))"
+        if (-not ($All | Where-Object id -eq $id)) {
+            throw "Unknown program: $id (known: $(($All | Where-Object id -ne 'toolbox' | ForEach-Object id) -join ', '))"
         }
     }
     $ids
 }
 
-# Aus den Ausweisen – dieselben Werte lesen toolbox.py und hardware_monitor_einstellungen.py
-$Aufgabe   = $Monitor.aufgabe                    # geplante Aufgabe, die den Monitor beim Anmelden startet
-$IpcPort   = $Monitor.port                       # Fernsteuerung des Monitors
-$GuiPort   = $Toolbox.port                       # Fernsteuerung der Toolbox
+# From the manifests – toolbox.py and hardware_monitor_settings.py read the same values
+$TaskName  = $Monitor.task                       # scheduled task that starts the monitor at logon
+$IpcPort   = $Monitor.port                       # remote control of the monitor
+$GuiPort   = $Toolbox.port                       # remote control of the Toolbox
 
 
-# ---------- Helfer ----------
-function Schritt($text) { Write-Host ""; Write-Host "== $text" -ForegroundColor Cyan }
-function Ok($text)      { Write-Host "   [OK] $text" -ForegroundColor Green }
-function Info($text)    { Write-Host "   $text" }
-$Warnungen = 0                                   # gezählt: mit Warnungen bleibt das Fenster am Ende offen
-function Warnung($text) { $script:Warnungen++; Write-Host "   [!] $text" -ForegroundColor Yellow }
+# ---------- Helpers ----------
+function Step($text)  { Write-Host ""; Write-Host "== $text" -ForegroundColor Cyan }
+function Ok($text)    { Write-Host "   [OK] $text" -ForegroundColor Green }
+function Info($text)  { Write-Host "   $text" }
+$Warnings = 0                                    # counted: with warnings the window stays open at the end
+function Warn($text)  { $script:Warnings++; Write-Host "   [!] $text" -ForegroundColor Yellow }
 
-function Monitor-Befehl($befehl) {
-    <# Schickt einen Befehl an den laufenden Hardware-Monitor (wie ipc() in hardware_monitor_gui.py) – $null, wenn er
-       nicht läuft. #>
-    Befehl-Senden $IpcPort $befehl
+function Send-MonitorCommand($command) {
+    <# Sends a command to the running Hardware Monitor (like ipc() in hardware_monitor_gui.py) – $null if it
+       isn't running. #>
+    Send-Command $IpcPort $command
 }
 
-function Toolbox-Befehl($befehl) {
-    <# Dasselbe für die Toolbox ("status", "quit", "show" – siehe instance_server in toolbox.py). #>
-    Befehl-Senden $GuiPort $befehl
+function Send-ToolboxCommand($command) {
+    <# The same for the Toolbox ("status", "quit", "show" – see instance_server in toolbox.py). #>
+    Send-Command $GuiPort $command
 }
 
-function Befehl-Senden($port, $befehl) {
+function Send-Command($port, $command) {
     try {
         $client = New-Object Net.Sockets.TcpClient
         $client.Connect('127.0.0.1', $port)
         $client.ReceiveTimeout = 1000
         $stream = $client.GetStream()
-        $bytes = [Text.Encoding]::UTF8.GetBytes("$befehl`n")
+        $bytes = [Text.Encoding]::UTF8.GetBytes("$command`n")
         $stream.Write($bytes, 0, $bytes.Length)
-        $antwort = (New-Object IO.StreamReader($stream)).ReadLine()
+        $answer = (New-Object IO.StreamReader($stream)).ReadLine()
         $client.Close()
-        return $antwort
+        return $answer
     } catch {
         return $null
     }
 }
 
-function Monitor-Beenden { Programm-Beenden $Monitor }
+function Stop-Monitor { Stop-Program $Monitor }
 
-function Programm-Beenden($p) {
-    <# Beendet ein Programm über seinen Port ("port" in programm.json) und wartet bis zu 5 s darauf. #>
-    Befehl-Senden $p.port 'quit' | Out-Null
-    for ($i = 0; $i -lt 50 -and (Befehl-Senden $p.port 'status'); $i++) { Start-Sleep -Milliseconds 100 }
+function Stop-Program($p) {
+    <# Quits a program via its port ("port" in program.json) and waits up to 5 s for it. #>
+    Send-Command $p.port 'quit' | Out-Null
+    for ($i = 0; $i -lt 50 -and (Send-Command $p.port 'status'); $i++) { Start-Sleep -Milliseconds 100 }
 }
 
-function Weitere-Programme {
-    <# Programme, die ohne Adminrechte eigenständig laufen (z. B. Discord Plus): alle mit Port außer Toolbox und
-       Hardware-Monitor – die beiden behandelt das Skript gesondert. #>
-    @($Alle | Where-Object { $_.port -and $_.id -ne 'toolbox' -and $_.id -ne $Monitor.id })
+function Get-OtherPrograms {
+    <# Programs that run on their own without admin rights (e.g. Discord Plus): all with a port except Toolbox and
+       Hardware Monitor – the script handles those two separately. #>
+    @($All | Where-Object { $_.port -and $_.id -ne 'toolbox' -and $_.id -ne $Monitor.id })
 }
 
-# Autostart der Programme ohne Adminrechte: Wert "autostart" aus programm.json unter HKCU\...\Run – so setzt ihn auch
-# winutil.autostart_setzen (Schalter in der Toolbox)
+# Autostart of the programs without admin rights: value "autostart" from program.json under HKCU\...\Run – that's
+# also how winutil.set_autostart sets it (switch in the Toolbox)
 $RunKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 
-function Autostart-Ziel($p) {
-    <# Was der Autostart-Eintrag startet, z. B. "E:\...\DiscordPlus.exe" (mit Anführungszeichen) – $null = keiner. #>
+function Get-AutostartTarget($p) {
+    <# What the autostart entry starts, e.g. "E:\...\DiscordPlus.exe" (with quotes) – $null = none. #>
     (Get-ItemProperty $RunKey -Name $p.autostart -ErrorAction SilentlyContinue).($p.autostart)
 }
 
-function Autostart-Loeschen($p) {
-    if (Autostart-Ziel $p) { Remove-ItemProperty $RunKey -Name $p.autostart; Ok 'Autostart-Eintrag gelöscht' }
-    else { Ok 'kein Autostart-Eintrag' }
+function Remove-Autostart($p) {
+    if (Get-AutostartTarget $p) { Remove-ItemProperty $RunKey -Name $p.autostart; Ok 'autostart entry deleted' }
+    else { Ok 'no autostart entry' }
 }
 
-function Toolbox-Beenden {
-    <# $true, wenn die Toolbox lief (und jetzt beendet ist). #>
-    if (-not (Toolbox-Befehl 'status')) { return $false }
-    Toolbox-Befehl 'quit' | Out-Null
-    for ($i = 0; $i -lt 50 -and (Toolbox-Befehl 'status'); $i++) { Start-Sleep -Milliseconds 100 }
-    Start-Sleep -Milliseconds 500                 # Prozess räumt nach dem Schließen des Ports noch kurz auf
+function Stop-Toolbox {
+    <# $true if the Toolbox was running (and is now quit). #>
+    if (-not (Send-ToolboxCommand 'status')) { return $false }
+    Send-ToolboxCommand 'quit' | Out-Null
+    for ($i = 0; $i -lt 50 -and (Send-ToolboxCommand 'status'); $i++) { Start-Sleep -Milliseconds 100 }
+    Start-Sleep -Milliseconds 500                 # the process still cleans up briefly after closing the port
     return $true
 }
 
-function Toolbox-Starten {
-    if (Test-Path $Toolbox.StarterPfad) { Start-Process $Toolbox.StarterPfad; return }
-    $exe = if (Test-Path $Toolbox.HostPfad) { $Toolbox.HostPfad } else { Join-Path $Runtime 'pythonw.exe' }
-    Start-Process $exe -ArgumentList "`"$($Toolbox.SkriptPfad)`"" -WorkingDirectory $Toolbox.Ordner
+function Start-Toolbox {
+    if (Test-Path $Toolbox.StarterPath) { Start-Process $Toolbox.StarterPath; return }
+    $exe = if (Test-Path $Toolbox.HostPath) { $Toolbox.HostPath } else { Join-Path $Runtime 'pythonw.exe' }
+    Start-Process $exe -ArgumentList "`"$($Toolbox.ScriptPath)`"" -WorkingDirectory $Toolbox.Folder
 }
 
-function Als-Admin($schritte) {
-    <# Startet dieses Skript mit -Admin nach einer UAC-Abfrage noch einmal. $true, wenn dort alles geklappt hat. #>
-    Info 'Windows fragt jetzt nach Adminrechten …'
+function Invoke-AsAdmin($steps) {
+    <# Starts this script again with -Admin after a UAC prompt. $true if everything worked there. #>
+    Info 'Windows is now asking for admin rights …'
     try {
-        # Ohne -Wait: Das wartet in Windows PowerShell auch auf alles, was der Admin-Durchlauf startet – nach
-        # monitor-starten also auf den Hardware-Monitor, d. h. ewig. WaitForExit wartet nur auf das Fenster selbst.
+        # Without -Wait: in Windows PowerShell that also waits for everything the admin run starts – after
+        # monitor-start that means for the Hardware Monitor, i.e. forever. WaitForExit only waits for the window itself.
         $p = Start-Process powershell.exe -Verb RunAs -PassThru -ArgumentList '-NoProfile',
-            '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"", '-Admin', ($schritte -join ',')
-        $null = $p.Handle                         # Handle gleich holen, sonst fehlt am Ende der ExitCode
+            '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"", '-Admin', ($steps -join ',')
+        $null = $p.Handle                         # get the handle right away, otherwise the ExitCode is missing at the end
         $p.WaitForExit()
         return $p.ExitCode -eq 0
     } catch {
-        Warnung 'Adminrechte abgelehnt.'
+        Warn 'Admin rights declined.'
         return $false
     }
 }
 
-function Relativ($von, $nach) {
-    <# Pfad von Ordner $von nach $nach, z. B. "..\..\runtime" – für den Starter, der so nach dem Verschieben noch passt.
-       (Windows PowerShell 5.1 hat kein [IO.Path]::GetRelativePath, deshalb über Uri.) #>
-    $basis = New-Object Uri ($von.TrimEnd('\') + '\')
-    $rel = [Uri]::UnescapeDataString($basis.MakeRelativeUri((New-Object Uri $nach)).ToString()) -replace '/', '\'
+function Get-RelativePath($from, $to) {
+    <# Path from folder $from to $to, e.g. "..\..\runtime" – for the starter, which then still fits after moving.
+       (Windows PowerShell 5.1 has no [IO.Path]::GetRelativePath, hence via Uri.) #>
+    $base = New-Object Uri ($from.TrimEnd('\') + '\')
+    $rel = [Uri]::UnescapeDataString($base.MakeRelativeUri((New-Object Uri $to)).ToString()) -replace '/', '\'
     if ($rel) { $rel } else { '.' }
 }
 
-function Starter-Bauen($p) {
-    <# Übersetzt setup\starter.cs (+ argumente.cs) für dieses Programm. Rückgabe: Meldung. Gebaut wird nur, wenn sich der erzeugte
-       Quelltext oder das Symbol geändert hat (csc erzeugt bei jedem Lauf eine leicht andere Datei – ein
-       Byte-Vergleich ginge nicht). #>
-    $ordner = Split-Path -Parent $p.StarterPfad
-    $werte = [ordered]@{
-        '%NAME%' = $p.name; '%VERSION%' = $p.version; '%HOST%' = (Split-Path -Leaf $p.HostPfad); '%FIRMA%' = 'Windows Toolbox'
-        '%RUNTIME%' = (Relativ $ordner $Runtime); '%SKRIPT%' = (Relativ $ordner $p.SkriptPfad)
+function Build-Starter($p) {
+    <# Compiles setup\starter.cs (+ arguments.cs) for this program. Returns: message. It is only built if the generated
+       source code or the icon has changed (csc creates a slightly different file on every run – a
+       byte comparison wouldn't work). #>
+    $folder = Split-Path -Parent $p.StarterPath
+    $values = [ordered]@{
+        '%NAME%' = $p.name; '%VERSION%' = $p.version; '%HOST%' = (Split-Path -Leaf $p.HostPath); '%COMPANY%' = 'Windows Toolbox'
+        '%RUNTIME%' = (Get-RelativePath $folder $Runtime); '%SCRIPT%' = (Get-RelativePath $folder $p.ScriptPath)
     }
-    $quelle = (Get-Content -Raw -Encoding UTF8 (Join-Path $PSScriptRoot 'starter.cs')) + "`r`n" +
-              (Get-Content -Raw -Encoding UTF8 (Join-Path $PSScriptRoot 'argumente.cs'))
-    foreach ($platzhalter in $werte.Keys) { $quelle = $quelle.Replace($platzhalter, $werte[$platzhalter]) }
-    # Prüfsumme des Symbols mit in den Quelltext – so wird nach einem neuen Symbol auch neu gebaut
-    $quelle += "`r`n// Symbol: $((Get-FileHash $p.SymbolPfad -Algorithm SHA256).Hash)`r`n"
-    $merker = Join-Path $Runtime "starter\$($p.id).cs"          # zuletzt übersetzter Quelltext (gehört zu runtime\)
-    if ((Test-Path $p.StarterPfad) -and (Test-Path $merker) -and
-        (Get-Content -Raw -Encoding UTF8 $merker) -eq $quelle) { return "$(Split-Path -Leaf $p.StarterPfad) ist schon aktuell" }
-    if (-not (Test-Path $Csc)) { throw "C#-Compiler nicht gefunden ($Csc)" }
+    $source = (Get-Content -Raw -Encoding UTF8 (Join-Path $PSScriptRoot 'starter.cs')) + "`r`n" +
+              (Get-Content -Raw -Encoding UTF8 (Join-Path $PSScriptRoot 'arguments.cs'))
+    foreach ($placeholder in $values.Keys) { $source = $source.Replace($placeholder, $values[$placeholder]) }
+    # Checksum of the icon into the source code too – so it gets rebuilt after a new icon
+    $source += "`r`n// Icon: $((Get-FileHash $p.IconPath -Algorithm SHA256).Hash)`r`n"
+    $memo = Join-Path $Runtime "starter\$($p.id).cs"            # last compiled source code (belongs to runtime\)
+    if ((Test-Path $p.StarterPath) -and (Test-Path $memo) -and
+        (Get-Content -Raw -Encoding UTF8 $memo) -eq $source) { return "$(Split-Path -Leaf $p.StarterPath) is already up to date" }
+    if (-not (Test-Path $Csc)) { throw "C# compiler not found ($Csc)" }
 
-    New-Item -ItemType Directory -Force (Split-Path -Parent $merker) | Out-Null
-    $tmp = Join-Path (Split-Path -Parent $merker) "$($p.id).tmp.cs"
-    [IO.File]::WriteAllText($tmp, $quelle, (New-Object Text.UTF8Encoding $true))    # mit BOM, sonst kein „ü“ in csc
-    $neu = "$($p.StarterPfad).neu"
-    $ausgabe = & $Csc /nologo /target:winexe /optimize+ "/win32icon:$($p.SymbolPfad)" "/out:$neu" $tmp 2>&1
-    if ($LASTEXITCODE -ne 0) { throw "csc meldet: $ausgabe" }
-    Move-Item -Force $neu $p.StarterPfad
-    Move-Item -Force $tmp $merker
-    "$(Split-Path -Leaf $p.StarterPfad) angelegt"
+    New-Item -ItemType Directory -Force (Split-Path -Parent $memo) | Out-Null
+    $tmp = Join-Path (Split-Path -Parent $memo) "$($p.id).tmp.cs"
+    [IO.File]::WriteAllText($tmp, $source, (New-Object Text.UTF8Encoding $true))    # with BOM, otherwise no "ü" in csc
+    $new = "$($p.StarterPath).new"
+    $output = & $Csc /nologo /target:winexe /optimize+ "/win32icon:$($p.IconPath)" "/out:$new" $tmp 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "csc reports: $output" }
+    Move-Item -Force $new $p.StarterPath
+    Move-Item -Force $tmp $memo
+    "$(Split-Path -Leaf $p.StarterPath) created"
 }
 
 
-# ---------- Verknüpfungen auf Toolbox.exe ----------
-# Schlüssel: Ordnername für [Environment]::GetFolderPath (findet auch einen Desktop, den OneDrive verschoben hat;
-# 'Programs' = Startmenü des Benutzers, ohne Adminrechte); Wert: so heißt der Ort im Fenster und in den Meldungen
-$Orte = [ordered]@{ Desktop = 'Desktop'; Programs = 'Startmenü' }
+# ---------- Shortcuts to Toolbox.exe ----------
+# Key: folder name for [Environment]::GetFolderPath (also finds a desktop that OneDrive has moved;
+# 'Programs' = Start menu of the user, without admin rights); value: what the location is called in the messages
+$Locations = [ordered]@{ Desktop = 'Desktop'; Programs = 'Start menu' }
 
-function Ort-Ordner($ort) { [Environment]::GetFolderPath($ort) }
+function Get-LocationFolder($location) { [Environment]::GetFolderPath($location) }
 
-function Verknuepfung-Pfad($ort) { Join-Path (Ort-Ordner $ort) "$VerknuepfungName.lnk" }
+function Get-ShortcutPath($location) { Join-Path (Get-LocationFolder $location) "$ShortcutName.lnk" }
 
-function Verknuepfung-Ziel($ort) {
-    <# Wohin die Verknüpfung zeigt – $null, wenn es sie nicht gibt. #>
-    $pfad = Verknuepfung-Pfad $ort
-    if (-not (Test-Path -LiteralPath $pfad)) { return $null }
-    (New-Object -ComObject WScript.Shell).CreateShortcut($pfad).TargetPath
+function Get-ShortcutTarget($location) {
+    <# Where the shortcut points – $null if it doesn't exist. #>
+    $path = Get-ShortcutPath $location
+    if (-not (Test-Path -LiteralPath $path)) { return $null }
+    (New-Object -ComObject WScript.Shell).CreateShortcut($path).TargetPath
 }
 
-function Verknuepfung-Unsere($ort) {
-    <# Gibt es sie, und gehört sie zu diesem Ordner? Zeigt sie ins Leere (Ordner verschoben), zählt sie auch. Zeigt sie
-       auf eine andere Toolbox, die es noch gibt (zweiter Klon), nicht – die wird nur ersetzt, wenn man es im Fenster
-       ausdrücklich ankreuzt, und nie gelöscht. #>
-    $ziel = Verknuepfung-Ziel $ort
-    if ($null -eq $ziel) { return $false }
-    -not $ziel -or $ziel -eq $Toolbox.StarterPfad -or -not (Test-Path -LiteralPath $ziel)
+function Test-OurShortcut($location) {
+    <# Does it exist, and does it belong to this folder? If it points into nowhere (folder moved), it counts too. If it
+       points to another Toolbox that still exists (second clone), it doesn't – that one is only replaced if you
+       explicitly check it in the window, and never deleted. #>
+    $target = Get-ShortcutTarget $location
+    if ($null -eq $target) { return $false }
+    -not $target -or $target -eq $Toolbox.StarterPath -or -not (Test-Path -LiteralPath $target)
 }
 
-function Verknuepfungen-Einrichten($wunsch) {
-    <# 5. $wunsch aus dem Fenster: je Ort $true/$false. Ohne Fenster ($null) bleibt jede, wie sie ist – nur eine, die
-       ins Leere zeigt, zeigt danach wieder auf diesen Ordner. #>
-    Schritt "Verknüpfungen „$VerknuepfungName“"
-    foreach ($ort in $Orte.Keys) {
-        $wo = $Orte[$ort]
-        $unsere = Verknuepfung-Unsere $ort
-        $soll = if ($wunsch) { $wunsch[$ort] } else { $unsere }
-        if ($soll) {
-            if ((Verknuepfung-Ziel $ort) -eq $Toolbox.StarterPfad) { Ok "${wo}: schon da"; continue }
-            if (-not (Test-Path $Toolbox.StarterPfad)) { Warnung "${wo}: nicht angelegt – Toolbox.exe fehlt (siehe oben)"; continue }
-            $lnk = (New-Object -ComObject WScript.Shell).CreateShortcut((Verknuepfung-Pfad $ort))
-            $lnk.TargetPath = $Toolbox.StarterPfad
+function Install-Shortcuts($wish) {
+    <# 5. $wish from the window: $true/$false per location. Without the window ($null) each stays as it is – only one
+       that points into nowhere points to this folder again afterwards. #>
+    Step "Shortcuts `"$ShortcutName`""
+    foreach ($location in $Locations.Keys) {
+        $where = $Locations[$location]
+        $ours = Test-OurShortcut $location
+        $should = if ($wish) { $wish[$location] } else { $ours }
+        if ($should) {
+            if ((Get-ShortcutTarget $location) -eq $Toolbox.StarterPath) { Ok "${where}: already there"; continue }
+            if (-not (Test-Path $Toolbox.StarterPath)) { Warn "${where}: not created – Toolbox.exe is missing (see above)"; continue }
+            $lnk = (New-Object -ComObject WScript.Shell).CreateShortcut((Get-ShortcutPath $location))
+            $lnk.TargetPath = $Toolbox.StarterPath
             $lnk.WorkingDirectory = $Root
-            $lnk.IconLocation = "$($Toolbox.StarterPfad),0"    # das Symbol steckt in Toolbox.exe
+            $lnk.IconLocation = "$($Toolbox.StarterPath),0"    # the icon is inside Toolbox.exe
             $lnk.Save()
-            Ok "${wo}: angelegt"
-        } elseif ($unsere) {
-            Remove-Item -LiteralPath (Verknuepfung-Pfad $ort) -Force
-            Ok "${wo}: gelöscht"
-        } elseif (Verknuepfung-Ziel $ort) {
-            Ok "${wo}: zeigt auf eine andere Toolbox – bleibt"
+            Ok "${where}: created"
+        } elseif ($ours) {
+            Remove-Item -LiteralPath (Get-ShortcutPath $location) -Force
+            Ok "${where}: deleted"
+        } elseif (Get-ShortcutTarget $location) {
+            Ok "${where}: points to another Toolbox – stays"
         } else {
-            Ok "${wo}: keine"
+            Ok "${where}: none"
         }
     }
 }
 
-function Verknuepfungen-Loeschen {
-    <# Für Uninstall – immer, nicht erst auf Nachfrage: Nach dem Entfernen zeigten sie ins Leere. Gelöscht wird jede
-       Verknüpfung auf diese Toolbox.exe auf dem Desktop und im Startmenü (dort auch in Unterordnern) – auch eine
-       umbenannte oder verschobene –, dazu „$VerknuepfungName“, wenn sie ins Leere zeigt (Verknuepfung-Unsere).
-       Verknüpfungen auf eine andere Toolbox bleiben. #>
+function Remove-Shortcuts {
+    <# For uninstalling – always, not only on request: after removing they would point into nowhere. Every shortcut
+       to this Toolbox.exe on the desktop and in the Start menu (there also in subfolders) is deleted – also a
+       renamed or moved one –, plus "$ShortcutName" if it points into nowhere (Test-OurShortcut).
+       Shortcuts to another Toolbox stay. #>
     $shell = New-Object -ComObject WScript.Shell
-    $pfade = @(foreach ($ort in $Orte.Keys) {
-        Get-ChildItem -LiteralPath (Ort-Ordner $ort) -Filter *.lnk -File -Recurse:($ort -eq 'Programs') -ErrorAction SilentlyContinue |
-            Where-Object { $shell.CreateShortcut($_.FullName).TargetPath -eq $Toolbox.StarterPfad } | ForEach-Object FullName
-        if (Verknuepfung-Unsere $ort) { Verknuepfung-Pfad $ort }
+    $paths = @(foreach ($location in $Locations.Keys) {
+        Get-ChildItem -LiteralPath (Get-LocationFolder $location) -Filter *.lnk -File -Recurse:($location -eq 'Programs') -ErrorAction SilentlyContinue |
+            Where-Object { $shell.CreateShortcut($_.FullName).TargetPath -eq $Toolbox.StarterPath } | ForEach-Object FullName
+        if (Test-OurShortcut $location) { Get-ShortcutPath $location }
     }) | Select-Object -Unique
-    if (-not $pfade) { Ok 'keine'; return }
-    foreach ($pfad in $pfade) {
-        try { Remove-Item -LiteralPath $pfad -Force; Ok "gelöscht: $pfad" }
-        catch { Warnung "ließ sich nicht löschen: $pfad" }
+    if (-not $paths) { Ok 'none'; return }
+    foreach ($path in $paths) {
+        try { Remove-Item -LiteralPath $path -Force; Ok "deleted: $path" }
+        catch { Warn "couldn't be deleted: $path" }
     }
 }
 
 
-# ---------- Auswahlfenster ----------
-function Auswahl-Fenster($vorher) {
-    <# Fragt in einem kleinen Fenster nach der Sprache (vorausgewählt: Sprache) und welche Programme eingerichtet sein
-       sollen ($vorher ist vorausgewählt). Dazu zwei Kästchen für die Verknüpfungen (Schritt 5).
-       Rückgabe: Sprache = Code aus sprachen.json, Ids = die gewählten IDs (ohne Toolbox, evtl. leer),
-       Verknuepfungen = je Ort $true/$false – oder $null bei Abbrechen.
-       Texte: setup.… aus toolbox\i18n.json, Name und Beschreibung der Programme aus ihrer i18n.json. Es öffnet sich in
-       der vorausgewählten Sprache; ein Klick auf eine andere beschriftet sofort alles neu.
-       WinForms gehört zum .NET Framework von Windows – Python und damit tkinter gibt es an dieser Stelle ja noch nicht. #>
+# ---------- Selection window ----------
+function Show-SelectionWindow($before) {
+    <# Asks in a small window for the language (preselected: Get-Language) and which programs should be installed
+       ($before is preselected). Plus two checkboxes for the shortcuts (step 5).
+       Returns: Language = code from languages.json, Ids = the chosen IDs (without Toolbox, maybe empty),
+       Shortcuts = $true/$false per location – or $null on Cancel.
+       Texts: setup.… from toolbox\i18n.json, name and description of the programs from their i18n.json. It opens in
+       the preselected language; a click on another one relabels everything right away.
+       WinForms belongs to the .NET Framework of Windows – Python and thus tkinter don't exist at this point yet. #>
     Add-Type -AssemblyName System.Windows.Forms, System.Drawing
-    # Selbst skalieren statt von Windows unscharf hochzeichnen lassen (bei Anzeige-Skalierung über 100 %)
+    # Scale ourselves instead of having Windows draw it blurry (at display scaling above 100 %)
     Add-Type -Namespace Toolbox -Name Dpi -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetProcessDPIAware();'
     [Toolbox.Dpi]::SetProcessDPIAware() | Out-Null
     [Windows.Forms.Application]::EnableVisualStyles()
 
     $form = New-Object Windows.Forms.Form
-    $s = $form.CreateGraphics().DpiX / 96                 # Skalierung für feste Pixelmaße
-    $vorgewaehlt = Sprache
-    $toolboxTexte = Texte-Laden (Join-Path $Root 'toolbox\i18n.json')
-    # Alle Beschriftungen: Steuerelement und sein Text je Sprache – ein Klick auf eine Sprache setzt sie neu
-    $beschriftung = New-Object Collections.ArrayList
-    function Beschriften($control, $texte) {
-        [void]$beschriftung.Add([pscustomobject]@{ Control = $control; Texte = $texte })
-        $control.Text = $texte[$vorgewaehlt]
+    $s = $form.CreateGraphics().DpiX / 96                 # scaling for fixed pixel sizes
+    $preselected = Get-Language
+    $toolboxTexts = Load-Texts (Join-Path $Root 'toolbox\i18n.json')
+    # All labels: control and its text per language – a click on a language sets them again
+    $labels = New-Object Collections.ArrayList
+    function Set-Label($control, $texts) {
+        [void]$labels.Add([pscustomobject]@{ Control = $control; Texts = $texts })
+        $control.Text = $texts[$preselected]
     }
-    Beschriften $form (Uebersetzt $toolboxTexte 'setup.titel')
+    Set-Label $form (Get-Translated $toolboxTexts 'setup.title')
     $form.Icon = New-Object Drawing.Icon (Join-Path $Root 'toolbox\toolbox.ico')
     $form.Font = New-Object Drawing.Font('Segoe UI', 9)
     $form.FormBorderStyle = 'FixedDialog'
@@ -433,272 +431,272 @@ function Auswahl-Fenster($vorher) {
     $form.StartPosition = 'CenterScreen'
     $form.AutoSize = $true
     $form.AutoSizeMode = 'GrowAndShrink'
-    $form.TopMost = $true                                 # nicht hinter dem Konsolenfenster verschwinden
+    $form.TopMost = $true                                 # don't disappear behind the console window
     $form.Add_Shown({ $form.Activate() })
 
-    $liste = New-Object Windows.Forms.TableLayoutPanel
-    $liste.AutoSize = $true
-    $liste.ColumnCount = 1
-    $liste.Padding = New-Object Windows.Forms.Padding ([int](14 * $s))
-    $form.Controls.Add($liste)
+    $list = New-Object Windows.Forms.TableLayoutPanel
+    $list.AutoSize = $true
+    $list.ColumnCount = 1
+    $list.Padding = New-Object Windows.Forms.Padding ([int](14 * $s))
+    $form.Controls.Add($list)
 
-    function Zeile($control, $abstandOben = 0, $einzug = 0) {
+    function Add-Row($control, $marginTop = 0, $indent = 0) {
         $control.AutoSize = $true
-        $control.Margin = New-Object Windows.Forms.Padding ([int]($einzug * $s)), ([int]($abstandOben * $s)), 0, 0
-        $liste.Controls.Add($control)
+        $control.Margin = New-Object Windows.Forms.Padding ([int]($indent * $s)), ([int]($marginTop * $s)), 0, 0
+        $list.Controls.Add($control)
     }
 
-    # Sprache der Toolbox und aller Programme – ändern geht später in der Toolbox (⚙ → Darstellung)
-    $titel = New-Object Windows.Forms.Label
-    Beschriften $titel (Uebersetzt $toolboxTexte 'setup.sprache')
-    $titel.Font = New-Object Drawing.Font($form.Font, [Drawing.FontStyle]::Bold)
-    Zeile $titel
-    $sprachen = New-Object Windows.Forms.FlowLayoutPanel  # eigener Container: die Optionsfelder schließen sich gegenseitig aus
-    $sprachen.AutoSize = $true
-    $sprachen.MaximumSize = New-Object Drawing.Size ([int](380 * $s)), 0     # viele Sprachen: in die nächste Zeile
-    $sprachKnoepfe = @()
-    foreach ($sprache in $SprachListe.sprachen.PSObject.Properties) {          # je Sprache aus sprachen.json ein Feld
-        $knopf = New-Object Windows.Forms.RadioButton
-        $knopf.Text = "$($sprache.Value) ($($sprache.Name.ToUpper()))"       # z. B. „Deutsch (DE)“
-        $knopf.Tag = $sprache.Name
-        $knopf.AutoSize = $true
-        $knopf.Checked = $sprache.Name -eq $vorgewaehlt
-        $knopf.Add_CheckedChanged({                       # andere Sprache gewählt: alles sofort neu beschriften
-            if ($this.Checked) { foreach ($b in $beschriftung) { $b.Control.Text = $b.Texte[$this.Tag] } }
+    # Language of the Toolbox and all programs – it can be changed later in the Toolbox (⚙ → Appearance)
+    $title = New-Object Windows.Forms.Label
+    Set-Label $title (Get-Translated $toolboxTexts 'setup.language')
+    $title.Font = New-Object Drawing.Font($form.Font, [Drawing.FontStyle]::Bold)
+    Add-Row $title
+    $languages = New-Object Windows.Forms.FlowLayoutPanel  # own container: the radio buttons exclude each other
+    $languages.AutoSize = $true
+    $languages.MaximumSize = New-Object Drawing.Size ([int](380 * $s)), 0     # many languages: into the next line
+    $languageButtons = @()
+    foreach ($language in $LanguageList.languages.PSObject.Properties) {      # one field per language from languages.json
+        $button = New-Object Windows.Forms.RadioButton
+        $button.Text = "$($language.Value) ($($language.Name.ToUpper()))"     # e.g. "Deutsch (DE)"
+        $button.Tag = $language.Name
+        $button.AutoSize = $true
+        $button.Checked = $language.Name -eq $preselected
+        $button.Add_CheckedChanged({                      # another language chosen: relabel everything right away
+            if ($this.Checked) { foreach ($l in $labels) { $l.Control.Text = $l.Texts[$this.Tag] } }
         }.GetNewClosure())
-        $sprachen.Controls.Add($knopf)
-        $sprachKnoepfe += $knopf
+        $languages.Controls.Add($button)
+        $languageButtons += $button
     }
-    Zeile $sprachen 4
+    Add-Row $languages 4
 
-    $titel = New-Object Windows.Forms.Label
-    Beschriften $titel (Uebersetzt $toolboxTexte 'setup.programme')
-    $titel.Font = New-Object Drawing.Font($form.Font, [Drawing.FontStyle]::Bold)
-    Zeile $titel 16
+    $title = New-Object Windows.Forms.Label
+    Set-Label $title (Get-Translated $toolboxTexts 'setup.programs')
+    $title.Font = New-Object Drawing.Font($form.Font, [Drawing.FontStyle]::Bold)
+    Add-Row $title 16
 
-    $grau = [Drawing.SystemColors]::GrayText
-    $kaestchen = @()
-    foreach ($p in $Alle) {
+    $gray = [Drawing.SystemColors]::GrayText
+    $checkboxes = @()
+    foreach ($p in $All) {
         $box = New-Object Windows.Forms.CheckBox
-        $name = Uebersetzt $p.Texte 'programm.name' $p.name
+        $name = Get-Translated $p.Texts 'program.name' $p.name
         foreach ($code in @($name.Keys)) { $name[$code] = "$($name[$code]) $($p.version)" }
-        Beschriften $box $name
+        Set-Label $box $name
         $box.Tag = $p.id
-        $box.Checked = $p.id -eq 'toolbox' -or $vorher -contains $p.id
-        $box.Enabled = $p.id -ne 'toolbox'                # die Toolbox ist immer dabei
-        Zeile $box 10
-        $kaestchen += $box
-        if ($p.beschreibung) {
+        $box.Checked = $p.id -eq 'toolbox' -or $before -contains $p.id
+        $box.Enabled = $p.id -ne 'toolbox'                # the Toolbox is always included
+        Add-Row $box 10
+        $checkboxes += $box
+        if ($p.description) {
             $text = New-Object Windows.Forms.Label
-            Beschriften $text (Uebersetzt $p.Texte 'programm.beschreibung' $p.beschreibung)
-            $text.ForeColor = $grau
-            $text.MaximumSize = New-Object Drawing.Size ([int](380 * $s)), 0      # lange Texte umbrechen
-            Zeile $text 0 18
+            Set-Label $text (Get-Translated $p.Texts 'program.description' $p.description)
+            $text.ForeColor = $gray
+            $text.MaximumSize = New-Object Drawing.Size ([int](380 * $s)), 0      # wrap long texts
+            Add-Row $text 0 18
         }
     }
 
-    $alle = New-Object Windows.Forms.LinkLabel
-    Beschriften $alle (Uebersetzt $toolboxTexte 'setup.alle')
-    $alle.Add_LinkClicked({ foreach ($box in $kaestchen) { $box.Checked = $true } }.GetNewClosure())
-    Zeile $alle 12
+    $selectAll = New-Object Windows.Forms.LinkLabel
+    Set-Label $selectAll (Get-Translated $toolboxTexts 'setup.all')
+    $selectAll.Add_LinkClicked({ foreach ($box in $checkboxes) { $box.Checked = $true } }.GetNewClosure())
+    Add-Row $selectAll 12
 
-    $hinweis = New-Object Windows.Forms.Label
-    Beschriften $hinweis (Uebersetzt $toolboxTexte 'setup.hinweis')
-    $hinweis.ForeColor = $grau
-    $hinweis.MaximumSize = New-Object Drawing.Size ([int](380 * $s)), 0
-    Zeile $hinweis 8
+    $hint = New-Object Windows.Forms.Label
+    Set-Label $hint (Get-Translated $toolboxTexts 'setup.hint')
+    $hint.ForeColor = $gray
+    $hint.MaximumSize = New-Object Drawing.Size ([int](380 * $s)), 0
+    Add-Row $hint 8
 
-    $titel = New-Object Windows.Forms.Label
-    Beschriften $titel (Uebersetzt $toolboxTexte 'setup.verknuepfungen')
-    $titel.Font = New-Object Drawing.Font($form.Font, [Drawing.FontStyle]::Bold)
-    Zeile $titel 16
-    $ortKaestchen = @{}                                   # Ort -> Kästchen
-    foreach ($ort in $Orte.Keys) {
+    $title = New-Object Windows.Forms.Label
+    Set-Label $title (Get-Translated $toolboxTexts 'setup.shortcuts')
+    $title.Font = New-Object Drawing.Font($form.Font, [Drawing.FontStyle]::Bold)
+    Add-Row $title 16
+    $locationBoxes = @{}                                  # location -> checkbox
+    foreach ($location in $Locations.Keys) {
         $box = New-Object Windows.Forms.CheckBox
-        Beschriften $box (Uebersetzt $toolboxTexte $(if ($ort -eq 'Desktop') { 'setup.desktop' } else { 'setup.startmenue' }))
-        $box.Checked = Verknuepfung-Unsere $ort            # beim ersten Einrichten aus; Häkchen weg löscht sie
-        Zeile $box 6
-        $ortKaestchen[$ort] = $box
+        Set-Label $box (Get-Translated $toolboxTexts $(if ($location -eq 'Desktop') { 'setup.desktop' } else { 'setup.start_menu' }))
+        $box.Checked = Test-OurShortcut $location         # off on the first setup; unchecking deletes it
+        Add-Row $box 6
+        $locationBoxes[$location] = $box
     }
 
-    $knoepfe = New-Object Windows.Forms.FlowLayoutPanel
-    $knoepfe.FlowDirection = 'RightToLeft'
-    $abbrechen = New-Object Windows.Forms.Button
-    Beschriften $abbrechen (Uebersetzt $toolboxTexte 'setup.abbrechen')
-    $abbrechen.DialogResult = 'Cancel'
+    $buttons = New-Object Windows.Forms.FlowLayoutPanel
+    $buttons.FlowDirection = 'RightToLeft'
+    $cancel = New-Object Windows.Forms.Button
+    Set-Label $cancel (Get-Translated $toolboxTexts 'setup.cancel')
+    $cancel.DialogResult = 'Cancel'
     $ok = New-Object Windows.Forms.Button
-    Beschriften $ok (Uebersetzt $toolboxTexte 'setup.einrichten')
+    Set-Label $ok (Get-Translated $toolboxTexts 'setup.install')
     $ok.DialogResult = 'OK'
-    foreach ($knopf in $abbrechen, $ok) {
-        $knopf.AutoSize = $true
-        $knopf.MinimumSize = New-Object Drawing.Size ([int](88 * $s)), 0
-        $knoepfe.Controls.Add($knopf)
+    foreach ($button in $cancel, $ok) {
+        $button.AutoSize = $true
+        $button.MinimumSize = New-Object Drawing.Size ([int](88 * $s)), 0
+        $buttons.Controls.Add($button)
     }
     $form.AcceptButton = $ok
-    $form.CancelButton = $abbrechen
-    Zeile $knoepfe 14
-    $knoepfe.Dock = 'Fill'                                # nach Zeile: Knöpfe rechtsbündig über die volle Breite
+    $form.CancelButton = $cancel
+    Add-Row $buttons 14
+    $buttons.Dock = 'Fill'                                # after Add-Row: buttons right-aligned across the full width
 
-    $ergebnis = $form.ShowDialog()
-    $ids = @($kaestchen | Where-Object { $_.Checked -and $_.Tag -ne 'toolbox' } | ForEach-Object { $_.Tag })
-    $verknuepfungen = @{}
-    foreach ($ort in $Orte.Keys) { $verknuepfungen[$ort] = $ortKaestchen[$ort].Checked }
-    $sprache = ($sprachKnoepfe | Where-Object Checked | Select-Object -First 1).Tag
+    $result = $form.ShowDialog()
+    $ids = @($checkboxes | Where-Object { $_.Checked -and $_.Tag -ne 'toolbox' } | ForEach-Object { $_.Tag })
+    $shortcuts = @{}
+    foreach ($location in $Locations.Keys) { $shortcuts[$location] = $locationBoxes[$location].Checked }
+    $language = ($languageButtons | Where-Object Checked | Select-Object -First 1).Tag
     $form.Dispose()
-    if ($ergebnis -ne 'OK') { return $null }
-    [pscustomobject]@{ Sprache = $sprache; Ids = $ids; Verknuepfungen = $verknuepfungen }
+    if ($result -ne 'OK') { return $null }
+    [pscustomobject]@{ Language = $language; Ids = $ids; Shortcuts = $shortcuts }
 }
 
 
-# ---------- Zustand vor dem Einrichten – ist danach genauso (auch nach einem Update) ----------
-function Autostart {
-    <# 'an' oder 'aus' (Schalter „Autostart“ in der Toolbox) – $null, wenn es die Aufgabe nicht gibt. #>
-    $task = Get-ScheduledTask -TaskName $Aufgabe -ErrorAction SilentlyContinue
-    if (-not $task) { $null } elseif ($task.State -eq 'Disabled') { 'aus' } else { 'an' }
+# ---------- State before setting up – is exactly the same afterwards (also after an update) ----------
+function Get-Autostart {
+    <# 'on' or 'off' (switch "Autostart" in the Toolbox) – $null if the task doesn't exist. #>
+    $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    if (-not $task) { $null } elseif ($task.State -eq 'Disabled') { 'off' } else { 'on' }
 }
 
-function Zustand-Merken {
-    <# Hält ganz am Anfang fest, was der Nutzer eingestellt hat und das Einrichten anfassen könnte –
-       Zustand-Abgleichen stellt es am Ende wieder her:
-       - Autostart: die Aufgabe liegt in Windows, nicht in daten\ – und Windows legt sie beim Neu-Einrichten aktiv an
-       - ob der Hardware-Monitor lief (ob die Toolbox lief, merkt sich Einrichten selbst: $toolboxLief)
-       - welche weiteren Programme liefen (Weitere-Programme) – Einrichten beendet sie, danach laufen sie wieder
-       - die Einstellungsdateien in daten\ (Einrichten selbst schreibt dort nur installiert.json – die Auswahl – und
-         nach dem Fenster die Sprache in toolbox.json) #>
-    $dateien = @{}
-    foreach ($f in Get-ChildItem (Join-Path $Root 'daten\*.json') -ErrorAction SilentlyContinue) {
-        if ($f.Name -ne (Split-Path -Leaf $InstalliertDatei)) { $dateien[$f.Name] = [IO.File]::ReadAllText($f.FullName) }
+function Save-State {
+    <# Notes at the very beginning what the user has set and setting up might touch –
+       Restore-State restores it at the end:
+       - autostart: the task lives in Windows, not in data\ – and Windows creates it enabled when setting it up again
+       - whether the Hardware Monitor was running (whether the Toolbox was running, setting up notes itself: $toolboxWasRunning)
+       - which other programs were running (Get-OtherPrograms) – setting up quits them, afterwards they run again
+       - the settings files in data\ (setting up itself only writes installed.json there – the selection – and
+         after the window the language into toolbox.json) #>
+    $files = @{}
+    foreach ($f in Get-ChildItem (Join-Path $Root 'data\*.json') -ErrorAction SilentlyContinue) {
+        if ($f.Name -ne (Split-Path -Leaf $InstalledFile)) { $files[$f.Name] = [IO.File]::ReadAllText($f.FullName) }
     }
-    $laufend = @(Weitere-Programme | Where-Object { Befehl-Senden $_.port 'status' } | ForEach-Object id)
-    [pscustomobject]@{ Autostart = Autostart; MonitorLief = [bool](Monitor-Befehl 'status'); Laufend = $laufend
-                       Dateien = $dateien }
+    $running = @(Get-OtherPrograms | Where-Object { Send-Command $_.port 'status' } | ForEach-Object id)
+    [pscustomobject]@{ Autostart = Get-Autostart; MonitorWasRunning = [bool](Send-MonitorCommand 'status'); Running = $running
+                       Files = $files }
 }
 
-function Json-Lesbar($pfad) {
-    try { $text = [IO.File]::ReadAllText($pfad); if (-not $text.Trim()) { return $false }; $null = $text | ConvertFrom-Json; $true }
+function Test-JsonReadable($path) {
+    try { $text = [IO.File]::ReadAllText($path); if (-not $text.Trim()) { return $false }; $null = $text | ConvertFrom-Json; $true }
     catch { $false }
 }
 
-function Zustand-Abgleichen($vor, $monitorDa, $neuStarten, $ids) {
-    <# Stellt her, was Zustand-Merken festgehalten hat. Läuft auch, wenn das Einrichten unterwegs abbricht.
-       $monitorDa: Hardware-Monitor ist (noch) eingerichtet. $neuStarten: läuft er, mit dem neuen Code neu starten
-       (-Neustart nach einem Update, in Schritt 3 für die neue .exe beendet, Aufgabe zeigt jetzt woandershin).
-       $ids: die eingerichteten Programme (weitere Programme starten nur wieder, wenn sie noch dazugehören). #>
-    Schritt 'Alles wie vorher? (Autostart, laufende Programme, Einstellungen)'
-    $admin = @()                                  # was nur mit Adminrechten geht – zusammen in EINER UAC-Abfrage
+function Restore-State($before, $monitorInstalled, $restartMonitor, $ids) {
+    <# Restores what Save-State noted. Also runs if setting up aborts on the way.
+       $monitorInstalled: Hardware Monitor is (still) installed. $restartMonitor: if it is running, restart it with the
+       new code (-Restart after an update, quit in step 3 for the new .exe, task now points somewhere else).
+       $ids: the installed programs (other programs only start again if they still belong to them). #>
+    Step 'Everything as before? (autostart, running programs, settings)'
+    $admin = @()                                  # what only works with admin rights – together in ONE UAC prompt
 
-    # Autostart: genau wie vorher. Gab es die Aufgabe noch nicht, ist er aus (so legt task_command sie an).
-    $soll = if ($vor.Autostart) { $vor.Autostart } else { 'aus' }
-    $ist = Autostart
-    if (-not $ist) {
-        if ($monitorDa -and $vor.Autostart) { Warnung "Aufgabe $Aufgabe fehlt – Setup.exe erneut ausführen." }
-    } elseif ($ist -eq $soll) {
-        Ok $(if ($vor.Autostart) { "Autostart: $ist – wie vorher" } else { 'Autostart: aus (einschalten in der Toolbox)' })
+    # Autostart: exactly as before. If the task didn't exist yet, it is off (that's how task_command creates it).
+    $should = if ($before.Autostart) { $before.Autostart } else { 'off' }
+    $is = Get-Autostart
+    if (-not $is) {
+        if ($monitorInstalled -and $before.Autostart) { Warn "Task $TaskName is missing – run Setup.exe again." }
+    } elseif ($is -eq $should) {
+        Ok $(if ($before.Autostart) { "Autostart: $is – as before" } else { 'Autostart: off (turn it on in the Toolbox)' })
     } else {
-        Info "Autostart ist $ist, war $soll – wird zurückgestellt"
-        $admin += "autostart-$soll"               # die Aufgabe läuft mit Adminrechten -> ändern nur mit Adminrechten
+        Info "Autostart is $is, was $should – setting it back"
+        $admin += "autostart-$should"             # the task runs with admin rights -> change only with admin rights
     }
 
-    # Hardware-Monitor: lief er vorher, läuft er danach wieder (mit dem neuen Code); lief er nicht, bleibt er aus
-    $laeuft = [bool](Monitor-Befehl 'status')
-    if (-not $monitorDa) {
-        # abgewählt oder nie eingerichtet – nichts zu tun
-    } elseif (-not $vor.MonitorLief) {
-        Ok $(if ($laeuft) { 'Hardware-Monitor läuft' } else { 'Hardware-Monitor: nicht gestartet – wie vorher (Start über die Toolbox)' })
-    } elseif ($laeuft -and -not $neuStarten) {
-        Ok 'Hardware-Monitor läuft – wie vorher'
-    } elseif (-not (Test-Path $Monitor.StarterPfad)) {
-        Warnung "Hardware-Monitor lief vorher, aber $(Split-Path -Leaf $Monitor.StarterPfad) fehlt (siehe oben) – Setup.exe erneut ausführen."
+    # Hardware Monitor: if it was running before, it runs again afterwards (with the new code); if not, it stays off
+    $running = [bool](Send-MonitorCommand 'status')
+    if (-not $monitorInstalled) {
+        # deselected or never installed – nothing to do
+    } elseif (-not $before.MonitorWasRunning) {
+        Ok $(if ($running) { 'Hardware Monitor is running' } else { 'Hardware Monitor: not started – as before (start it via the Toolbox)' })
+    } elseif ($running -and -not $restartMonitor) {
+        Ok 'Hardware Monitor is running – as before'
+    } elseif (-not (Test-Path $Monitor.StarterPath)) {
+        Warn "Hardware Monitor was running before, but $(Split-Path -Leaf $Monitor.StarterPath) is missing (see above) – run Setup.exe again."
     } else {
-        if ($laeuft) { Monitor-Beenden }          # läuft noch mit dem alten Code
-        if ($ist -eq 'an') {                      # über die Aufgabe: ohne UAC-Abfrage
-            Start-ScheduledTask -TaskName $Aufgabe
-            Ok $(if ($laeuft) { 'Hardware-Monitor neu gestartet – lief vorher' } else { 'Hardware-Monitor wieder gestartet – lief vorher' })
+        if ($running) { Stop-Monitor }            # still running with the old code
+        if ($is -eq 'on') {                       # via the task: without UAC prompt
+            Start-ScheduledTask -TaskName $TaskName
+            Ok $(if ($running) { 'Hardware Monitor restarted – was running before' } else { 'Hardware Monitor started again – was running before' })
         } else {
-            $admin += 'monitor-starten'           # Autostart aus -> braucht für die CPU-Werte Adminrechte
+            $admin += 'monitor-start'             # autostart off -> needs admin rights for the CPU values
         }
     }
 
-    # Weitere Programme (ohne Adminrechte): Einrichten hat sie beendet – lief eins vorher, jetzt wieder starten
-    foreach ($p in Weitere-Programme | Where-Object { $vor.Laufend -contains $_.id }) {
-        if (Befehl-Senden $p.port 'status') { Ok "$($p.name) läuft – wie vorher" }
-        elseif ($ids -notcontains $p.id) { Ok "$($p.name): entfernt, läuft nicht mehr" }
-        elseif (-not (Test-Path $p.StarterPfad)) { Warnung "$($p.name) lief vorher, aber $(Split-Path -Leaf $p.StarterPfad) fehlt (siehe oben)." }
+    # Other programs (without admin rights): setting up quit them – if one was running before, start it again now
+    foreach ($p in Get-OtherPrograms | Where-Object { $before.Running -contains $_.id }) {
+        if (Send-Command $p.port 'status') { Ok "$($p.name) is running – as before" }
+        elseif ($ids -notcontains $p.id) { Ok "$($p.name): removed, no longer running" }
+        elseif (-not (Test-Path $p.StarterPath)) { Warn "$($p.name) was running before, but $(Split-Path -Leaf $p.StarterPath) is missing (see above)." }
         else {
-            try { Start-Process $p.StarterPfad -WorkingDirectory $p.Ordner; Ok "$($p.name) wieder gestartet – lief vorher" }
-            catch { Warnung "$($p.name) startete nicht: $_" }
+            try { Start-Process $p.StarterPath -WorkingDirectory $p.Folder; Ok "$($p.name) started again – was running before" }
+            catch { Warn "$($p.name) didn't start: $_" }
         }
     }
 
     if ($admin.Count -gt 0) {
-        $meldungen = @{ 'autostart-an' = 'Autostart: an – wie vorher'; 'autostart-aus' = 'Autostart: aus – wie vorher'
-                        'monitor-starten' = 'Hardware-Monitor wieder gestartet – lief vorher' }
-        if ($OhneAdmin) { Warnung "übersprungen (-OhneAdmin): $($admin -join ', ') – in der Toolbox nachholen." }
-        elseif (Als-Admin $admin) { foreach ($s in $admin) { Ok $meldungen[$s] } }
-        else { Warnung 'Nicht alles ließ sich wiederherstellen – in der Toolbox nachholen (Seite Hardware-Monitor).' }
+        $messages = @{ 'autostart-on' = 'Autostart: on – as before'; 'autostart-off' = 'Autostart: off – as before'
+                       'monitor-start' = 'Hardware Monitor started again – was running before' }
+        if ($NoAdmin) { Warn "skipped (-NoAdmin): $($admin -join ', ') – catch up in the Toolbox." }
+        elseif (Invoke-AsAdmin $admin) { foreach ($s in $admin) { Ok $messages[$s] } }
+        else { Warn 'Not everything could be restored – catch up in the Toolbox (Hardware Monitor page).' }
     }
 
-    # Einstellungen in daten\: fehlt eine Datei oder ist sie kaputt, kommt die von vorher zurück
-    $gleich = 0
-    foreach ($name in $vor.Dateien.Keys) {
-        $pfad = Join-Path $Root "daten\$name"
-        if (-not (Json-Lesbar $pfad)) {
-            [IO.File]::WriteAllText($pfad, $vor.Dateien[$name], (New-Object Text.UTF8Encoding $false))
-            Ok "daten\$name war weg oder kaputt – wiederhergestellt"
-        } elseif ([IO.File]::ReadAllText($pfad) -eq $vor.Dateien[$name]) {
-            $gleich++
-        } else {                                  # z. B. Fensterposition, die der Monitor beim Beenden speichert
-            Info "daten\${name}: vom Programm selbst gespeichert (z. B. beim Beenden)"
+    # Settings in data\: if a file is missing or broken, the one from before comes back
+    $same = 0
+    foreach ($name in $before.Files.Keys) {
+        $path = Join-Path $Root "data\$name"
+        if (-not (Test-JsonReadable $path)) {
+            [IO.File]::WriteAllText($path, $before.Files[$name], (New-Object Text.UTF8Encoding $false))
+            Ok "data\$name was gone or broken – restored"
+        } elseif ([IO.File]::ReadAllText($path) -eq $before.Files[$name]) {
+            $same++
+        } else {                                  # e.g. window position that the monitor saves when quitting
+            Info "data\${name}: saved by the program itself (e.g. when quitting)"
         }
     }
-    if ($vor.Dateien.Count -eq 0) { Ok 'Einstellungen: noch keine gespeichert' }
-    elseif ($gleich -eq $vor.Dateien.Count) { Ok "Einstellungen in daten\: alle $gleich Dateien unverändert" }
+    if ($before.Files.Count -eq 0) { Ok 'Settings: none saved yet' }
+    elseif ($same -eq $before.Files.Count) { Ok "Settings in data\: all $same files unchanged" }
 }
 
 
-# ---------- Der Teil mit Adminrechten (läuft im eigenen Fenster) ----------
-function Admin-Schritte($schritte) {
+# ---------- The part with admin rights (runs in its own window) ----------
+function Invoke-AdminSteps($steps) {
     $ok = $true
-    if ($schritte -contains 'pawnio') {
-        Schritt 'PawnIO installieren'
+    if ($steps -contains 'pawnio') {
+        Step 'Install PawnIO'
         winget install --id namazso.PawnIO --exact --accept-package-agreements --accept-source-agreements | Out-Host
-        if ($LASTEXITCODE -eq 0) { Ok 'installiert' } else { Warnung "winget meldet Code $LASTEXITCODE"; $ok = $false }
+        if ($LASTEXITCODE -eq 0) { Ok 'installed' } else { Warn "winget reports code $LASTEXITCODE"; $ok = $false }
     }
-    if ($schritte -contains 'aufgabe') {
-        Schritt "Aufgabe $Aufgabe einrichten"
-        & $RuntimePy -B -c $PyAufgabe (Join-Path $Root 'toolbox') $Aufgabe $Monitor.StarterPfad | Out-Host
-        if ($LASTEXITCODE -ne 0) { Warnung 'fehlgeschlagen'; $ok = $false } else { Ok 'eingerichtet' }
+    if ($steps -contains 'task') {
+        Step "Set up task $TaskName"
+        & $RuntimePy -B -c $PyTask (Join-Path $Root 'toolbox') $TaskName $Monitor.StarterPath | Out-Host
+        if ($LASTEXITCODE -ne 0) { Warn 'failed'; $ok = $false } else { Ok 'set up' }
     }
-    # Zurückstellen, wie es vor dem Einrichten war (Zustand-Abgleichen)
-    if ($schritte -contains 'autostart-an') {
-        Schritt 'Autostart wieder einschalten'
-        try { Enable-ScheduledTask -TaskName $Aufgabe | Out-Null; Ok 'an, wie vorher' }
-        catch { Warnung $_; $ok = $false }
+    # Set back to how it was before setting up (Restore-State)
+    if ($steps -contains 'autostart-on') {
+        Step 'Turn autostart back on'
+        try { Enable-ScheduledTask -TaskName $TaskName | Out-Null; Ok 'on, as before' }
+        catch { Warn $_; $ok = $false }
     }
-    if ($schritte -contains 'autostart-aus') {
-        Schritt 'Autostart wieder ausschalten'
-        try { Disable-ScheduledTask -TaskName $Aufgabe | Out-Null; Ok 'aus, wie vorher' }
-        catch { Warnung $_; $ok = $false }
+    if ($steps -contains 'autostart-off') {
+        Step 'Turn autostart back off'
+        try { Disable-ScheduledTask -TaskName $TaskName | Out-Null; Ok 'off, as before' }
+        catch { Warn $_; $ok = $false }
     }
-    if ($schritte -contains 'monitor-starten') {        # mit Adminrechten gestartet -> der Monitor hat sie auch
-        Schritt 'Hardware-Monitor wieder starten'
-        try { Start-Process $Monitor.StarterPfad -WorkingDirectory $Monitor.Ordner; Ok 'gestartet' }
-        catch { Warnung $_; $ok = $false }
+    if ($steps -contains 'monitor-start') {             # started with admin rights -> the monitor has them too
+        Step 'Start Hardware Monitor again'
+        try { Start-Process $Monitor.StarterPath -WorkingDirectory $Monitor.Folder; Ok 'started' }
+        catch { Warn $_; $ok = $false }
     }
-    if ($schritte -contains 'aufgabe-loeschen') {
-        Schritt "Aufgabe $Aufgabe löschen"
-        try { Unregister-ScheduledTask -TaskName $Aufgabe -Confirm:$false; Ok 'gelöscht' }
-        catch { Warnung $_; $ok = $false }
+    if ($steps -contains 'task-delete') {
+        Step "Delete task $TaskName"
+        try { Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false; Ok 'deleted' }
+        catch { Warn $_; $ok = $false }
     }
-    if (-not $ok) { Read-Host "`nEnter drücken zum Schließen" | Out-Null }   # Fehler lesbar lassen
+    if (-not $ok) { Read-Host "`nPress Enter to close" | Out-Null }   # keep errors readable
     return $ok
 }
 
 
-# ---------- Einrichten ----------
-function Finde-Python {
-    <# Registriertes Python $PythonVersion (64 Bit) aus der Registry (PEP 514) – oder $null.
-       Andere Versionen zählen bewusst nicht: requirements.txt ist nur mit $PythonVersion geprüft. #>
+# ---------- Set up ----------
+function Find-Python {
+    <# Registered Python $PythonVersion (64 bit) from the registry (PEP 514) – or $null.
+       Other versions deliberately don't count: requirements.txt is only tested with $PythonVersion. #>
     foreach ($hive in 'HKCU:', 'HKLM:') {
         $exe = (Get-ItemProperty "$hive\Software\Python\PythonCore\$PythonVersion\InstallPath" `
                     -ErrorAction SilentlyContinue).ExecutablePath
@@ -707,355 +705,355 @@ function Finde-Python {
     $null
 }
 
-function Runtime-Version {
-    <# Major.Minor des Pythons in runtime\, z. B. "3.14". #>
+function Get-RuntimeVersion {
+    <# Major.minor of the Python in runtime\, e.g. "3.14". #>
     & $RuntimePy -c 'import sys; print(*sys.version_info[:2], sep=''.'')'
 }
 
-function Einrichten {
-    # Merken, was eingestellt ist, bevor irgendetwas passiert – am Ende ist es wieder genauso (Zustand-Abgleichen)
-    $vorZustand = Zustand-Merken
+function Install-Toolbox {
+    # Note what is set before anything happens – at the end it is exactly the same again (Restore-State)
+    $stateBefore = Save-State
 
-    # 0. Welche Programme: aus -Programme, wie bisher (-Neustart) oder aus dem Fenster
-    $vorher = Installierte
-    $verknuepfungen = $null                       # nur das Fenster fragt danach – sonst bleiben sie, wie sie sind
-    if ($Programme) { $ids = @($vorher) + @(Programm-Ids $Programme) | Select-Object -Unique }
-    elseif ($Neustart) { $ids = $vorher }
+    # 0. Which programs: from -Programs, as before (-Restart) or from the window
+    $before = Get-Installed
+    $shortcuts = $null                            # only the window asks for them – otherwise they stay as they are
+    if ($Programs) { $ids = @($before) + @(Get-ProgramIds $Programs) | Select-Object -Unique }
+    elseif ($Restart) { $ids = $before }
     else {
-        $wahl = Auswahl-Fenster $vorher
-        if ($null -eq $wahl) { Write-Host 'Abgebrochen – nichts geändert.'; return }
-        $ids = $wahl.Ids
-        $verknuepfungen = $wahl.Verknuepfungen
-        Sprache-Speichern $wahl.Sprache
-        # gehört zur Wahl im Fenster, nicht zu dem, was Zustand-Abgleichen am Ende wiederherstellt
-        $vorZustand.Dateien[(Split-Path -Leaf $ToolboxDatei)] = [IO.File]::ReadAllText($ToolboxDatei)
-        Ok "Sprache: $($wahl.Sprache)"
+        $choice = Show-SelectionWindow $before
+        if ($null -eq $choice) { Write-Host 'Cancelled – nothing changed.'; return }
+        $ids = $choice.Ids
+        $shortcuts = $choice.Shortcuts
+        Save-Language $choice.Language
+        # belongs to the choice in the window, not to what Restore-State restores at the end
+        $stateBefore.Files[(Split-Path -Leaf $ToolboxFile)] = [IO.File]::ReadAllText($ToolboxFile)
+        Ok "Language: $($choice.Language)"
     }
     $ids = @($ids)
-    Installierte-Speichern $ids                   # gleich speichern: Bricht unten etwas ab, gilt die Wahl trotzdem
-    # Schritte 3–7 für alle gewählten Programme – mit -Programme nur für die genannten (die übrigen sind ja schon
-    # eingerichtet). Python und runtime\ (1–2) brauchen alle, die werden immer geprüft.
-    $Auswahl = @($Alle | Where-Object {
-        if ($Programme) { (Programm-Ids $Programme) -contains $_.id } else { $_.id -eq 'toolbox' -or $ids -contains $_.id }
+    Save-Installed $ids                           # save right away: if something below aborts, the choice still applies
+    # Steps 3–7 for all chosen programs – with -Programs only for the named ones (the others are already
+    # installed). Python and runtime\ (1–2) are needed by all, they are always checked.
+    $Selection = @($All | Where-Object {
+        if ($Programs) { (Get-ProgramIds $Programs) -contains $_.id } else { $_.id -eq 'toolbox' -or $ids -contains $_.id }
     })
-    $mitMonitor = $Auswahl -contains $Monitor
+    $withMonitor = $Selection -contains $Monitor
 
-    # Eine laufende Toolbox hält Dateien in runtime\ fest (Pakete, Toolbox.exe) -> vorher beenden, am Ende neu starten
-    $toolboxLief = Toolbox-Beenden
-    if ($toolboxLief) { Info 'Toolbox für die Einrichtung beendet – wird am Ende wieder gestartet.' }
-    # Dasselbe für weitere Programme (halten ihre .exe in runtime\ fest; danach starten sie mit dem neuen Code)
-    foreach ($p in Weitere-Programme | Where-Object { $vorZustand.Laufend -contains $_.id }) {
-        Programm-Beenden $p
-        Start-Sleep -Milliseconds 500             # Prozess räumt nach dem Schließen des Ports noch kurz auf
-        Info "$($p.name) für die Einrichtung beendet – wird am Ende wieder gestartet."
+    # A running Toolbox keeps files in runtime\ locked (packages, Toolbox.exe) -> quit it first, restart it at the end
+    $toolboxWasRunning = Stop-Toolbox
+    if ($toolboxWasRunning) { Info 'Toolbox quit for the setup – will be started again at the end.' }
+    # The same for other programs (they keep their .exe in runtime\ locked; afterwards they start with the new code)
+    foreach ($p in Get-OtherPrograms | Where-Object { $stateBefore.Running -contains $_.id }) {
+        Stop-Program $p
+        Start-Sleep -Milliseconds 500             # the process still cleans up briefly after closing the port
+        Info "$($p.name) quit for the setup – will be started again at the end."
     }
 
-    # Die Schritte selbst; Abgleichen und Toolbox-Start kommen auch dann, wenn unterwegs etwas abbricht
-    $lauf = @{ NeuStarten = [bool]$Neustart }     # Monitor neu starten (-Neustart: nach einem Update) – setzen die Schritte
+    # The steps themselves; restoring and the Toolbox start also come if something aborts on the way
+    $run = @{ RestartMonitor = [bool]$Restart }   # restart the monitor (-Restart: after an update) – set by the steps
     try {
-        Einrichten-Schritte $vorher $ids $Auswahl $mitMonitor $lauf $verknuepfungen | Out-Host
+        Install-Steps $before $ids $Selection $withMonitor $run $shortcuts | Out-Host
     } finally {
-        try { Zustand-Abgleichen $vorZustand ($ids -contains $Monitor.id) $lauf.NeuStarten $ids }
-        catch { Warnung "Abgleichen fehlgeschlagen: $_" }
-        if ($toolboxLief) { Toolbox-Starten }
+        try { Restore-State $stateBefore ($ids -contains $Monitor.id) $run.RestartMonitor $ids }
+        catch { Warn "Restoring failed: $_" }
+        if ($toolboxWasRunning) { Start-Toolbox }
     }
 
     Write-Host ""
-    if ($script:Warnungen) {
-        Write-Host "Fertig, aber nicht alles hat geklappt – siehe die gelben [!]-Zeilen oben." -ForegroundColor Yellow
-    } elseif ($toolboxLief) {
-        Write-Host "Fertig. Die Toolbox wurde wieder gestartet." -ForegroundColor Green
+    if ($script:Warnings) {
+        Write-Host "Done, but not everything worked – see the yellow [!] lines above." -ForegroundColor Yellow
+    } elseif ($toolboxWasRunning) {
+        Write-Host "Done. The Toolbox was started again." -ForegroundColor Green
     } else {
-        Write-Host "Fertig. Die Toolbox startest du mit Toolbox.exe." -ForegroundColor Green
+        Write-Host "Done. Start the Toolbox with Toolbox.exe." -ForegroundColor Green
     }
 }
 
-function Einrichten-Schritte($vorher, $ids, $Auswahl, $mitMonitor, $lauf, $verknuepfungen) {
-    foreach ($p in $Alle | Where-Object { $vorher -contains $_.id -and $ids -notcontains $_.id }) {
-        Programm-Entfernen $p                     # im Fenster abgewählt
+function Install-Steps($before, $ids, $Selection, $withMonitor, $run, $shortcuts) {
+    foreach ($p in $All | Where-Object { $before -contains $_.id -and $ids -notcontains $_.id }) {
+        Uninstall-Program $p                      # deselected in the window
     }
 
     # 1. Python
-    Schritt "Python $PythonVersion"
+    Step "Python $PythonVersion"
     if (Test-Path $RuntimePy) {
-        $vorhanden = Runtime-Version
-        if ($vorhanden -eq $PythonVersion) { Ok 'runtime\ ist schon da – das installierte Python wird nicht gebraucht' }
-        else { Warnung "runtime\ enthält Python $vorhanden statt $PythonVersion – zum Wechseln runtime\ löschen und erneut einrichten." }
+        $present = Get-RuntimeVersion
+        if ($present -eq $PythonVersion) { Ok 'runtime\ is already there – the installed Python is not needed' }
+        else { Warn "runtime\ contains Python $present instead of $PythonVersion – to switch, delete runtime\ and set up again." }
     } else {
-        $python = Finde-Python
+        $python = Find-Python
         if (-not $python) {
-            Info "Python $PythonVersion nicht gefunden – wird per winget installiert …"
+            Info "Python $PythonVersion not found – installing it via winget …"
             winget install --id "Python.Python.$PythonVersion" --exact --scope user --accept-package-agreements --accept-source-agreements
-            $python = Finde-Python
-            if (-not $python) { throw "Python $PythonVersion konnte nicht installiert werden. Bitte von python.org installieren und erneut starten." }
+            $python = Find-Python
+            if (-not $python) { throw "Python $PythonVersion could not be installed. Please install it from python.org and start again." }
         }
         Ok "Python $($python.Version): $($python.Exe)"
     }
 
     # 2. runtime\
-    Schritt 'Eigenes Python im Projektordner (runtime\)'
+    Step 'Our own Python in the project folder (runtime\)'
     if (-not (Test-Path $RuntimePy)) {
-        $basis = Split-Path -Parent $python.Exe
-        Info "Kopiere $basis …"
-        # Ohne Doku, Tests, Entwickler-Dateien und die installierten Pakete (die kommen gleich frisch dazu)
-        robocopy $basis $Runtime /E /NFL /NDL /NJH /NJS /NP `
-            /XD (Join-Path $basis 'Doc') (Join-Path $basis 'include') (Join-Path $basis 'libs') `
-                (Join-Path $basis 'Scripts') (Join-Path $basis 'Tools') (Join-Path $basis 'Lib\site-packages') `
-                (Join-Path $basis 'Lib\test') __pycache__ `
+        $base = Split-Path -Parent $python.Exe
+        Info "Copying $base …"
+        # Without docs, tests, developer files and the installed packages (those come fresh in a moment)
+        robocopy $base $Runtime /E /NFL /NDL /NJH /NJS /NP `
+            /XD (Join-Path $base 'Doc') (Join-Path $base 'include') (Join-Path $base 'libs') `
+                (Join-Path $base 'Scripts') (Join-Path $base 'Tools') (Join-Path $base 'Lib\site-packages') `
+                (Join-Path $base 'Lib\test') __pycache__ `
             /XF *.pyc | Out-Null
-        if ($LASTEXITCODE -ge 8) { throw "Kopieren fehlgeschlagen (robocopy-Code $LASTEXITCODE)" }
+        if ($LASTEXITCODE -ge 8) { throw "Copying failed (robocopy code $LASTEXITCODE)" }
         New-Item -ItemType Directory -Force (Join-Path $Runtime 'Lib\site-packages') | Out-Null
 
-        # Python soll nur nutzen, was in runtime\ liegt – nichts aus dem installierten Python oder dem Benutzerordner.
-        # So fällt sofort auf, wenn etwas fehlt, statt erst auf einem anderen PC.
-        # ._pth-Datei: feste Suchpfade, Umgebungsvariablen wie PYTHONPATH zählen nicht
+        # Python should only use what is in runtime\ – nothing from the installed Python or the user folder.
+        # That way it is noticed right away when something is missing, instead of only on another PC.
+        # ._pth file: fixed search paths, environment variables like PYTHONPATH don't count
         $dll = Get-ChildItem $Runtime -Filter 'python3*.dll' | Where-Object Name -ne 'python3.dll' | Select-Object -First 1
         "$($dll.BaseName).zip`r`nDLLs`r`nLib`r`nimport site`r`n" |
             Set-Content -Encoding ASCII (Join-Path $Runtime "$($dll.BaseName)._pth")
-        # sitecustomize.py: nimmt die Pakete aus %APPDATA%\Python wieder heraus (die ._pth-Datei allein tut das nicht)
-        "# Angelegt von Setup.exe: keine Pakete aus dem Benutzerordner (%APPDATA%\Python) verwenden`r`n" +
+        # sitecustomize.py: takes the packages from %APPDATA%\Python out again (the ._pth file alone doesn't do that)
+        "# Created by Setup.exe: don't use packages from the user folder (%APPDATA%\Python)`r`n" +
         "import site, sys`r`n" +
         "if site.getusersitepackages() in sys.path:`r`n" +
         "    sys.path.remove(site.getusersitepackages())`r`n" |
             Set-Content -Encoding ASCII (Join-Path $Runtime 'Lib\sitecustomize.py')
 
-        Info 'Installiere pip …'
-        # Ausgabe verwerfen (u. a. die Warnung, runtime\Scripts stehe nicht im PATH – braucht es auch nicht);
-        # 'Continue', weil PowerShell 5.1 Text auf stderr sonst als Fehler wertet
+        Info 'Installing pip …'
+        # Discard the output (among others the warning that runtime\Scripts isn't in the PATH – it isn't needed);
+        # 'Continue', because PowerShell 5.1 otherwise treats text on stderr as an error
         $ErrorActionPreference = 'Continue'
         & $RuntimePy -m ensurepip --default-pip 2>&1 | Out-Null
         $ErrorActionPreference = 'Stop'
-        if ($LASTEXITCODE -ne 0) { throw 'pip konnte nicht eingerichtet werden' }
-        Ok 'runtime\ angelegt'
+        if ($LASTEXITCODE -ne 0) { throw 'pip could not be set up' }
+        Ok 'runtime\ created'
     }
-    # Ohne ssl lädt pip nichts von PyPI – z. B. wenn beim Kopieren libcrypto-3.dll fehlte. Lieber hier klar abbrechen.
+    # Without ssl pip loads nothing from PyPI – e.g. if libcrypto-3.dll was missing when copying. Better abort clearly here.
     & $RuntimePy -c 'import ssl'
-    if ($LASTEXITCODE -ne 0) { throw 'runtime\ ist unvollständig (ssl fehlt) – Ordner runtime\ löschen und erneut einrichten' }
-    Info 'Pakete aus requirements.txt (feste Versionen) …'
+    if ($LASTEXITCODE -ne 0) { throw 'runtime\ is incomplete (ssl is missing) – delete the folder runtime\ and set up again' }
+    Info 'Packages from requirements.txt (fixed versions) …'
     & $RuntimePy -m pip install --disable-pip-version-check --no-warn-script-location --quiet `
         -r (Join-Path $Root 'requirements.txt')
-    if ($LASTEXITCODE -ne 0) { throw 'Pakete konnten nicht installiert werden' }
+    if ($LASTEXITCODE -ne 0) { throw 'Packages could not be installed' }
     & $RuntimePy -c 'import tkinter, customtkinter, pystray, PIL, clr, pygame'
-    if ($LASTEXITCODE -ne 0) { throw 'runtime\ ist unvollständig – Ordner runtime\ löschen und erneut einrichten' }
-    Ok 'Pakete vollständig'
+    if ($LASTEXITCODE -ne 0) { throw 'runtime\ is incomplete – delete the folder runtime\ and set up again' }
+    Ok 'Packages complete'
 
-    # 3. Je Programm: pythonw.exe-Kopie mit eigenem Namen und Symbol + Starter
-    foreach ($p in $Auswahl | Where-Object StarterPfad) {
-        Schritt "$($p.name): $(Split-Path -Leaf $p.StarterPfad)"
-        $meldung = & $RuntimePy -B (Join-Path $PSScriptRoot 'exe_anlegen.py') $p.HostPfad $p.name $p.SymbolPfad
-        # 2 = Datei gesperrt, weil das Programm läuft. Den Monitor dürfen wir kurz beenden (Schritt 7 startet ihn neu),
-        # die Toolbox nicht – da bleibt die alte Datei bis zum nächsten Einrichten.
-        if ($LASTEXITCODE -eq 2 -and $p -eq $Monitor -and (Monitor-Befehl 'status')) {
-            Info 'Hardware-Monitor läuft noch mit der alten Datei – wird kurz beendet …'
-            Monitor-Beenden
-            $lauf.NeuStarten = $true
-            # Der Prozess räumt nach dem letzten IPC-Lebenszeichen noch kurz auf (LHM schließen) – so lange ist die
-            # Datei noch gesperrt. Bis zu 10 s erneut versuchen.
+    # 3. Per program: pythonw.exe copy with its own name and icon + starter
+    foreach ($p in $Selection | Where-Object StarterPath) {
+        Step "$($p.name): $(Split-Path -Leaf $p.StarterPath)"
+        $message = & $RuntimePy -B (Join-Path $PSScriptRoot 'make_exe.py') $p.HostPath $p.name $p.IconPath
+        # 2 = file locked because the program is running. We may quit the monitor briefly (step 7 restarts it),
+        # but not the Toolbox – there the old file stays until the next setup.
+        if ($LASTEXITCODE -eq 2 -and $p -eq $Monitor -and (Send-MonitorCommand 'status')) {
+            Info 'Hardware Monitor is still running with the old file – quitting it briefly …'
+            Stop-Monitor
+            $run.RestartMonitor = $true
+            # The process still cleans up briefly after the last IPC sign of life (closing LHM) – the file is
+            # still locked that long. Retry for up to 10 s.
             for ($i = 0; $i -lt 20; $i++) {
-                $meldung = & $RuntimePy -B (Join-Path $PSScriptRoot 'exe_anlegen.py') $p.HostPfad $p.name $p.SymbolPfad
+                $message = & $RuntimePy -B (Join-Path $PSScriptRoot 'make_exe.py') $p.HostPath $p.name $p.IconPath
                 if ($LASTEXITCODE -ne 2) { break }
                 Start-Sleep -Milliseconds 500
             }
         }
-        if ($LASTEXITCODE -eq 0) { Ok "runtime\$meldung" }
-        elseif ($LASTEXITCODE -eq 2) { Warnung "$meldung (z. B. Toolbox schließen)" }
-        else { Warnung $meldung }
+        if ($LASTEXITCODE -eq 0) { Ok "runtime\$message" }
+        elseif ($LASTEXITCODE -eq 2) { Warn "$message (e.g. close the Toolbox)" }
+        else { Warn $message }
 
-        try { Ok (Starter-Bauen $p) }
-        catch { Warnung "Starter nicht angelegt: $_" }
+        try { Ok (Build-Starter $p) }
+        catch { Warn "Starter not created: $_" }
 
-        # Autostart ohne Adminrechte: ein vorhandener Eintrag zeigt nach dem Verschieben noch auf den alten Ort
+        # Autostart without admin rights: an existing entry still points to the old location after moving
         if ($p.autostart) {
-            $ziel = Autostart-Ziel $p
-            if (-not $ziel) { Ok 'Autostart: aus (einschalten in der Toolbox)' }
-            elseif ($ziel -eq "`"$($p.StarterPfad)`"") { Ok 'Autostart: an' }
+            $target = Get-AutostartTarget $p
+            if (-not $target) { Ok 'Autostart: off (turn it on in the Toolbox)' }
+            elseif ($target -eq "`"$($p.StarterPath)`"") { Ok 'Autostart: on' }
             else {
-                Set-ItemProperty $RunKey -Name $p.autostart -Value "`"$($p.StarterPfad)`""
-                Ok "Autostart zeigt jetzt hierher (vorher: $ziel)"
+                Set-ItemProperty $RunKey -Name $p.autostart -Value "`"$($p.StarterPath)`""
+                Ok "Autostart now points here (before: $target)"
             }
         }
     }
 
-    # 4. Je Programm: Downloads aus programm.json
-    foreach ($p in $Auswahl) {
+    # 4. Per program: downloads from program.json
+    foreach ($p in $Selection) {
         foreach ($d in @($p.downloads | Where-Object { $_ })) {
-            Schritt "$($d.name) $($d.version) für $($p.name)"
-            $ziel = Join-Path $p.Ordner $d.ordner
-            $pruefdatei = Join-Path $ziel $d.pruefdatei
-            if (Test-Path $pruefdatei) {
-                $vorhanden = (Get-Item $pruefdatei).VersionInfo.ProductVersion -replace '\+.*$', ''
-                if ($vorhanden -eq $d.version) { Ok 'schon da' }
-                else { Warnung "$($d.ordner)\ enthält Version $vorhanden statt $($d.version) – bleibt so (zum Ersetzen den Ordner löschen)." }
+            Step "$($d.name) $($d.version) for $($p.name)"
+            $target = Join-Path $p.Folder $d.folder
+            $checkFile = Join-Path $target $d.check_file
+            if (Test-Path $checkFile) {
+                $present = (Get-Item $checkFile).VersionInfo.ProductVersion -replace '\+.*$', ''
+                if ($present -eq $d.version) { Ok 'already there' }
+                else { Warn "$($d.folder)\ contains version $present instead of $($d.version) – stays that way (delete the folder to replace it)." }
             } else {
-                $zip = Join-Path ([IO.Path]::GetTempPath()) "$($p.id)-$($d.ordner)-$($d.version).zip"
-                Info "Lade $($d.url) …"
+                $zip = Join-Path ([IO.Path]::GetTempPath()) "$($p.id)-$($d.folder)-$($d.version).zip"
+                Info "Downloading $($d.url) …"
                 Invoke-WebRequest $d.url -OutFile $zip -UseBasicParsing
                 if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne $d.sha256) {
                     Remove-Item $zip
-                    throw 'Prüfsumme der heruntergeladenen Datei stimmt nicht – Download abgebrochen.'
+                    throw 'Checksum of the downloaded file doesn''t match – download aborted.'
                 }
-                Expand-Archive $zip -DestinationPath $ziel -Force
+                Expand-Archive $zip -DestinationPath $target -Force
                 Remove-Item $zip
-                Get-ChildItem $ziel -Recurse -File | Unblock-File    # „aus dem Internet“-Markierung entfernen, sonst lädt .NET die DLLs nicht
-                Ok "entpackt nach $ziel"
+                Get-ChildItem $target -Recurse -File | Unblock-File    # remove the "from the internet" mark, otherwise .NET won't load the DLLs
+                Ok "extracted to $target"
             }
         }
     }
 
-    Verknuepfungen-Einrichten $verknuepfungen
+    Install-Shortcuts $shortcuts
 
-    if ($mitMonitor) { Monitor-Einrichten $lauf }
-    # 7. (Neu) starten, was vorher lief, Autostart wie vorher: Zustand-Abgleichen (in Einrichten)
+    if ($withMonitor) { Install-Monitor $run }
+    # 7. (Re)start what was running before, autostart as before: Restore-State (in Install-Toolbox)
 }
 
-function Monitor-Einrichten($lauf) {
-    # 6. Adminrechte: PawnIO und Aufgabe
-    Schritt 'PawnIO und Autostart-Aufgabe'
-    $schritte = @()
-    if (Get-Service PawnIO -ErrorAction SilentlyContinue) { Ok 'PawnIO ist installiert' }
-    else { Info 'PawnIO fehlt'; $schritte += 'pawnio' }
+function Install-Monitor($run) {
+    # 6. Admin rights: PawnIO and task
+    Step 'PawnIO and autostart task'
+    $steps = @()
+    if (Get-Service PawnIO -ErrorAction SilentlyContinue) { Ok 'PawnIO is installed' }
+    else { Info 'PawnIO is missing'; $steps += 'pawnio' }
 
-    # Die Aufgabe startet den Starter ohne Argumente (wie task_points_here in hardware_monitor_gui.py)
-    $task = Get-ScheduledTask -TaskName $Aufgabe -ErrorAction SilentlyContinue
-    $taskPasst = $task -and $task.Actions[0].Execute -eq $Monitor.StarterPfad -and -not $task.Actions[0].Arguments
-    if ($taskPasst) { Ok "Aufgabe $Aufgabe zeigt auf diesen Ordner" }
-    elseif (-not (Test-Path $Monitor.StarterPfad)) { Warnung "$($Monitor.StarterPfad) fehlt (siehe oben) – Aufgabe bleibt, wie sie ist" }
-    elseif ($task) { Info "Aufgabe $Aufgabe zeigt noch auf: $($task.Actions[0].Execute) $($task.Actions[0].Arguments)"; $schritte += 'aufgabe' }
-    else { Info "Aufgabe $Aufgabe fehlt"; $schritte += 'aufgabe' }
-    # Autostart bleibt dabei, wie er war: task_command schaltet die neu angelegte Aufgabe gleich wieder aus, wenn sie
-    # vorher aus war oder fehlte; Zustand-Abgleichen prüft es am Ende noch einmal
+    # The task starts the starter without arguments (like task_points_here in hardware_monitor_gui.py)
+    $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    $taskFits = $task -and $task.Actions[0].Execute -eq $Monitor.StarterPath -and -not $task.Actions[0].Arguments
+    if ($taskFits) { Ok "Task $TaskName points to this folder" }
+    elseif (-not (Test-Path $Monitor.StarterPath)) { Warn "$($Monitor.StarterPath) is missing (see above) – task stays as it is" }
+    elseif ($task) { Info "Task $TaskName still points to: $($task.Actions[0].Execute) $($task.Actions[0].Arguments)"; $steps += 'task' }
+    else { Info "Task $TaskName is missing"; $steps += 'task' }
+    # Autostart stays as it was: task_command turns the newly created task off again right away if it
+    # was off before or missing; Restore-State checks it once more at the end
 
-    if ($schritte.Count -eq 0) {
-        # nichts zu tun
-    } elseif ($OhneAdmin) {
-        Warnung 'übersprungen (-OhneAdmin)'
-    } elseif (Als-Admin $schritte) {
-        Ok 'erledigt'
-        # Ein laufender Monitor kam noch von der alten Aufgabe (anderer Ordner) -> neu starten
-        if ($schritte -contains 'aufgabe') { $lauf.NeuStarten = $true }
+    if ($steps.Count -eq 0) {
+        # nothing to do
+    } elseif ($NoAdmin) {
+        Warn 'skipped (-NoAdmin)'
+    } elseif (Invoke-AsAdmin $steps) {
+        Ok 'done'
+        # A running monitor still came from the old task (different folder) -> restart it
+        if ($steps -contains 'task') { $run.RestartMonitor = $true }
     } else {
-        Warnung 'Nicht alles hat geklappt – Setup.exe erneut ausführen.'
+        Warn 'Not everything worked – run Setup.exe again.'
     }
 }
 
 
-# ---------- Entfernen ----------
-function Aufgabe-Loeschen {
-    if (-not (Get-ScheduledTask -TaskName $Aufgabe -ErrorAction SilentlyContinue)) {
-        Ok "Aufgabe $Aufgabe gibt es nicht"
+# ---------- Uninstall ----------
+function Remove-Task {
+    if (-not (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue)) {
+        Ok "Task $TaskName doesn't exist"
         return
     }
     try {
-        Unregister-ScheduledTask -TaskName $Aufgabe -Confirm:$false
-        Ok "Aufgabe $Aufgabe gelöscht"
-    } catch {                                     # die Aufgabe läuft mit Adminrechten – zum Löschen braucht es meist auch welche
-        if (Als-Admin @('aufgabe-loeschen')) { Ok "Aufgabe $Aufgabe gelöscht" } else { Warnung "Die Aufgabe $Aufgabe ist noch da." }
+        Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
+        Ok "Task $TaskName deleted"
+    } catch {                                     # the task runs with admin rights – deleting it usually needs them too
+        if (Invoke-AsAdmin @('task-delete')) { Ok "Task $TaskName deleted" } else { Warn "The task $TaskName is still there." }
     }
 }
 
-function Programm-Entfernen($p) {
-    <# Ein Programm wieder ausbauen: beenden, Aufgabe löschen, Starter, pythonw.exe-Kopie und Downloads löschen.
-       Der Code bleibt (gehört zum Repo), die Einstellungen in daten\ auch – Einrichten macht es wieder vollständig. #>
-    Schritt "$($p.name) entfernen"
-    $etwas = $false
-    if ($p.port -and (Befehl-Senden $p.port 'status')) { Programm-Beenden $p; Ok 'beendet'; $etwas = $true }
-    if ($p.id -eq $Monitor.id -and (Get-ScheduledTask -TaskName $Aufgabe -ErrorAction SilentlyContinue)) {
-        Aufgabe-Loeschen; $etwas = $true
+function Uninstall-Program($p) {
+    <# Take a program out again: quit it, delete the task, delete starter, pythonw.exe copy and downloads.
+       The code stays (belongs to the repo), the settings in data\ too – setting up makes it complete again. #>
+    Step "Remove $($p.name)"
+    $anything = $false
+    if ($p.port -and (Send-Command $p.port 'status')) { Stop-Program $p; Ok 'quit'; $anything = $true }
+    if ($p.id -eq $Monitor.id -and (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue)) {
+        Remove-Task; $anything = $true
     }
-    if ($p.autostart -and (Autostart-Ziel $p)) { Autostart-Loeschen $p; $etwas = $true }
-    $pfade = @($p.StarterPfad, $p.HostPfad, (Join-Path $Runtime "starter\$($p.id).cs")) +
-             @(@($p.downloads | Where-Object { $_ }) | ForEach-Object { Join-Path $p.Ordner $_.ordner }) |
+    if ($p.autostart -and (Get-AutostartTarget $p)) { Remove-Autostart $p; $anything = $true }
+    $paths = @($p.StarterPath, $p.HostPath, (Join-Path $Runtime "starter\$($p.id).cs")) +
+             @(@($p.downloads | Where-Object { $_ }) | ForEach-Object { Join-Path $p.Folder $_.folder }) |
              Where-Object { $_ -and (Test-Path $_) }
-    foreach ($pfad in $pfade) {
-        # Ein gerade beendetes Programm hält seine .exe noch kurz fest – bis zu 10 s erneut versuchen
+    foreach ($path in $paths) {
+        # A program that was just quit still holds on to its .exe briefly – retry for up to 10 s
         for ($i = 0; ; $i++) {
-            try { Remove-Item $pfad -Recurse -Force; Ok "gelöscht: $pfad"; break }
+            try { Remove-Item $path -Recurse -Force; Ok "deleted: $path"; break }
             catch {
-                if ($i -ge 20) { Warnung "ließ sich nicht löschen: $pfad"; break }
+                if ($i -ge 20) { Warn "couldn't be deleted: $path"; break }
                 Start-Sleep -Milliseconds 500
             }
         }
-        $etwas = $true
+        $anything = $true
     }
-    if (-not $etwas) { Ok 'war nicht eingerichtet' }
+    if (-not $anything) { Ok 'was not installed' }
 }
 
-function Programme-Entfernen {
-    <# -Entfernen -Programme <ids>: nur diese Programme. Die Toolbox wird dafür beendet und danach neu gestartet,
-       damit sie die geänderte Auswahl zeigt. #>
-    if (($Programme -split ',' | ForEach-Object { $_.Trim() }) -contains 'toolbox') {
-        Warnung 'Die Toolbox selbst entfernt Uninstall.exe ohne -Programme.'
+function Uninstall-Programs {
+    <# -Uninstall -Programs <ids>: only these programs. The Toolbox is quit for it and restarted afterwards,
+       so it shows the changed selection. #>
+    if (($Programs -split ',' | ForEach-Object { $_.Trim() }) -contains 'toolbox') {
+        Warn 'The Toolbox itself is removed by Uninstall.exe without -Programs.'
     }
-    $ids = @(Programm-Ids $Programme)
+    $ids = @(Get-ProgramIds $Programs)
     if (-not $ids) { return }
-    $toolboxLief = Toolbox-Beenden
-    foreach ($p in $Alle | Where-Object { $ids -contains $_.id }) { Programm-Entfernen $p }
-    Installierte-Speichern @(Installierte | Where-Object { $ids -notcontains $_ })
+    $toolboxWasRunning = Stop-Toolbox
+    foreach ($p in $All | Where-Object { $ids -contains $_.id }) { Uninstall-Program $p }
+    Save-Installed @(Get-Installed | Where-Object { $ids -notcontains $_ })
 
     Write-Host ""
-    if ($toolboxLief) {
-        Toolbox-Starten
-        Write-Host "Fertig. Die Toolbox wurde wieder gestartet." -ForegroundColor Green
+    if ($toolboxWasRunning) {
+        Start-Toolbox
+        Write-Host "Done. The Toolbox was started again." -ForegroundColor Green
     } else {
-        Write-Host "Fertig." -ForegroundColor Green
+        Write-Host "Done." -ForegroundColor Green
     }
 }
 
-function Entfernen {
-    Schritt 'Toolbox beenden'
-    if (Toolbox-Beenden) { Ok 'beendet' } else { Ok 'lief nicht' }
+function Uninstall-Toolbox {
+    Step 'Quit Toolbox'
+    if (Stop-Toolbox) { Ok 'quit' } else { Ok 'was not running' }
 
-    Schritt 'Hardware-Monitor beenden'
-    if (Monitor-Befehl 'status') { Monitor-Beenden; Ok 'beendet' } else { Ok 'lief nicht' }
+    Step 'Quit Hardware Monitor'
+    if (Send-MonitorCommand 'status') { Stop-Monitor; Ok 'quit' } else { Ok 'was not running' }
 
-    foreach ($p in Weitere-Programme) {
-        Schritt "$($p.name) beenden"
-        if (Befehl-Senden $p.port 'status') { Programm-Beenden $p; Ok 'beendet' } else { Ok 'lief nicht' }
+    foreach ($p in Get-OtherPrograms) {
+        Step "Quit $($p.name)"
+        if (Send-Command $p.port 'status') { Stop-Program $p; Ok 'quit' } else { Ok 'was not running' }
     }
 
-    Schritt "Aufgabe $Aufgabe löschen"
-    Aufgabe-Loeschen
+    Step "Delete task $TaskName"
+    Remove-Task
 
-    foreach ($p in $Alle | Where-Object autostart) {
-        Schritt "Autostart von $($p.name) löschen"
-        Autostart-Loeschen $p
+    foreach ($p in $All | Where-Object autostart) {
+        Step "Delete autostart of $($p.name)"
+        Remove-Autostart $p
     }
 
-    Schritt 'Verknüpfungen löschen (Desktop, Startmenü)'
-    Verknuepfungen-Loeschen
+    Step 'Delete shortcuts (desktop, Start menu)'
+    Remove-Shortcuts
 
-    Schritt 'Erzeugte und heruntergeladene Dateien'
-    $pfade = @($Runtime) + @($Alle | ForEach-Object {
+    Step 'Generated and downloaded files'
+    $paths = @($Runtime) + @($All | ForEach-Object {
         $p = $_
-        $p.StarterPfad
-        @($p.downloads | Where-Object { $_ }) | ForEach-Object { Join-Path $p.Ordner $_.ordner }
+        $p.StarterPath
+        @($p.downloads | Where-Object { $_ }) | ForEach-Object { Join-Path $p.Folder $_.folder }
     }) | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
-    if (-not $pfade) {
-        Ok 'nichts da'
+    if (-not $paths) {
+        Ok 'nothing there'
     } else {
-        $pfade | ForEach-Object { Info $_ }
-        if ((Read-Host '   Das alles löschen? (j/n)') -match '^[jJyY]') {
+        $paths | ForEach-Object { Info $_ }
+        if ((Read-Host '   Delete all of this? (y/n)') -match '^[yYjJ]') {
             try {
-                $pfade | ForEach-Object { Remove-Item -LiteralPath $_ -Recurse -Force }
-                Ok 'gelöscht'
+                $paths | ForEach-Object { Remove-Item -LiteralPath $_ -Recurse -Force }
+                Ok 'deleted'
             } catch {
-                Warnung 'Nicht alles ließ sich löschen – läuft die Toolbox noch? Dann schließen und erneut versuchen.'
+                Warn 'Not everything could be deleted – is the Toolbox still running? Then close it and try again.'
             }
         } else {
-            Ok 'bleiben'
+            Ok 'kept'
         }
     }
 
     Write-Host ""
-    Write-Host "Fertig. Den Ordner kannst du jetzt löschen (daten\ enthält deine Einstellungen)." -ForegroundColor Green
-    Write-Host "PawnIO bleibt installiert (entfernen: winget uninstall namazso.PawnIO)." -ForegroundColor Green
+    Write-Host "Done. You can delete the folder now (data\ contains your settings)." -ForegroundColor Green
+    Write-Host "PawnIO stays installed (to remove: winget uninstall namazso.PawnIO)." -ForegroundColor Green
 }
 
 
-if ($Admin) { exit $(if (Admin-Schritte ($Admin -split ',')) { 0 } else { 1 }) }
-elseif ($Entfernen -and $Programme) { Programme-Entfernen }
-elseif ($Entfernen) { Entfernen }
-else { Einrichten }
-# Exit-Code für Setup.exe/Uninstall.exe: 0 = alles geklappt -> Fenster schließt sich von selbst; 2 = fertig, aber mit
-# Warnungen -> bleibt offen, damit man sie lesen kann (1 = abgebrochen, das macht PowerShell bei einem Fehler selbst)
-exit $(if ($Warnungen) { 2 } else { 0 })
+if ($Admin) { exit $(if (Invoke-AdminSteps ($Admin -split ',')) { 0 } else { 1 }) }
+elseif ($Uninstall -and $Programs) { Uninstall-Programs }
+elseif ($Uninstall) { Uninstall-Toolbox }
+else { Install-Toolbox }
+# Exit code for Setup.exe/Uninstall.exe: 0 = everything worked -> window closes by itself; 2 = done, but with
+# warnings -> stays open so you can read them (1 = aborted, PowerShell does that itself on an error)
+exit $(if ($Warnings) { 2 } else { 0 })

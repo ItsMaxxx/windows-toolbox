@@ -1,12 +1,12 @@
-// Vorlage für die Starter-.exe jedes Programms (Toolbox.exe, HardwareMonitor.exe, …).
-// setup.ps1 ersetzt die %PLATZHALTER% mit den Werten aus der programm.json und übersetzt das mit csc.exe – dem
-// C#-Compiler, der bei Windows 10/11 im .NET Framework schon dabei ist (kein zusätzliches Werkzeug nötig).
+// Template for the starter .exe of each program (Toolbox.exe, HardwareMonitor.exe, …).
+// setup.ps1 replaces the %PLACEHOLDERS% with the values from the program.json and compiles it with csc.exe – the
+// C# compiler that already comes with the .NET Framework on Windows 10/11 (no extra tool needed).
 //
-// Der Starter macht nur eins: runtime\<Name>.exe (pythonw.exe mit eigenem Namen, siehe exe_anlegen.py) mit dem Skript
-// des Programms starten und sich beenden. Alle Pfade sind relativ zum Ort des Starters – deshalb funktionieren
-// Doppelklick und Verknüpfungen auch nach dem Verschieben des Ordners, und es braucht keine Argumente.
-// Zusätzliche Argumente reicht er weiter (z. B. --nach <pid> beim Neustart der Toolbox).
-// Wird er mit Adminrechten gestartet (Aufgabenplanung, UAC), läuft auch das Programm mit Adminrechten.
+// The starter does only one thing: start runtime\<Name>.exe (pythonw.exe with its own name, see make_exe.py) with the
+// program's script and quit. All paths are relative to the starter's location – that's why double-click and
+// shortcuts still work after moving the folder, and no arguments are needed.
+// It passes on additional arguments (e.g. --after <pid> when the Toolbox restarts).
+// If it is started with admin rights (Task Scheduler, UAC), the program runs with admin rights too.
 
 using System;
 using System.Diagnostics;
@@ -15,50 +15,50 @@ using System.Reflection;
 using System.Text;
 using System.Windows.Forms;
 
-[assembly: AssemblyTitle("%NAME%")]            // Dateibeschreibung (Explorer, Task-Manager)
+[assembly: AssemblyTitle("%NAME%")]            // file description (Explorer, Task Manager)
 [assembly: AssemblyProduct("Toolbox")]
-[assembly: AssemblyCompany("%FIRMA%")]             // Herausgeber (Task-Manager → Autostart)
+[assembly: AssemblyCompany("%COMPANY%")]       // publisher (Task Manager → Startup apps)
 [assembly: AssemblyFileVersion("%VERSION%")]
 
 static class Starter
 {
     const string Name = "%NAME%";
-    const string Runtime = @"%RUNTIME%";       // Ordner mit dem eigenen Python, relativ zum Starter
-    const string Host = "%HOST%";              // pythonw.exe-Kopie mit eigenem Namen in runtime\
-    const string Skript = @"%SKRIPT%";         // relativ zum Starter
+    const string Runtime = @"%RUNTIME%";       // folder with our own Python, relative to the starter
+    const string Host = "%HOST%";              // pythonw.exe copy with its own name in runtime\
+    const string Script = @"%SCRIPT%";         // relative to the starter
 
     [STAThread]
     static int Main(string[] args)
     {
-        string ordner = AppDomain.CurrentDomain.BaseDirectory;
-        string runtime = Path.GetFullPath(Path.Combine(ordner, Runtime));
+        string folder = AppDomain.CurrentDomain.BaseDirectory;
+        string runtime = Path.GetFullPath(Path.Combine(folder, Runtime));
         string host = Path.Combine(runtime, Host);
         if (!File.Exists(host))
             host = Path.Combine(runtime, "pythonw.exe");
-        string skript = Path.GetFullPath(Path.Combine(ordner, Skript));
+        string script = Path.GetFullPath(Path.Combine(folder, Script));
 
-        if (!File.Exists(host) || !File.Exists(skript))
+        if (!File.Exists(host) || !File.Exists(script))
         {
-            MessageBox.Show((File.Exists(skript) ? "runtime\\ fehlt" : skript + " fehlt") +
-                            " – bitte zuerst Setup.exe ausführen.", Name,
+            MessageBox.Show((File.Exists(script) ? "runtime\\ is missing" : script + " is missing") +
+                            " – please run Setup.exe first.", Name,
                             MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return 1;
         }
 
-        StringBuilder argumente = new StringBuilder(Argumente.Quote(skript));
+        StringBuilder arguments = new StringBuilder(Arguments.Quote(script));
         foreach (string arg in args)
-            argumente.Append(' ').Append(Argumente.Quote(arg));
+            arguments.Append(' ').Append(Arguments.Quote(arg));
 
-        ProcessStartInfo info = new ProcessStartInfo(host, argumente.ToString());
-        info.UseShellExecute = false;          // erbt so die Rechte des Starters (auch Adminrechte)
-        info.WorkingDirectory = Path.GetDirectoryName(skript);
+        ProcessStartInfo info = new ProcessStartInfo(host, arguments.ToString());
+        info.UseShellExecute = false;          // this way it inherits the starter's rights (admin rights too)
+        info.WorkingDirectory = Path.GetDirectoryName(script);
         try
         {
             Process.Start(info);
         }
-        catch (Exception fehler)
+        catch (Exception error)
         {
-            MessageBox.Show("Start fehlgeschlagen: " + fehler.Message, Name, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show("Start failed: " + error.Message, Name, MessageBoxButtons.OK, MessageBoxIcon.Error);
             return 1;
         }
         return 0;
