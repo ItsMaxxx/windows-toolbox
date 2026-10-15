@@ -8,7 +8,7 @@ Sammlung kleiner, selbst geschriebener Windows-Tools mit einer gemeinsamen Oberf
 | **Hardware-Monitor** | `programs/hardware_monitor/` | CPU- und GPU-Temperatur als Zahlen in der Taskleiste; Klick öffnet ein Fenster mit Hardware-Werten in Tabs und allen Hardwaredaten (Hersteller-/Produkt-IDs, Seriennummern) ([README](programs/hardware_monitor/README.md)) |
 | **Discord Plus** | `programs/discord_plus/` | Erweiterungen für Discord – bisher der Call-Status: zeigt „Im Call“ an, sobald du telefonierst oder in einem Voice-Chat bist – auch für Freunde ohne Zugriff auf Server oder Anruf; Einrichtung mit Anleitung auf der Toolbox-Seite ([README](programs/discord_plus/README.md)) |
 | **Cube Game** | `programs/cube_game/` | Arena-Shooter: Das Spielfenster schrumpft ständig, Schüsse gegen seine Ränder drücken sie wieder auf (WASD + Maus) ([README](programs/cube_game/README.md)) |
-| **Last Bastion** | `programs/last_bastion/` | Konzept für ein Echtzeit-Strategiespiel (StarCraft × They Are Billions × Factorio); die Toolbox-Seite öffnet das Design-Dokument ([README](programs/last_bastion/README.md), [DESIGN](programs/last_bastion/DESIGN.md)) |
+| **Last Bastion** | `programs/last_bastion/` | Echtzeit-Strategiespiel (StarCraft × They Are Billions × Factorio) mit eigenem Repo; die Toolbox-Seite findet den Spielordner, öffnet das Design-Dokument und startet das Spiel ([README](programs/last_bastion/README.md)) |
 
 Jedes Tool hat in seinem Ordner eine eigene `README.md` mit Einrichtung, Bedienung und Technik.
 
@@ -42,7 +42,7 @@ windows-toolbox/
 │  └─ program.ico        Standardsymbol der Programme (⚒ auf Grün), z. B. für den Hardware-Monitor
 └─ programs/
    ├─ cube_game/                   Spiel (pygame-ce) – Aufbau siehe programs/cube_game/README.md
-   ├─ last_bastion/                Spielkonzept (Echtzeit-Strategie) – Design-Dokument DESIGN.md, Aufbau siehe README.md
+   ├─ last_bastion/                nur die Seite für das Spiel Last Bastion (eigenes Repo) – siehe README.md dort
    ├─ discord_plus/                Erweiterungen für Discord (Call-Status) – Aufbau siehe programs/discord_plus/README.md
    └─ hardware_monitor/            ein Programm = ein Ordner, alles darin
       ├─ program.json             Ausweis: Name, Tab, Beschreibung, Version, Skript, Starter, Port, Aufgabe, Downloads
