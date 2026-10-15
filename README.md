@@ -8,6 +8,7 @@ Sammlung kleiner, selbst geschriebener Windows-Tools mit einer gemeinsamen Oberf
 | **Hardware-Monitor** | `programme/hardware_monitor/` | CPU- und GPU-Temperatur als Zahlen in der Taskleiste; Klick öffnet ein Fenster mit Hardware-Werten in Tabs und allen Hardwaredaten (Hersteller-/Produkt-IDs, Seriennummern) ([README](programme/hardware_monitor/README.md)) |
 | **Discord Plus** | `programme/discord_plus/` | Erweiterungen für Discord – bisher der Call-Status: zeigt „Im Call“ an, sobald du telefonierst oder in einem Voice-Chat bist – auch für Freunde ohne Zugriff auf Server oder Anruf; Einrichtung mit Anleitung auf der Toolbox-Seite ([README](programme/discord_plus/README.md)) |
 | **Cube Game** | `programme/cube_game/` | Arena-Shooter: Das Spielfenster schrumpft ständig, Schüsse gegen seine Ränder drücken sie wieder auf (WASD + Maus) ([README](programme/cube_game/README.md)) |
+| **Last Bastion** | `programme/last_bastion/` | Konzept für ein Echtzeit-Strategiespiel (StarCraft × They Are Billions × Factorio); die Toolbox-Seite öffnet das Design-Dokument ([README](programme/last_bastion/README.md), [DESIGN](programme/last_bastion/DESIGN.md)) |
 
 Jedes Tool hat in seinem Ordner eine eigene `README.md` mit Einrichtung, Bedienung und Technik.
 
@@ -41,6 +42,7 @@ windows-toolbox/
 │  └─ programm.ico        Standardsymbol der Programme (⚒ auf Grün), z. B. für den Hardware-Monitor
 └─ programme/
    ├─ cube_game/                   Spiel (pygame-ce) – Aufbau siehe programme/cube_game/README.md
+   ├─ last_bastion/                Spielkonzept (Echtzeit-Strategie) – Design-Dokument DESIGN.md, Aufbau siehe README.md
    ├─ discord_plus/                Erweiterungen für Discord (Call-Status) – Aufbau siehe programme/discord_plus/README.md
    └─ hardware_monitor/            ein Programm = ein Ordner, alles darin
       ├─ programm.json             Ausweis: Name, Tab, Beschreibung, Version, Skript, Starter, Port, Aufgabe, Downloads
