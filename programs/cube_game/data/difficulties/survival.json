@@ -40,7 +40,7 @@
       { "weights": { "artillery": "x3" }, "spawn": { "artillery": 3 }, "announce": "Artillery incoming!" },
       { "weights": { "carrier": "x3" }, "spawn": { "carrier": 2 }, "announce": "Carriers incoming!" }
     ] },
-    { "from": 420, "to": 440, "every": 90, "spawn_interval": "x0.8", "one_of": [
+    { "from": 430, "to": 440, "every": 90, "spawn_interval": "x0.8", "one_of": [
       { "spawn": { "commander": 2, "fat": 4 }, "announce": "Commanders incoming!" },
       { "spawn": { "pusher": 2 }, "announce": "Pushers incoming!" },
       { "spawn": { "fat": 4, "cannoneer": 2 }, "announce": "Heavy wave!" },
@@ -48,7 +48,7 @@
       { "weights": { "sniper": "x2" }, "spawn": { "laser": 2, "sniper": 2 }, "announce": "Lasers incoming!" },
       { "spawn": { "living_window": 2 }, "announce": "Living Windows!" }
     ] },
-    { "from": 360, "to": 366, "every": 90, "breathe": 70, "announce": "The arena breathes in!" },
+    { "from": 360, "to": 366, "every": 85, "breathe": 70, "announce": "The arena breathes in!" },
     { "from": 480, "every": 90, "one_of": [
       { "points": { "totem": 1 } },
       { "points": { "nest": 1 } },
