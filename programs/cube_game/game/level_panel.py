@@ -4,12 +4,13 @@ and below them the details of the level under the mouse (or the chosen one): its
 spawning, cores – at the start and where they go), which enemies come when, and its events.
 
 Every button already shows small indicators of what's coming: a square in each enemy type's colour (evolutions with
-their dark frame) and one icon per kind of event (swarms, waves of one type, harder hits, more HP, harder walls).
+their dark frame) and one icon per kind of event (swarms, waves of one type, harder hits, more HP, harder walls, a die
+for a phase that picks one of several things at random, a pin for points of interest).
 Locked levels show them too, only dimmed – so you can see what's ahead. A tick marks cleared levels.
 
 Everything comes from the level files (data/difficulties/*.json): the hints are written there, the rest follows from
 the enemies, evolutions, swarms and phases. Rows: a new row starts whenever the tens of "order" change (1–6: A,
-11–16: B, 20: Survival) – or after COLUMNS levels.
+11–16: B, 21–26: C, 27: Survival) – or after COLUMNS levels.
 
 Only lays out and draws – the game menu handles the clicks (thing_at gives the level under the mouse).
 """
@@ -23,11 +24,12 @@ from game import settings, skill_tree
 from game.difficulty import DIFFICULTIES, evolution_chance
 from game.enemies.roster import ENEMY_TYPES, EVOLUTIONS, apply
 from game.game_over_scene import format_time
-from game.icons import (CORE_COLOR, draw_check, draw_damage_icon, draw_hp_icon, draw_notice_icon, draw_swarm_icon,
-                        draw_wall_icon, draw_wave_icon)
+from game.icons import (CORE_COLOR, draw_check, draw_damage_icon, draw_hp_icon, draw_notice_icon, draw_pin_icon,
+                        draw_random_icon, draw_swarm_icon, draw_wall_icon, draw_wave_icon)
+from game.points import FIND_COLOR, NAMES as POINT_NAMES, THREAT_COLOR, THREATS
 from game.skins.skin import draw_tier_frame
 
-COLUMNS = 6
+COLUMNS = 7                         # buttons in a row at most (C1 … C6 and Survival)
 BUTTON_HEIGHT = 74
 GAP = 8
 DETAILS_GAP = 18                    # between the last row of buttons and the details
@@ -54,7 +56,7 @@ HP_COLOR = (110, 220, 110)
 WALL_COLOR = (175, 175, 190)
 NOTICE_COLOR = (255, 215, 60)
 EVENT_ICONS = {"swarm": draw_swarm_icon, "wave": draw_wave_icon, "damage": draw_damage_icon, "hp": draw_hp_icon,
-               "walls": draw_wall_icon, "notice": draw_notice_icon}
+               "walls": draw_wall_icon, "notice": draw_notice_icon, "random": draw_random_icon, "point": draw_pin_icon}
 DAMAGE_STATS = {"contact_damage", "projectile_damage", "blast_damage"}
 
 
@@ -65,6 +67,7 @@ class Event:
     kind: str                       # key in EVENT_ICONS
     text: str
     color: tuple
+    every: float = 0                # > 0: again every this many seconds
 
 
 def dimmed(color, factor):
@@ -118,9 +121,14 @@ def enemy_rows(level):
     first = {}
     for entry in level.enemies:
         first[entry.type] = min(first.get(entry.type, entry.after), entry.after)
+    notes = {}
     for swarms in level.swarms:
         first[swarms.type] = min(first.get(swarms.type, swarms.after), swarms.after)
-    rows = [(key, after, "") for key, after in first.items()]
+        if swarms.leader:
+            first[swarms.leader] = min(first.get(swarms.leader, swarms.after), swarms.after)
+            share = "" if swarms.leader_chance >= 1 else f"{percent(swarms.leader_chance)} of "
+            notes[swarms.leader] = f"leads {share}{ENEMY_TYPES[swarms.type].name} swarms"
+    rows = [(key, after, notes.get(key, "")) for key, after in first.items()]
     for entry in level.evolutions:
         if entry.type not in first:
             continue                # its tier 1 type never comes, so it never evolves
@@ -146,14 +154,31 @@ def events(level):
         found.append(Event(swarms.after, None, "swarm", f"{ENEMY_TYPES[swarms.type].name} swarms",
                            ENEMY_TYPES[swarms.type].skin.color))
     for phase in level.phases:
+        if phase.options:
+            found += option_events(phase)
+            continue
         changes = phase_changes(phase)
         if not changes and phase.announce:
             changes = [("notice", phase.announce, NOTICE_COLOR)]
         for index, (kind, text, color) in enumerate(changes):
             # the phase's own announcement describes it best – for its first change
             found.append(Event(phase.start, phase.end, kind, phase.announce if phase.announce and index == 0 else text,
-                               color))
+                               color, phase.every))
     return sorted(found, key=lambda event: event.time)
+
+
+def option_events(phase):
+    """A phase with options ("one_of"): one Event per option, with the die – what the option brings (its announcement,
+    else its first change) and how likely it is."""
+    total = sum(weight for weight, _ in phase.options)
+    found = []
+    for weight, option in phase.options:
+        changes = phase_changes(option)
+        text = option.announce or (changes[0][1] if changes else phase.announce or "nothing more")
+        color = changes[0][2] if changes else NOTICE_COLOR
+        found.append(Event(phase.start, phase.end, "random", f"{text} ({percent(weight / total)})", color,
+                           phase.every))
+    return found
 
 
 def phase_changes(phase):
@@ -176,6 +201,12 @@ def phase_changes(phase):
             changes.append(("walls", f"Walls get heavier ({change_text(operation, number, '')})", WALL_COLOR))
         else:
             changes.append(("walls", f"Walls close in {change_text(operation, number, ' px/s')}", WALL_COLOR))
+    if phase.breathe:
+        changes.append(("walls", f"Walls breathe in {phase.breathe:g} px, then spring back", WALL_COLOR))
+    if phase.points:
+        names = [POINT_NAMES[kind] + (f" ×{count}" if count > 1 else "") for kind, count in phase.points]
+        threat = any(kind in THREATS for kind, _ in phase.points)
+        changes.append(("point", " and ".join(names) + " out there", THREAT_COLOR if threat else FIND_COLOR))
     if any(stat in DAMAGE_STATS for _, stat, _, _ in phase.enemy_stats):
         changes.append(("damage", "Enemies hit harder", DAMAGE_COLOR))
     hp = sum(number for _, stat, operation, number in phase.enemy_stats if stat == "base_hp" and operation == "add")
@@ -248,7 +279,7 @@ class LevelPanel:
             draw_check(surface, (rect.right - 16, name.centery), CLEARED if not selected else (40, 150, 40), 14)
         elif level.goal is not None:
             draw_text(surface, format_time(level.goal), 20, text, alpha=170, midright=(rect.right - 10, name.centery))
-        elif not unlocked:
+        elif not unlocked and name.right + 8 + font(20).size("locked")[0] <= rect.right - 10:    # a long name: dimmed
             draw_text(surface, "locked", 20, text, midright=(rect.right - 10, name.centery))
         factor = 1.0 if unlocked else DIM
         x = rect.left + 10 + ENEMY_ICON / 2
@@ -347,7 +378,8 @@ class LevelPanel:
         lines = []                  # [event, [its times]]
         for event in events(level):
             same = next((line for line in lines if event.end is None and line[0].end is None
-                         and (line[0].kind, line[0].text) == (event.kind, event.text)), None)
+                         and (line[0].kind, line[0].text, line[0].every) == (event.kind, event.text, event.every)),
+                        None)
             if same:
                 same[1].append(event.time)
             else:
@@ -365,7 +397,7 @@ class LevelPanel:
                 when = ", ".join(format_time(time) for time in times[:2]) + (" …" if len(times) > 2 else "")
             draw_text(surface, when, 19, settings.TEXT_MUTED, topleft=(left + DETAIL_ICON + 10, y + 1))
             text_left = left + DETAIL_ICON + 10 + TIME_WIDTH
-            text = event.text
+            text = event.text + (f" – every {format_time(event.every)}" if event.every else "")
             while len(text) > 4 and font(21).size(text)[0] > left + width - text_left:
                 text = text[:-2] + "…"
             draw_text(surface, text, 21, settings.TEXT, topleft=(text_left, y))

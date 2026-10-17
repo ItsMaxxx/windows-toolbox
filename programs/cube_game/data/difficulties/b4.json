@@ -3,48 +3,52 @@
   "description": "from above, evolved: Clusters join the Artillery, hard walls",
   "order": 14,
   "goal": 360,
-  "core_chance": 1,
+  "core_chance": 0.07,
   "unlock": { "requires": "b3" },
   "hints": ["Artillery and drone carriers", "Clusters: their shell bursts into three – watch the small circles", "Every evolution can show up"],
   "arena": { "start_size": [400, 280], "shrink_speed": 13, "shrink_growth": 2.5, "max_shrink_speed": 28, "armor": 7, "push_falloff": 0.8 },
-  "spawning": { "first_spawn": 2, "start_interval": 2.2, "min_interval": 0.72, "interval_drop": 0.012 },
+  "spawning": { "first_spawn": 0.5, "start_interval": 2.2, "min_interval": 0.72, "interval_drop": 0.012 },
   "enemies": [
-    { "type": "basic",     "weight": 45, "after": 0 },
-    { "type": "shooter",   "weight": 15, "after": 0,  "growth": 2 },
+    { "type": "basic", "weight": 45, "after": 0 },
+    { "type": "shooter", "weight": 15, "after": 0, "growth": 2 },
     { "type": "artillery", "weight": 18, "after": 20, "growth": 4 },
-    { "type": "carrier",   "weight": 15, "after": 40, "growth": 4 },
-    { "type": "charger",   "weight": 10, "after": 60, "growth": 1 },
-    { "type": "sniper",    "weight": 8,  "after": 60, "growth": 1 }
+    { "type": "carrier", "weight": 15, "after": 40, "growth": 4 },
+    { "type": "charger", "weight": 10, "after": 60, "growth": 1 },
+    { "type": "sniper", "weight": 8, "after": 60, "growth": 1 }
   ],
   "evolutions": [
-    { "type": "basic",   "chance": 0.2,  "after": 0,  "growth": 0.03, "max_chance": 0.4 },
-    { "type": "shooter", "chance": 0.2,  "after": 0,  "growth": 0.03, "max_chance": 0.4 },
+    { "type": "basic", "chance": 0.2, "after": 0, "growth": 0.03, "max_chance": 0.4 },
+    { "type": "shooter", "chance": 0.2, "after": 0, "growth": 0.03, "max_chance": 0.4 },
     { "type": "charger", "chance": 0.15, "after": 60, "growth": 0.04, "max_chance": 0.4 },
-    { "type": "sniper",  "chance": 0.15, "after": 60, "growth": 0.04, "max_chance": 0.4 },
+    { "type": "sniper", "chance": 0.15, "after": 60, "growth": 0.04, "max_chance": 0.4 },
     { "type": "artillery", "chance": 0.15, "after": 40, "growth": 0.05, "max_chance": 0.45 }
   ],
-  "swarms": {
-    "type": "basic", "after": 40,
-    "start_chance": 0.03, "chance_growth": 0.001, "max_chance": 0.17,
-    "start_size": 7, "growth_time": 10, "max_size": 32, "min_gap": 6
-  },
+  "swarms": { "type": "basic", "after": 40, "start_chance": 0.03, "chance_growth": 0.001, "max_chance": 0.17, "start_size": 7, "growth_time": 10, "max_size": 32, "min_gap": 6 },
   "phases": [
-    { "from": 60, "to": 90, "weights": { "artillery": "x3" }, "spawn": { "artillery": 3, "cluster": 1 }, "spawn_interval": "x0.85",
-      "announce": "Artillery incoming!" },
-    { "from": 110, "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
-    { "from": 140, "to": 170, "weights": { "carrier": "x3" }, "spawn": { "carrier": 3 }, "spawn_interval": "x0.85",
-      "announce": "Carriers incoming!" },
-    { "from": 160, "arena": { "armor": "+5" }, "announce": "The walls harden!" },
-    { "from": 210, "enemy_stats": { "all": { "base_hp": "+1" } } },
-    { "from": 240, "to": 270, "weights": { "artillery": "x2", "carrier": "x2" }, "spawn": { "artillery": 3, "carrier": 2 },
-      "spawn_interval": "x0.85", "announce": "Bombardment!" },
-    { "from": 300, "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
+    { "from": 0, "to": 20, "spawn": { "basic": 4 }, "spawn_interval": "x0.5" },
+    { "from": 60, "to": 90, "weights": { "artillery": "x3" }, "spawn": { "artillery": 3, "cluster": 1 }, "spawn_interval": "x0.85", "announce": "Artillery incoming!" },
+    { "from": 110, "every": 190, "enemy_stats": { "all": { "contact_damage": "x1.1", "projectile_damage": "x1.1", "blast_damage": "x1.1" } }, "announce": "Enemies hit harder!" },
+    { "from": 140, "to": 170, "spawn_interval": "x0.85", "one_of": [
+      { "weights": { "carrier": "x3" }, "spawn": { "carrier": 3 }, "announce": "Carriers incoming!" },
+      { "weights": { "artillery": "x2" }, "spawn": { "cluster": 2, "artillery": 1 }, "announce": "Clusters incoming!" }
+    ] },
+    { "from": 160, "every": 260, "arena": { "armor": "+5" }, "announce": "The walls harden!" },
+    { "from": 210, "every": 180, "enemy_stats": { "all": { "base_hp": "+1" } }, "announce": "Enemies +1 HP" },
+    { "from": 240, "to": 270, "weights": { "artillery": "x2", "carrier": "x2" }, "spawn": { "artillery": 3, "carrier": 2 }, "spawn_interval": "x0.85", "announce": "Bombardment!" },
+    { "from": 280, "to": 286, "breathe": 60, "announce": "The arena breathes in!" },
     { "from": 325, "to": 360, "weights": { "artillery": "x2", "fat": "+10", "cannoneer": "+10" }, "spawn": { "artillery": 2, "carrier": 1, "fat": 2 }, "spawn_interval": "x0.7", "announce": "Final wave!" },
-    { "from": 345, "to": 360, "spawn": { "carrier": 1, "cannoneer": 2 }, "spawn_interval": "x0.8", "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "arena": { "shrink_speed": "x1.3" }, "announce": "Hold on!" },
-    { "from": 390, "enemy_stats": { "all": { "base_hp": "+1" } } },
-    { "from": 420, "arena": { "armor": "+5" }, "announce": "The walls harden!" }
+    { "from": 345, "to": 360, "spawn": { "carrier": 1, "cannoneer": 2 }, "spawn_interval": "x0.8", "enemy_stats": { "all": { "contact_damage": "x1.15", "projectile_damage": "x1.15", "blast_damage": "x1.15" } }, "arena": { "shrink_speed": "x1.3" }, "announce": "Hold on!" },
+    { "from": 390, "to": 410, "every": 45, "spawn_interval": "x0.8", "one_of": [
+      { "weights": { "artillery": "x2" }, "spawn": { "cluster": 2, "artillery": 1 }, "announce": "Clusters incoming!" },
+      { "weights": { "carrier": "x3" }, "spawn": { "carrier": 2 }, "announce": "Carriers incoming!" },
+      { "weights": { "artillery": "x3" }, "spawn": { "artillery": 3 }, "announce": "Artillery incoming!" }
+    ] },
+    { "from": 410, "to": 416, "every": 80, "breathe": 70, "announce": "The arena breathes in!" },
+    { "from": 420, "every": 120, "one_of": [
+      { "points": { "totem": 1 } },
+      { "points": { "nest": 1 } },
+      { "points": { "storm": 1 } }
+    ] }
   ],
-  "enemy_stats": {
-    "all": { "base_hp": "+2" }
-  }
+  "enemy_stats": { "all": { "base_hp": "+2" } }
 }

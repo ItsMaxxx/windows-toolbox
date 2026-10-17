@@ -1,0 +1,48 @@
+{
+  "name": "C2",
+  "description": "blitz: Shields and fast walls",
+  "order": 22,
+  "goal": 300,
+  "core_chance": 0.25,
+  "unlock": { "requires": "c1" },
+  "hints": ["Fast walls – keep pushing", "Many Shields: get round them or use rockets", "Shield swarms led by Commanders"],
+  "arena": { "start_size": [400, 280], "shrink_speed": 17, "shrink_growth": 3, "max_shrink_speed": 34, "armor": 4, "push_falloff": 0.8 },
+  "spawning": { "first_spawn": 0.5, "start_interval": 2.45, "min_interval": 0.95, "interval_drop": 0.01 },
+  "enemies": [
+    { "type": "shield", "weight": 40, "after": 0, "growth": 3 },
+    { "type": "fat", "weight": 30, "after": 0 },
+    { "type": "commander", "weight": 6, "after": 40, "growth": 1 },
+    { "type": "cannoneer", "weight": 8, "after": 60, "growth": 1 }
+  ],
+  "swarms": [
+    { "type": "shield", "after": 40, "start_chance": 0.02, "chance_growth": 0.0007, "max_chance": 0.11, "start_size": 3, "growth_time": 20, "max_size": 10, "min_gap": 9, "leader": "commander", "leader_chance": 0.5 }
+  ],
+  "phases": [
+    { "from": 0, "to": 20, "spawn": { "fat": 3 }, "spawn_interval": "x0.5" },
+    { "from": 70, "to": 100, "spawn_interval": "x0.85", "one_of": [
+      { "weights": { "shield": "x2" }, "spawn": { "shield": 4 }, "announce": "Shields incoming!" },
+      { "weights": { "fat": "x2" }, "spawn": { "fat": 5 }, "announce": "Fat Guys incoming!" }
+    ] },
+    { "from": 100, "every": 100, "arena": { "shrink_speed": "x1.15" }, "announce": "The walls speed up!" },
+    { "from": 120, "every": 130, "enemy_stats": { "all": { "contact_damage": "x1.1", "projectile_damage": "x1.1", "blast_damage": "x1.1" } }, "announce": "Enemies hit harder!" },
+    { "from": 160, "every": 150, "enemy_stats": { "all": { "base_hp": "+1" } }, "announce": "Enemies +1 HP" },
+    { "from": 180, "to": 186, "breathe": 70, "announce": "The arena breathes in!" },
+    { "from": 210, "to": 240, "spawn_interval": "x0.85", "one_of": [
+      { "weights": { "shield": "x2" }, "spawn": { "shield": 4 }, "announce": "Shields incoming!" },
+      { "spawn": { "commander": 2, "fat": 4 }, "announce": "Commanders incoming!" }
+    ] },
+    { "from": 270, "to": 300, "spawn": { "shield": 3, "fat": 2 }, "spawn_interval": "x0.7", "announce": "Final wave!" },
+    { "from": 285, "to": 300, "spawn": { "shield": 2, "commander": 1 }, "spawn_interval": "x0.8", "enemy_stats": { "all": { "contact_damage": "x1.15", "projectile_damage": "x1.15", "blast_damage": "x1.15" } }, "announce": "Hold on!" },
+    { "from": 330, "to": 350, "every": 45, "spawn_interval": "x0.8", "one_of": [
+      { "weights": { "shield": "x2" }, "spawn": { "shield": 4 }, "announce": "Shields incoming!" },
+      { "spawn": { "commander": 2, "fat": 4 }, "announce": "Commanders incoming!" },
+      { "spawn": { "fat": 4, "cannoneer": 2 }, "announce": "Heavy wave!" }
+    ] },
+    { "from": 350, "to": 356, "every": 80, "breathe": 70, "announce": "The arena breathes in!" },
+    { "from": 360, "every": 120, "one_of": [
+      { "points": { "totem": 1 } },
+      { "points": { "nest": 1 } },
+      { "points": { "storm": 1 } }
+    ] }
+  ]
+}

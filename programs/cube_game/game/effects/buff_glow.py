@@ -11,11 +11,12 @@ COLOR = (255, 70, 150)
 GAP = 4                     # pixels between the enemy and the outline
 
 
-def buff_glow(size):
-    """The outline for an enemy of size, as a picture – put its top left corner GAP pixels up and left of the enemy's."""
+def buff_glow(size, color=COLOR):
+    """The outline for an enemy of size, as a picture – put its top left corner GAP pixels up and left of the enemy's.
+    color: the buff's (a Commander's is gold)."""
     def make():
         glow = pygame.Surface((size[0] + 2 * GAP, size[1] + 2 * GAP), pygame.SRCALPHA)
-        pygame.draw.rect(glow, COLOR, glow.get_rect(), 2, border_radius=3)
+        pygame.draw.rect(glow, color, glow.get_rect(), 2, border_radius=3)
         return glow
 
-    return PICTURES.get(("buff glow", tuple(size)), make)
+    return PICTURES.get(("buff glow", tuple(size), tuple(color)), make)

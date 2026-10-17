@@ -42,8 +42,8 @@ from game.buildings.watchtower import Watchtower, values as watchtower_values
 from game.core_pickup import CorePickup
 from game.difficulty import DIFFICULTIES, next_difficulty
 from game.field import Field
-from game.enemies.roster import EnemyRoster
-from game.enemies.spawner import Spawner
+from game.enemies.roster import ENEMY_TYPES, EnemyRoster
+from game.enemies.spawner import Spawner, distance_to_rect
 from game.artillery_strike import ArtilleryStrike
 from game.laser_beam import LaserBeam
 from game.effects.artillery_blast import ArtilleryBlast
@@ -52,8 +52,10 @@ from game.effects.explosion import Explosion
 from game.effects.slow_field import SlowField
 from game.effects.spark import Spark
 from game.hud import Hud
+from game.icons import draw_swarm_icon
 from game.inventory import Inventory
 from game.pause_menu import PauseMenu
+from game.points import Points
 from game.shop import Shop
 from game.shop_panel import ShopPanel
 from game.star_pickup import StarPickup
@@ -62,10 +64,15 @@ PLAYING, PAUSED, INVENTORY, SHOP = "playing", "paused", "inventory", "shop"
 PANEL_SIZES = {PAUSED: pause_menu.SIZE, INVENTORY: inventory.SIZE, SHOP: shop_panel.SIZE}
 MARKER_INSET = 8                # off-screen markers: distance from the window's edge …
 MARKER_RADIUS = 4               # … and size
+SWARM_MARKER_INSET = 16         # a swarm's marker: distance from the window's edge …
+SWARM_MARKER_SIZES = (12, 30)   # … size far away and right at the window …
+SWARM_MARKER_FAR = 900          # … counts as far away from this many pixels beyond the window
 NOTICE_TIME = 4.0               # seconds a notice ("… unlocked", a phase's announcement) stays on screen
 NOTICE_COLOR = (255, 215, 60)
 PHASE_COLOR = (255, 110, 80)
 SHORT_NOTICE_TIME = 1.5         # seconds for small notices ("A watchtower costs 25 stars")
+LOOKOUT_MARGIN = 14             # a Pusher's window: this much around its body …
+LOOKOUT_BORDER = (150, 50, 50)  # … with a red frame, so it's clearly the enemy's
 TOWER_BACKGROUND = (12, 12, 14) # a watchtower's window outside the arena: almost black, a hint of grey …
 RADAR_BACKGROUND = (5, 11, 17)  # … the radar's: a hint of blue – just enough to tell them apart from the arena
 SEPARATION_PASSES = (2, 8)      # how often per tick touching enemies are pushed apart (more: crowds overlap less) …
@@ -115,6 +122,7 @@ class PlayScene(Scene):
         self.slow_fields = []                   # left by mines – slows the enemies in it
         self.pickups = []                       # stars and cores dropped by killed enemies
         self.towers = []                        # watchtowers – in the air or standing
+        self.points = Points(skill_tree.start_finds(profile))    # points of interest out there (game/points.py)
         self.ui_layer = None                    # this frame's HUD etc. for the extra windows: (main window, surface)
         self.ui_surface = None                  # the transparent surface it's drawn on (kept between frames)
         self.outlines = SpriteCache(16)         # the extra windows' borders (draw_outline) – big, so only a few
@@ -216,7 +224,9 @@ class PlayScene(Scene):
         self.notices = [notice for notice in self.notices if notice[2] > 0]
         if not self.cleared and self.difficulty.goal is not None and self.elapsed >= self.difficulty.goal:
             self.clear_level()
-        self.arena.changes = [change for phase in self.spawner.active_phases() for change in phase.arena]
+        phases = self.spawner.active_phases()
+        self.arena.changes = [change for phase in phases for change in phase.arena]
+        self.arena.breathe(phases)
         self.arena.update(dt)
         self.ship.update(dt, self.engine.mouse_position())
         self.arena.contain(self.ship)
@@ -232,7 +242,10 @@ class PlayScene(Scene):
         self.roster.update(dt)
         field = self.field()
         self.engine.confine_mouse(field.rects)          # the mouse may go anywhere in the field
-        self.enemies += self.spawner.update(dt, self.arena.rect, field.sight[1:])
+        new = self.spawner.update(dt, self.arena.rect, field.sight[1:])
+        for enemy in new:
+            enemy.arena, enemy.spawner = self.arena, self.spawner   # the Pusher shoves it, the Living Window spawns
+        self.enemies += new
         self.lure_enemies()
         self.slow_enemies(dt)
         for text in self.spawner.announcements:
@@ -250,10 +263,14 @@ class PlayScene(Scene):
                 enemy.seen = True                       # the player has had it in view
             self.enemies += enemy.spawned
             enemy.spawned.clear()
+        for enemy in self.enemies:
+            if enemy.commands:
+                enemy.command(self.enemies)             # a Commander's aura
         self.separate_enemies()
         self.update_towers(dt)
         self.expose_enemies()
         self.update_radar(dt)
+        self.points.update(dt, self)
 
         # effects on shots in flight (slowing areas, deflecting enemies, …) go here – before projectile.update()
         self.update_player_shots(dt)
@@ -272,7 +289,11 @@ class PlayScene(Scene):
                 self.explosions.append(Explosion(enemy.center, enemy.size * 1.6, enemy.color))
                 if enemy.drops_loot:
                     self.drop_loot(enemy.center)
+        for enemy in self.enemies:
+            if not enemy.alive and getattr(enemy, "view", None) is not None:
+                self.engine.close_view(enemy.view)      # a Pusher's or Living Window's window
         self.enemies = [enemy for enemy in self.enemies if enemy.alive]
+        self.update_lookouts()
 
         for pickup in self.pickups:
             pickup.update(dt, self.ship)
@@ -356,6 +377,22 @@ class PlayScene(Scene):
                     self.engine.close_view(tower.view)
         self.towers = [tower for tower in self.towers if tower.alive]
 
+    def update_lookouts(self):
+        """Every Pusher and Living Window on a monitor gets a small window of its own that follows it – out there it's
+        seen, but it's no part of the field (Field lookouts)."""
+        for enemy in self.enemies:
+            if not hasattr(enemy, "view"):
+                continue
+            rect = pygame.Rect(enemy.body.inflate(2 * LOOKOUT_MARGIN, 2 * LOOKOUT_MARGIN))
+            if enemy.view is None and self.desktop.contains(rect.center):
+                enemy.view = self.engine.open_view()
+            if enemy.view is not None:
+                enemy.view.rect = rect.clamp(self.desktop.area_at(rect.center))
+
+    def lookouts(self):
+        """The windows of the Pushers and Living Windows."""
+        return [enemy.view for enemy in self.enemies if getattr(enemy, "view", None) is not None]
+
     def expose_enemies(self):
         """Enemies in a standing watchtower's area take its damage_bonus percent more damage this tick (Enemy.
         damage_factor) – the biggest bonus counts, towers don't stack."""
@@ -391,15 +428,16 @@ class PlayScene(Scene):
     def separate_enemies(self):
         """Enemies can't overlap: every touching pair is pushed apart (ENEMY_GAP between them), the heavier one moves
         less. That's also how they shove each other – a charging Charger rams the others out of its way."""
-        if not self.enemies:
+        solid = [enemy for enemy in self.enemies if enemy.solid]     # the Pusher walks through everything
+        if not solid:
             return
-        cell_size = max(enemy.size for enemy in self.enemies) + ENEMY_GAP
+        cell_size = max(enemy.size for enemy in solid) + ENEMY_GAP
         reach = ENEMY_GAP + SEPARATION_REACH        # filtered once, so the passes only go through pairs that can touch
-        pairs = [(a.rect, b.rect, a.mass, b.mass, ENEMY_GAP) for a, b in nearby_pairs(self.enemies, cell_size)
+        pairs = [(a.rect, b.rect, a.mass, b.mass, ENEMY_GAP) for a, b in nearby_pairs(solid, cell_size)
                  if close(a.rect, b.rect, reach)]
         for tower in self.towers:                   # standing towers are solid: enemies are pushed out, never them
             if tower.landed:
-                pairs += [(tower.rect, enemy.rect, math.inf, enemy.mass, 0) for enemy in self.enemies
+                pairs += [(tower.rect, enemy.rect, math.inf, enemy.mass, 0) for enemy in solid
                           if close(tower.rect, enemy.rect, reach)]
         fewest, most = SEPARATION_PASSES
         passes = min(most, max(fewest, SEPARATION_BUDGET // max(len(pairs), 1)))
@@ -412,7 +450,8 @@ class PlayScene(Scene):
         closes it again after its duration."""
         if self.radar is None:
             return
-        change = self.radar.update(dt, self.enemies, self.field().sight, self.desktop)
+        hidden = [point.position for point in self.points.points if not point.revealed]
+        change = self.radar.update(dt, self.enemies, self.field().sight, self.desktop, hidden)
         if change == "open":
             self.radar.view = self.engine.open_view()
             if self.radar.view is not None:
@@ -595,6 +634,7 @@ class PlayScene(Scene):
         area = pygame.Rect(offset, surface.get_size())
         for ground in self.burning + self.slow_fields:      # on the ground, under everything else
             ground.draw(surface, offset)
+        self.points.draw(surface, offset, area)
         for strike in self.strikes:
             strike.draw(surface, offset)
         for beam in self.beams:
@@ -627,6 +667,8 @@ class PlayScene(Scene):
         surface.fill(settings.BACKGROUND, self.arena.window_rect().move(-offset[0], -offset[1]))
         self.draw_outline(surface, offset)
         self.draw_world(surface, offset)
+        if view in self.lookouts():
+            pygame.draw.rect(surface, LOOKOUT_BORDER, surface.get_rect(), settings.BORDER_WIDTH)
         if self.ui_layer is not None:                   # the main window's HUD etc. where this window covers it
             window, layer = self.ui_layer
             surface.blit(layer, (window.left - offset[0], window.top - offset[1]))
@@ -646,7 +688,8 @@ class PlayScene(Scene):
         size = (surface.get_width() + 2 * width, surface.get_height() + 2 * width)
         origin = pygame.Vector2(offset) - (width, width)
         covered_rects = []
-        for rect in self.field().sight:
+        field = self.field()
+        for rect in field.sight[:len(field.sight) - len(field.lookouts)]:      # a Pusher's window has its own frame
             local = rect.move(-origin.x, -origin.y).clip(pygame.Rect((0, 0), size))
             if local.width and local.height:
                 covered_rects.append(tuple(local))
@@ -667,20 +710,39 @@ class PlayScene(Scene):
     def extra_views(self):
         """The open extra windows: the watchtowers' and the radar's."""
         views = [tower.view for tower in self.towers] + ([self.radar.view] if self.radar is not None else [])
-        return [view for view in views if view is not None]
+        return [view for view in views if view is not None] + self.lookouts()
 
     def field(self):
         """The field right now: the arena and the extra windows (game/field.py)."""
-        return Field(self.arena, [view.rect for view in self.extra_views() if view.rect is not None])
+        lookouts = self.lookouts()
+        return Field(self.arena, [view.rect for view in self.extra_views() if view.rect is not None
+                                  and view not in lookouts],
+                     [view.rect for view in lookouts if view.rect is not None])
 
     def draw_offscreen_markers(self, surface, offset):
-        """A dot at the window's edge for every enemy the player can't see (in no window), in its colour, where it
-        would come in."""
+        """At the window's edge, where it would come in: a dot for every enemy the player can't see (in no window), in
+        its colour – a swarm gets one swarm icon instead, the bigger the closer it is – and an arrow for every point of
+        interest out of sight."""
         inside = surface.get_rect().inflate(-2 * MARKER_INSET, -2 * MARKER_INSET)
         field = self.field()
+        swarms = {}                                     # swarm -> [its enemies out of sight]
         for enemy in self.enemies:
-            position = enemy.center - offset
             if field.sees_point(enemy.center):
                 continue
+            if enemy.swarm is not None:
+                swarms.setdefault(enemy.swarm, []).append(enemy)
+                continue
+            position = enemy.center - offset
             marker = (min(max(position.x, inside.left), inside.right), min(max(position.y, inside.top), inside.bottom))
             pygame.draw.circle(surface, enemy.color, marker, MARKER_RADIUS)
+        swarm_inside = surface.get_rect().inflate(-2 * SWARM_MARKER_INSET, -2 * SWARM_MARKER_INSET)
+        for swarm, members in swarms.items():
+            middle = sum((enemy.center for enemy in members), pygame.Vector2()) / len(members)
+            distance = distance_to_rect(middle, self.arena.rect)
+            near = 1 - min(1.0, distance / SWARM_MARKER_FAR)                # 1 at the window, 0 far away
+            size = SWARM_MARKER_SIZES[0] + (SWARM_MARKER_SIZES[1] - SWARM_MARKER_SIZES[0]) * near
+            position = middle - offset
+            marker = (min(max(position.x, swarm_inside.left), swarm_inside.right),
+                      min(max(position.y, swarm_inside.top), swarm_inside.bottom))
+            draw_swarm_icon(surface, marker, ENEMY_TYPES[swarm.kind].skin.color, round(size))
+        self.points.draw_markers(surface, offset, field)

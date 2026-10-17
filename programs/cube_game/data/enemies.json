@@ -60,5 +60,19 @@
     "swing_time": 0.35, "arc_height": 80, "arc_steepness": 0.18, "arc_peak": 0.5, "shell_size": 18,
     "split_count": 3, "split_spread": 170, "split_min_spread": 100, "split_radius": 40, "split_damage": 35,
     "split_time": 0.8, "split_arc_height": 60
+  },
+  "commander": {
+    "base_hp": 5, "armor": 1, "speed": 85, "size": 30, "contact_damage": 25,
+    "preferred_distance": 220, "back_off": 80, "close_in": 40,
+    "aura_radius": 170, "aura_time": 3, "aura_speed": 1.2, "aura_damage": 1.25
+  },
+  "pusher": {
+    "base_hp": 10, "speed": 70, "size": 46, "contact_damage": 25,
+    "push_speed": 30, "arm_length": 44, "arm_width": 18
+  },
+  "living_window": {
+    "base_hp": 1, "speed": 60, "size": 80, "contact_damage": 0,
+    "min_size": 30, "max_size": 220, "grow_speed": 6, "shrink_per_damage": 6,
+    "overlap": 30, "slide_speed": 25, "spawn_interval": 5, "burst_count": 8
   }
 }

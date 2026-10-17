@@ -1,0 +1,50 @@
+{
+  "name": "C4",
+  "description": "lungs: the arena breathes, Clusters from above",
+  "order": 24,
+  "goal": 330,
+  "core_chance": 0.19,
+  "unlock": { "requires": "c3" },
+  "hints": ["The arena breathes in every 40 seconds – push while it does", "Clusters: three small circles each", "Cannoneers and Lasers"],
+  "arena": { "start_size": [400, 280], "shrink_speed": 19, "shrink_growth": 2.5, "max_shrink_speed": 36, "armor": 5, "push_falloff": 0.8 },
+  "spawning": { "first_spawn": 0.5, "start_interval": 1.5, "min_interval": 0.65, "interval_drop": 0.011 },
+  "enemies": [
+    { "type": "fat", "weight": 40, "after": 0 },
+    { "type": "cluster", "weight": 15, "after": 15, "growth": 2 },
+    { "type": "cannoneer", "weight": 12, "after": 30, "growth": 2 },
+    { "type": "laser", "weight": 10, "after": 45, "growth": 2 },
+    { "type": "pusher", "weight": 3, "after": 120, "growth": 1 }
+  ],
+  "swarms": [
+    { "type": "fat", "after": 40, "start_chance": 0.02, "chance_growth": 0.0008, "max_chance": 0.12, "start_size": 4, "growth_time": 18, "max_size": 14, "min_gap": 8, "leader": "commander", "leader_chance": 0.4 }
+  ],
+  "phases": [
+    { "from": 0, "to": 20, "spawn": { "fat": 3 }, "spawn_interval": "x0.5" },
+    { "from": 30, "to": 36, "every": 40, "breathe": 80, "announce": "The arena breathes in!" },
+    { "from": 80, "to": 110, "spawn_interval": "x0.85", "one_of": [
+      { "weights": { "cluster": "x2" }, "spawn": { "cluster": 3 }, "announce": "Clusters incoming!" },
+      { "weights": { "laser": "x2" }, "spawn": { "laser": 3 }, "announce": "Lasers incoming!" }
+    ] },
+    { "from": 120, "every": 140, "enemy_stats": { "all": { "contact_damage": "x1.1", "projectile_damage": "x1.1", "blast_damage": "x1.1" } }, "announce": "Enemies hit harder!" },
+    { "from": 150, "every": 150, "arena": { "armor": "+5" }, "announce": "The walls harden!" },
+    { "from": 140, "every": 140, "enemy_stats": { "all": { "base_hp": "+1" } }, "announce": "Enemies +1 HP" },
+    { "from": 220, "to": 250, "spawn_interval": "x0.85", "one_of": [
+      { "weights": { "cluster": "x2" }, "spawn": { "cluster": 3 }, "announce": "Clusters incoming!" },
+      { "weights": { "cannoneer": "x2" }, "spawn": { "cannoneer": 3 }, "announce": "Cannoneers incoming!" },
+      { "spawn": { "pusher": 2 }, "announce": "Pushers incoming!" }
+    ] },
+    { "from": 300, "to": 330, "spawn": { "cluster": 2, "fat": 3 }, "spawn_interval": "x0.7", "announce": "Final wave!" },
+    { "from": 315, "to": 330, "spawn": { "cannoneer": 2, "laser": 1 }, "spawn_interval": "x0.8", "enemy_stats": { "all": { "contact_damage": "x1.15", "projectile_damage": "x1.15", "blast_damage": "x1.15" } }, "announce": "Hold on!" },
+    { "from": 360, "to": 380, "every": 45, "spawn_interval": "x0.8", "one_of": [
+      { "weights": { "cluster": "x2" }, "spawn": { "cluster": 3 }, "announce": "Clusters incoming!" },
+      { "weights": { "laser": "x2" }, "spawn": { "laser": 3 }, "announce": "Lasers incoming!" },
+      { "spawn": { "fat": 4, "cannoneer": 2 }, "announce": "Heavy wave!" }
+    ] },
+    { "from": 380, "to": 386, "every": 80, "breathe": 80, "announce": "The arena breathes in!" },
+    { "from": 390, "every": 120, "one_of": [
+      { "points": { "totem": 1 } },
+      { "points": { "nest": 1 } },
+      { "points": { "storm": 1 } }
+    ] }
+  ]
+}

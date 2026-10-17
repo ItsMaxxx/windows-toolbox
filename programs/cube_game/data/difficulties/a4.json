@@ -7,28 +7,33 @@
   "unlock": { "requires": "a3" },
   "hints": ["Artillery and drone carriers", "Keep moving – artillery aims where you stand", "Kill carriers before their drones swarm you"],
   "arena": { "start_size": [400, 280], "shrink_speed": 8, "shrink_growth": 2, "max_shrink_speed": 22, "armor": 1.5, "push_falloff": 0.8 },
-  "spawning": { "first_spawn": 2.5, "start_interval": 2.8, "min_interval": 1.05, "interval_drop": 0.009 },
+  "spawning": { "first_spawn": 0.5, "start_interval": 2.8, "min_interval": 1.05, "interval_drop": 0.009 },
   "enemies": [
-    { "type": "basic",     "weight": 40, "after": 0 },
-    { "type": "shooter",   "weight": 15, "after": 0,  "growth": 3 },
+    { "type": "basic", "weight": 40, "after": 0 },
+    { "type": "shooter", "weight": 15, "after": 0, "growth": 3 },
     { "type": "artillery", "weight": 15, "after": 20, "growth": 3 },
-    { "type": "carrier",   "weight": 10, "after": 45, "growth": 2 }
+    { "type": "carrier", "weight": 10, "after": 45, "growth": 2 }
   ],
-  "swarms": {
-    "type": "basic", "after": 50,
-    "start_chance": 0.04, "chance_growth": 0.0008, "max_chance": 0.12,
-    "start_size": 5, "growth_time": 12, "max_size": 30, "min_gap": 9
-  },
+  "swarms": { "type": "basic", "after": 50, "start_chance": 0.04, "chance_growth": 0.0008, "max_chance": 0.12, "start_size": 5, "growth_time": 12, "max_size": 30, "min_gap": 9 },
   "phases": [
-    { "from": 60, "to": 90, "weights": { "artillery": "x3" }, "spawn": { "artillery": 3 }, "spawn_interval": "x0.8",
-      "announce": "Artillery incoming!" },
-    { "from": 100, "enemy_stats": { "all": { "base_hp": "+1" } } },
-    { "from": 140, "to": 170, "weights": { "carrier": "x3" }, "spawn": { "carrier": 2 }, "spawn_interval": "x0.8",
-      "announce": "Carriers incoming!" },
-    { "from": 180, "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
+    { "from": 0, "to": 20, "spawn": { "basic": 4 }, "spawn_interval": "x0.5" },
+    { "from": 60, "to": 90, "spawn_interval": "x0.8", "one_of": [
+      { "weights": { "artillery": "x3" }, "spawn": { "artillery": 3 }, "announce": "Artillery incoming!" },
+      { "weights": { "carrier": "x3" }, "spawn": { "carrier": 2 }, "announce": "Carriers incoming!" }
+    ] },
+    { "from": 100, "every": 170, "enemy_stats": { "all": { "base_hp": "+1" } }, "announce": "Enemies +1 HP" },
+    { "from": 140, "to": 170, "spawn_interval": "x0.8", "one_of": [
+      { "weights": { "carrier": "x3" }, "spawn": { "carrier": 2 }, "announce": "Carriers incoming!" },
+      { "weights": { "shooter": "x3" }, "spawn": { "shooter": 4 }, "announce": "Shooters incoming!" }
+    ] },
+    { "from": 180, "every": 150, "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
     { "from": 210, "to": 240, "weights": { "artillery": "x2" }, "spawn": { "artillery": 3, "carrier": 1 }, "spawn_interval": "x0.65", "announce": "Final wave!" },
     { "from": 225, "to": 240, "spawn": { "basic": 5, "carrier": 1 }, "spawn_interval": "x0.8", "arena": { "shrink_speed": "x1.3" }, "announce": "Hold on!" },
-    { "from": 270, "enemy_stats": { "all": { "base_hp": "+1" } } },
-    { "from": 330, "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" }
+    { "from": 270, "to": 290, "every": 45, "spawn_interval": "x0.8", "one_of": [
+      { "weights": { "artillery": "x3" }, "spawn": { "artillery": 3 }, "announce": "Artillery incoming!" },
+      { "weights": { "carrier": "x3" }, "spawn": { "carrier": 2 }, "announce": "Carriers incoming!" },
+      { "weights": { "basic": "x2" }, "spawn": { "basic": 10 }, "announce": "The horde is coming!" }
+    ] },
+    { "from": 290, "to": 296, "every": 80, "breathe": 50, "announce": "The arena breathes in!" }
   ]
 }

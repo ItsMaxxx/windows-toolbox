@@ -19,6 +19,7 @@ DEFAULTS = {
         "distance": 220,            # pixels
         "duration": 0.12,           # seconds the dash takes
         "charges": 1,               # dashes stored at once (the skill tree's Charges add more)
+        "invulnerable_time": 0.2,   # seconds from the start of a dash in which nothing can hit the ship
     },
     "rocket": {
         "cooldown": 7,

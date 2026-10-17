@@ -57,5 +57,11 @@
   "radar":                   { "costs": [12] },
   "radar_size":              { "costs": [5, 10, 16], "per_level": 30 },
   "radar_cooldown":          { "costs": [5, 10, 16], "per_level": -0.75 },
-  "radar_duration":          { "costs": [5, 10, 16], "per_level": 1 }
+  "radar_duration":          { "costs": [5, 10, 16], "per_level": 1 },
+  "radar_find":              { "costs": [6, 12, 20], "per_level": 0.15 },
+
+  "points":                  { "costs": [10] },
+  "point_magnet":            { "costs": [8] },
+  "point_repair":            { "costs": [10] },
+  "point_rate":              { "costs": [6, 12, 20], "per_level": 8 }
 }

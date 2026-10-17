@@ -1,50 +1,58 @@
 {
   "name": "Survival",
   "description": "endless – how long can you last?",
-  "order": 20,
+  "order": 27,
   "goal": null,
-  "core_chance": 1,
+  "core_chance": 0.05,
   "unlock": { "requires": "b6" },
-  "hints": ["Endless – how long can you last?", "Starts with Basics, then every type comes in", "Evolutions from 4:00 on"],
+  "hints": ["Endless – how long can you last?", "Starts with Basics, then every type comes in", "Evolutions from 4:00, Commanders, Pushers, Living Windows from 7:00, threats from 8:00"],
   "arena": { "start_size": [400, 280], "shrink_speed": 10, "shrink_growth": 2.5, "max_shrink_speed": 32, "armor": 0, "push_falloff": 0.8 },
-  "spawning": { "first_spawn": 2.5, "start_interval": 3.0, "min_interval": 0.6, "interval_drop": 0.01 },
+  "spawning": { "first_spawn": 0.5, "start_interval": 3.0, "min_interval": 0.6, "interval_drop": 0.01 },
   "enemies": [
-    { "type": "basic",     "weight": 50, "after": 0 },
-    { "type": "shooter",   "weight": 20, "after": 30,  "growth": 4 },
-    { "type": "charger",   "weight": 20, "after": 60,  "growth": 4 },
-    { "type": "sniper",    "weight": 10, "after": 90,  "growth": 3 },
-    { "type": "artillery", "weight": 8,  "after": 120, "growth": 2 },
-    { "type": "carrier",   "weight": 8,  "after": 150, "growth": 2 }
+    { "type": "basic", "weight": 50, "after": 0 },
+    { "type": "shooter", "weight": 20, "after": 30, "growth": 4 },
+    { "type": "charger", "weight": 20, "after": 60, "growth": 4 },
+    { "type": "sniper", "weight": 10, "after": 90, "growth": 3 },
+    { "type": "artillery", "weight": 8, "after": 120, "growth": 2 },
+    { "type": "carrier", "weight": 8, "after": 150, "growth": 2 }
   ],
   "evolutions": [
-    { "type": "basic",   "chance": 0.05, "after": 240, "growth": 0.06, "max_chance": 0.6 },
+    { "type": "basic", "chance": 0.05, "after": 240, "growth": 0.06, "max_chance": 0.6 },
     { "type": "shooter", "chance": 0.05, "after": 270, "growth": 0.06, "max_chance": 0.6 },
     { "type": "charger", "chance": 0.05, "after": 300, "growth": 0.06, "max_chance": 0.6 },
-    { "type": "sniper",  "chance": 0.05, "after": 330, "growth": 0.06, "max_chance": 0.6 },
+    { "type": "sniper", "chance": 0.05, "after": 330, "growth": 0.06, "max_chance": 0.6 },
     { "type": "artillery", "chance": 0.05, "after": 360, "growth": 0.06, "max_chance": 0.6 }
   ],
   "swarms": [
-    {
-      "type": "basic", "after": 60,
-      "start_chance": 0.015, "chance_growth": 0.0008, "max_chance": 0.2,
-      "start_size": 5, "growth_time": 12, "max_size": 40, "min_gap": 6
-    },
-    {
-      "type": "charger", "after": 180,
-      "start_chance": 0.01, "chance_growth": 0.0005, "max_chance": 0.12,
-      "start_size": 4, "growth_time": 16, "max_size": 20, "min_gap": 10
-    }
+    { "type": "basic", "after": 60, "start_chance": 0.015, "chance_growth": 0.0008, "max_chance": 0.2, "start_size": 5, "growth_time": 12, "max_size": 40, "min_gap": 6 },
+    { "type": "charger", "after": 180, "start_chance": 0.01, "chance_growth": 0.0005, "max_chance": 0.12, "start_size": 4, "growth_time": 16, "max_size": 20, "min_gap": 10 }
   ],
   "phases": [
-    { "from": 180, "enemy_stats": { "all": { "base_hp": "+1" } } },
+    { "from": 0, "to": 20, "spawn": { "basic": 4 }, "spawn_interval": "x0.5" },
+    { "from": 180, "every": 180, "enemy_stats": { "all": { "base_hp": "+1" } }, "announce": "Enemies +1 HP" },
+    { "from": 240, "every": 180, "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
+    { "from": 300, "every": 180, "arena": { "armor": "+5" }, "announce": "The walls harden!" },
     { "from": 240, "spawn": { "fat": 3, "cannoneer": 1 }, "announce": "Evolution begins!" },
-    { "from": 240, "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
-    { "from": 300, "arena": { "armor": "+5" }, "announce": "The walls harden!" },
-    { "from": 360, "enemy_stats": { "all": { "base_hp": "+1" } } },
-    { "from": 420, "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
-    { "from": 480, "arena": { "armor": "+5" }, "announce": "The walls harden!" },
-    { "from": 540, "enemy_stats": { "all": { "base_hp": "+1" } } },
-    { "from": 600, "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
-    { "from": 720, "enemy_stats": { "all": { "base_hp": "+2" } } }
+    { "from": 300, "to": 320, "every": 60, "spawn_interval": "x0.8", "one_of": [
+      { "weights": { "charger": "x3" }, "spawn": { "charger": 4 }, "announce": "Chargers incoming!" },
+      { "weights": { "sniper": "x3" }, "spawn": { "sniper": 3 }, "announce": "Snipers incoming!" },
+      { "weights": { "basic": "x2" }, "spawn": { "basic": 10 }, "announce": "The horde is coming!" },
+      { "weights": { "artillery": "x3" }, "spawn": { "artillery": 3 }, "announce": "Artillery incoming!" },
+      { "weights": { "carrier": "x3" }, "spawn": { "carrier": 2 }, "announce": "Carriers incoming!" }
+    ] },
+    { "from": 420, "to": 440, "every": 90, "spawn_interval": "x0.8", "one_of": [
+      { "spawn": { "commander": 2, "fat": 4 }, "announce": "Commanders incoming!" },
+      { "spawn": { "pusher": 2 }, "announce": "Pushers incoming!" },
+      { "spawn": { "fat": 4, "cannoneer": 2 }, "announce": "Heavy wave!" },
+      { "weights": { "charger": "x2" }, "spawn": { "shield": 3, "charger": 2 }, "announce": "Shields incoming!" },
+      { "weights": { "sniper": "x2" }, "spawn": { "laser": 2, "sniper": 2 }, "announce": "Lasers incoming!" },
+      { "spawn": { "living_window": 2 }, "announce": "Living Windows!" }
+    ] },
+    { "from": 360, "to": 366, "every": 90, "breathe": 70, "announce": "The arena breathes in!" },
+    { "from": 480, "every": 90, "one_of": [
+      { "points": { "totem": 1 } },
+      { "points": { "nest": 1 } },
+      { "points": { "storm": 1 } }
+    ] }
   ]
 }

@@ -1,0 +1,10 @@
+{
+  "finds":  { "first": 25, "interval": 45, "min_interval": 15, "lifetime": 40 },
+  "place":  { "min_distance": 200, "max_distance": 650 },
+  "chest":  { "stars": 20 },
+  "magnet": { "time": 8, "speed": 900 },
+  "repair": { "push": 60 },
+  "totem":  { "lifetime": 50, "speed": 1.15, "damage": 1.2 },
+  "nest":   { "lifetime": 40, "interval": 2.5 },
+  "storm":  { "lifetime": 30, "radius": 220, "shrink_speed": 10 }
+}

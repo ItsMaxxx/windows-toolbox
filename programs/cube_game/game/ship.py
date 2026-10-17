@@ -117,8 +117,9 @@ class Ship(Entity):
                 ability.update(dt, self)
 
     def hit(self):
-        """Something hit the ship. True if it counts – False while still invulnerable from the last hit."""
-        if self.invulnerable > 0:
+        """Something hit the ship. True if it counts – False while still invulnerable from the last hit or while an
+        ability protects it (the dash)."""
+        if self.invulnerable > 0 or any(ability and ability.protects for ability in self.abilities):
             return False
         self.invulnerable = self.invulnerable_time
         return True

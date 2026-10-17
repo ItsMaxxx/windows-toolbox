@@ -3,7 +3,8 @@
     "cooldown": 3,
     "distance": 100,
     "duration": 0.1,
-    "charges": 1
+    "charges": 1,
+    "invulnerable_time": 0.2
   },
   "rocket": {
     "cooldown": 10,

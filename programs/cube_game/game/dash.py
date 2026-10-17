@@ -1,6 +1,7 @@
 """
 Dash (Shift): a quick burst in the direction you're moving – or towards the mouse if you're standing still.
 The arena still keeps the ship inside, so you can't dash through a wall. Leaves a short trail of afterimages.
+Nothing can hit the ship for invulnerable_time seconds from the start of a dash – it can dash through enemies and shots.
 Its values come from data/abilities.json ("dash"); distance and cooldown are on the ability, so cards can change them.
 With more than one charge (skill tree "Charges") it can dash again right away – once the dash before is over.
 The skill tree's "Mines" (mines: "mine" from data/abilities.json, None without it): every dash leaves a mine where it
@@ -31,11 +32,17 @@ class Dash(Ability):
         self.charges = self.max_charges
         self.distance = stats["distance"]   # pixels
         self.duration = stats["duration"]   # seconds the dash takes
+        self.invulnerable_time = stats["invulnerable_time"]
+        self.shield = 0.0                   # > 0: seconds left in which nothing can hit the ship
         self.time_left = 0.0                # > 0 while dashing
         self.direction = pygame.Vector2()
         self.trail = []                     # afterimages: [position, aim, age]
         self.mines = None                   # {"damage", "blast_radius", "wall_push", "size"} once "Mines" is bought
         self.slow_field = None              # {"slow", "size", "duration"} once "Slow field" is bought
+
+    @property
+    def protects(self):
+        return self.shield > 0
 
     @property
     def ready(self):
@@ -52,10 +59,12 @@ class Dash(Ability):
         moving = ship.move_direction()          # read now, so Shift together with a direction key goes that way
         self.direction = moving if moving.length_squared() else pygame.Vector2(ship.aim)
         self.time_left = self.duration
+        self.shield = self.invulnerable_time
         return [Mine(ship.rect.center, self.mines, self.slow_field)] if self.mines else []
 
     def update(self, dt, ship):
         super().update(dt, ship)
+        self.shield = max(0.0, self.shield - dt)
         if self.time_left > 0:
             step = min(dt, self.time_left)
             ship.rect.move_ip(self.direction * (self.distance / self.duration) * step)

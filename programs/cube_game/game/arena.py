@@ -16,6 +16,13 @@ Push falloff: the further the arena is out already, the less a push does – per
 but still easy to make taller. A push is multiplied by (start size ÷ size now) ^ push_falloff on the edge's axis: with
 falloff 1 it does half at twice the start width, and double while the arena is half as wide as at the start. 0 = off.
 
+Breathing: a phase with "breathe" pulls every edge in by that many pixels over its time, on top of the shrinking –
+and when it ends, they spring back out by as much (smoothly, like a push, but armor and falloff don't count). Push
+the walls while it lasts, and the arena is bigger afterwards (breathe()).
+
+Shoving: a Pusher moves the whole window (shove()). Where the screen ends, the window can't go on – that edge stays,
+and the opposite one moves in instead: the arena gets narrower, down to the ship's size.
+
 Getting hit squeezes the arena (hit()) – mostly from the side away from the ship, so it can't be dragged along by
 just moving one way.
 """
@@ -43,6 +50,8 @@ class Arena:
         self.base_armor = armor
         self.base_push_falloff = push_falloff
         self.changes = []                   # (value, operation, number) from the active phases – set by the scene
+        self.breathing = {}                 # id(phase) -> phase: the active phases that breathe – breathe()
+        self.storm_speed = 0.0              # pixels per second more while it reaches into a storm (game/points.py)
         self.fixed_speed = False
         self.ship_size = ship_data.current()["size"]   # the edges stop there – set by the scene from its ship
         self.elapsed = 0.0                  # seconds this arena has been shrinking
@@ -98,8 +107,19 @@ class Arena:
 
     def update(self, dt):
         self.elapsed += dt
-        self.squeeze(self.shrink_speed * dt)
+        breath = sum(phase.breathe / (phase.end - phase.start) for phase in self.breathing.values())
+        self.squeeze((self.shrink_speed + breath + self.storm_speed) * dt)
         self._expand(dt)
+
+    def breathe(self, phases):
+        """phases: the active phases (set by the scene every tick). Those with breathe pull the edges in while they
+        last; one that has ended gives its pixels back – every edge springs out again."""
+        now = {id(phase): phase for phase in phases if phase.breathe}
+        for key, phase in self.breathing.items():
+            if key not in now:
+                for side in SIDES:
+                    self.pending[side] += phase.breathe
+        self.breathing = now
 
     def squeeze(self, distance):
         """Moves every edge inwards by distance – each tick a little. It stops at the ship's size: then the ship is
@@ -133,6 +153,40 @@ class Arena:
             if not self.desktop.covers(self.widened(side, step)):
                 step = self.room(side, step)            # only up to the end of the screen
             self.rect = self.widened(side, step)
+
+    def shove(self, side, distance):
+        """Moves the whole window distance pixels towards side ("right": to the right). As far as the screen goes –
+        the rest squeezes: the edge at the end of the screen stays, the opposite one moves in (not below the ship)."""
+        direction = {"left": (-1, 0), "right": (1, 0), "top": (0, -1), "bottom": (0, 1)}[side]
+
+        def moved(step):
+            return self.rect.move(direction[0] * step, direction[1] * step)
+
+        step = distance
+        if not self.desktop.covers(moved(step)):
+            fits, too_far = 0.0, step                   # how far it can go – found by halving, like room()
+            for _ in range(ROOM_STEPS):
+                middle = (fits + too_far) / 2
+                if self.desktop.covers(moved(middle)):
+                    fits = middle
+                else:
+                    too_far = middle
+            step = fits
+        self.rect = moved(step)
+        rest = distance - step
+        if rest <= 0:
+            return
+        horizontal = side in ("left", "right")
+        rest = min(rest, max(0.0, (self.rect.width if horizontal else self.rect.height) - self.ship_size))
+        rect = self.rect
+        if side == "right":
+            rect.update(rect.left + rest, rect.top, rect.width - rest, rect.height)
+        elif side == "left":
+            rect.width -= rest
+        elif side == "bottom":
+            rect.update(rect.left, rect.top + rest, rect.width, rect.height - rest)
+        else:
+            rect.height -= rest
 
     def widened(self, side, step):
         """The arena with one edge moved out by step."""

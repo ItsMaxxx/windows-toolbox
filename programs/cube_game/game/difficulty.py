@@ -12,11 +12,12 @@ changes show up without a restart.
 """
 
 import json
+import random
 import re
 from dataclasses import dataclass, field, fields, replace
 from pathlib import Path
 
-from game import ability_data, buildings, cards, radar, ship_data, shop_data, skill_tree
+from game import ability_data, buildings, cards, points, radar, ship_data, shop_data, skill_tree
 from game.enemies import roster
 from game.enemies.roster import ENEMY_TYPES, EVOLUTIONS, EnemyRoster, stat_names
 from game.weapons import data as weapon_data
@@ -68,6 +69,8 @@ class Swarms:
     growth_time: float = 10         # … one more every this many seconds …
     max_size: int = 40              # … up to this
     min_gap: float = 6              # seconds at least between two swarms (of this kind)
+    leader: str | None = None       # an enemy type that comes in the swarm's middle (e.g. "commander") …
+    leader_chance: float = 1        # … in this share of the swarms
 
 
 @dataclass(frozen=True)
@@ -91,6 +94,10 @@ class Phase:
     arena: tuple = ()               # (value, operation, number) – the arena's ARENA_CHANGES while it lasts
     spawn: tuple = ()               # (type, count) – extra enemies once, when it starts
     spawn_interval: tuple = ()      # (operation, number) – on the seconds between enemies while it lasts (or empty)
+    breathe: float = 0              # pixels every edge moves in over the phase (on top), given back when it ends
+    points: tuple = ()              # (kind, count) – points of interest placed once, when it starts (game/points.py)
+    options: tuple = ()             # (weight, Phase) – "one_of": every run picks one and adds it (chosen())
+    every: float = 0                # > 0: starts again every this many seconds (each time as long as the first)
 
 
 @dataclass(frozen=True)
@@ -130,6 +137,27 @@ def default_key():
 def next_difficulty(key):
     """The level that clearing key unlocks – or None for the last."""
     return next((other for other, difficulty in DIFFICULTIES.items() if difficulty.requires == key), None)
+
+
+def chosen(phase):
+    """phase as it plays in this run: without options as it is, else with one of them picked (weighted) and added –
+    the lists (weights, enemy_stats, arena, spawn) after the phase's own, a single value (announce, spawn_interval,
+    breathe) of the option instead of the phase's."""
+    if not phase.options:
+        return phase
+    option = random.choices([option for _, option in phase.options],
+                            weights=[weight for weight, _ in phase.options])[0]
+    return with_option(phase, option)
+
+
+def with_option(phase, option):
+    """phase with option (one of its options, a Phase) added – see chosen()."""
+    return replace(phase, options=(), weights=phase.weights + option.weights,
+                   enemy_stats=phase.enemy_stats + option.enemy_stats, arena=phase.arena + option.arena,
+                   spawn=phase.spawn + option.spawn, points=phase.points + option.points,
+                   announce=option.announce or phase.announce,
+                   spawn_interval=option.spawn_interval or phase.spawn_interval,
+                   breathe=option.breathe or phase.breathe)
 
 
 def evolution_chance(entry, elapsed):
@@ -236,7 +264,7 @@ def read_swarms(data, file):
     """ "swarms": one { … } or a list of them (one per kind of swarm, e.g. basic and charger), [] for none."""
     section = data.get("swarms", {})
     if isinstance(section, dict):
-        return (read(Swarms, section, file, "swarms"),)
+        return (read_swarm(section, file, "swarms"),)
     if not isinstance(section, list):
         WARNINGS.append(f"{file} swarms: should be {{ … }} or a list [ … ] – using the defaults")
         return (Swarms(),)
@@ -245,12 +273,22 @@ def read_swarms(data, file):
         if isinstance(entry, dict) and entry.get("type", "basic") not in ENEMY_TYPES:
             WARNINGS.append(f"{file} swarms[{index}]: unknown type {json.dumps(entry['type'])} – skipped")
             continue
-        swarms.append(read(Swarms, entry, file, f"swarms[{index}]"))
+        swarms.append(read_swarm(entry, file, f"swarms[{index}]"))
     return tuple(swarms)
 
 
+def read_swarm(entry, file, where):
+    """One kind of swarm – its leader only if it's an enemy type."""
+    swarms = read(Swarms, entry, file, where)
+    if swarms.leader is not None and swarms.leader not in ENEMY_TYPES:
+        WARNINGS.append(f"{file} {where}.leader: unknown type {json.dumps(swarms.leader)} – no leader")
+        swarms = replace(swarms, leader=None)
+    return swarms
+
+
 def read_phases(data, file):
-    """ "phases": [{"from": 180, "to": 220, "weights": {"sniper": "x3"}, "enemy_stats": {…}, "announce": "…"}, …]"""
+    """ "phases": [{"from": 180, "to": 220, "every": 90, "weights": {"sniper": "x3"}, "enemy_stats": {…},
+    "announce": "…", "one_of": [{…}, {…}]}, …]"""
     section = data.get("phases", [])
     if not isinstance(section, list):
         WARNINGS.append(f"{file} phases: should be a list [ … ] – ignored")
@@ -261,8 +299,7 @@ def read_phases(data, file):
         if not isinstance(entry, dict):
             WARNINGS.append(f"{file} {where}: should be {{ … }} – skipped")
             continue
-        for key in entry.keys() - {"from", "to", "weights", "enemy_stats", "announce", "arena", "spawn",
-                                   "spawn_interval"}:
+        for key in entry.keys() - {"from", "to", "every", "one_of", *PHASE_KEYS}:
             WARNINGS.append(f"{file} {where}: unknown key \"{key}\" – ignored")
         start, end = entry.get("from", 0), entry.get("to")
         if not valid("from", start, 0.0):
@@ -271,28 +308,92 @@ def read_phases(data, file):
         if end is not None and not (valid("to", end, 0.0) and end > start):
             WARNINGS.append(f"{file} {where}.to: {json.dumps(end)} is not valid (seconds after \"from\") – skipped")
             continue
-        announce = entry.get("announce")
-        if announce is not None and not isinstance(announce, str):
-            WARNINGS.append(f"{file} {where}.announce: should be a text – ignored")
-            announce = None
-        stats = []
-        for change in read_enemy_stats(entry.get("enemy_stats", {}), file, f"{where}.enemy_stats"):
-            if change[2] == "set":
-                WARNINGS.append(f"{file} {where}.enemy_stats.{change[0]}.{change[1]}: only \"+1\", \"-1\" or "
-                                f"\"x1.5\" in a phase – ignored")
-            else:
-                stats.append(change)
-        interval = ()
-        if "spawn_interval" in entry:
-            interval = parse_change(entry["spawn_interval"]) or ()
-            if not interval or (interval[0] != "add" and interval[1] <= 0):
-                WARNINGS.append(f"{file} {where}.spawn_interval: {json.dumps(entry['spawn_interval'])} is not valid "
-                                f"– ignored (seconds, \"-1\", \"+1\" or \"x0.5\")")
-                interval = ()
-        phases.append(Phase(start, end, read_weights(entry.get("weights", {}), file, f"{where}.weights"),
-                            tuple(stats), announce, read_arena_changes(entry.get("arena", {}), file, f"{where}.arena"),
-                            read_spawn(entry.get("spawn", {}), file, f"{where}.spawn"), interval))
+        every = entry.get("every", 0)
+        if not valid("every", every, 0.0):
+            WARNINGS.append(f"{file} {where}.every: {json.dumps(every)} is not valid (seconds) – only once")
+            every = 0
+        phases.append(Phase(start, end, options=read_options(entry, end, file, where), every=every,
+                            **read_phase_values(entry, end, file, where)))
     return tuple(phases)
+
+
+PHASE_KEYS = ("weights", "enemy_stats", "announce", "arena", "spawn", "spawn_interval", "breathe", "points")
+
+
+def read_phase_values(entry, end, file, where):
+    """What a phase (or one of its options) does: its PHASE_KEYS as Phase fields. end: when the phase ends (None:
+    never – then it can't breathe)."""
+    announce = entry.get("announce")
+    if announce is not None and not isinstance(announce, str):
+        WARNINGS.append(f"{file} {where}.announce: should be a text – ignored")
+        announce = None
+    stats = []
+    for change in read_enemy_stats(entry.get("enemy_stats", {}), file, f"{where}.enemy_stats"):
+        if change[2] == "set":
+            WARNINGS.append(f"{file} {where}.enemy_stats.{change[0]}.{change[1]}: only \"+1\", \"-1\" or "
+                            f"\"x1.5\" in a phase – ignored")
+        else:
+            stats.append(change)
+    interval = ()
+    if "spawn_interval" in entry:
+        interval = parse_change(entry["spawn_interval"]) or ()
+        if not interval or (interval[0] != "add" and interval[1] <= 0):
+            WARNINGS.append(f"{file} {where}.spawn_interval: {json.dumps(entry['spawn_interval'])} is not valid "
+                            f"– ignored (seconds, \"-1\", \"+1\" or \"x0.5\")")
+            interval = ()
+    breathe = entry.get("breathe", 0)
+    if breathe and end is None:
+        WARNINGS.append(f"{file} {where}.breathe: only in a phase with \"to\" (the edges come back then) – ignored")
+        breathe = 0
+    elif not valid("breathe", breathe, 0.0):
+        WARNINGS.append(f"{file} {where}.breathe: {json.dumps(breathe)} is not valid – ignored (pixels)")
+        breathe = 0
+    return {"weights": read_weights(entry.get("weights", {}), file, f"{where}.weights"), "enemy_stats": tuple(stats),
+            "announce": announce, "arena": read_arena_changes(entry.get("arena", {}), file, f"{where}.arena"),
+            "spawn": read_spawn(entry.get("spawn", {}), file, f"{where}.spawn"), "spawn_interval": interval,
+            "breathe": breathe, "points": read_points(entry.get("points", {}), file, f"{where}.points")}
+
+
+def read_points(section, file, where):
+    """ {"totem": 1, "storm": 1} as (kind, count) – points of interest placed once, when the phase starts."""
+    if not isinstance(section, dict):
+        WARNINGS.append(f"{file} {where}: should be {{ … }} – ignored")
+        return ()
+    placed = []
+    for kind, count in section.items():
+        if kind not in points.KINDS:
+            WARNINGS.append(f"{file} {where}: unknown point \"{kind}\" – ignored (only {', '.join(points.KINDS)})")
+        elif isinstance(count, bool) or not isinstance(count, int) or count < 1:
+            WARNINGS.append(f"{file} {where}.{kind}: {json.dumps(count)} is not valid – ignored "
+                            f"(a whole number, 1 or more)")
+        else:
+            placed.append((kind, count))
+    return tuple(placed)
+
+
+def read_options(entry, end, file, where):
+    """ "one_of": [{"spawn": {"charger": 4}, "announce": "Chargers incoming!"}, {…, "weight": 2}, …] as
+    (weight, Phase) – every run picks one of them (chosen()). Weight 0 switches an option off."""
+    section = entry.get("one_of", [])
+    if not isinstance(section, list):
+        WARNINGS.append(f"{file} {where}.one_of: should be a list [ … ] – ignored")
+        return ()
+    options = []
+    for index, option in enumerate(section):
+        place = f"{where}.one_of[{index}]"
+        if not isinstance(option, dict):
+            WARNINGS.append(f"{file} {place}: should be {{ … }} – skipped")
+            continue
+        for key in option.keys() - {"weight", *PHASE_KEYS}:
+            WARNINGS.append(f"{file} {place}: unknown key \"{key}\" – ignored")
+        weight = option.get("weight", 1)
+        if not valid("weight", weight, 0.0):
+            WARNINGS.append(f"{file} {place}.weight: {json.dumps(weight)} is not valid – using 1")
+            weight = 1
+        if weight == 0:
+            continue
+        options.append((weight, Phase(**read_phase_values(option, end, file, place))))
+    return tuple(options)
 
 
 def read_spawn(section, file, where):
@@ -392,7 +493,8 @@ def parse_change(value):
 
 def reload():
     """Reads data/enemies.json, data/upgrades.json, data/shop.json, data/weapons.json, data/abilities.json,
-    data/buildings.json, data/radar.json, data/ships.json, data/skilltree.json and every file in FOLDER again
+    data/buildings.json, data/radar.json, data/points.json, data/ships.json, data/skilltree.json and every file in
+    FOLDER again
     (DIFFICULTIES and WARNINGS are changed in place)."""
     WARNINGS.clear()
     roster.reload(WARNINGS)
@@ -402,6 +504,7 @@ def reload():
     ability_data.reload(WARNINGS)
     buildings.reload(WARNINGS)
     radar.reload(WARNINGS)
+    points.reload(WARNINGS)
     ship_data.reload(WARNINGS)
     skill_tree.reload(WARNINGS)
     loaded = []

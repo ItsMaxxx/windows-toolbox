@@ -21,10 +21,13 @@ from game.enemies.basic import BasicEnemy
 from game.enemies.cannoneer import Cannoneer
 from game.enemies.carrier import Carrier
 from game.enemies.charger import Charger
+from game.enemies.commander import Commander
 from game.enemies.cluster import ClusterArtillery
 from game.enemies.critter import Critter
 from game.enemies.fat import FatGuy
 from game.enemies.laser import Laser
+from game.enemies.living_window import LivingWindow
+from game.enemies.pusher import Pusher
 from game.enemies.shield import ShieldBearer
 from game.enemies.shooter import Shooter
 from game.enemies.sniper import Sniper
@@ -32,7 +35,8 @@ from game.enemies.sniper import Sniper
 # the names the data files use for the enemy types
 ENEMY_TYPES = {"basic": BasicEnemy, "charger": Charger, "shooter": Shooter, "sniper": Sniper, "carrier": Carrier,
                "critter": Critter, "artillery": Artillery, "fat": FatGuy, "cannoneer": Cannoneer, "shield": ShieldBearer,
-               "laser": Laser, "cluster": ClusterArtillery}
+               "laser": Laser, "cluster": ClusterArtillery, "commander": Commander, "pusher": Pusher,
+               "living_window": LivingWindow}
 # tier 1 type -> its evolution (tier 2)
 EVOLUTIONS = {"basic": "fat", "shooter": "cannoneer", "charger": "shield", "sniper": "laser", "artillery": "cluster"}
 FILE = Path(__file__).resolve().parents[2] / "data" / "enemies.json"

@@ -3,46 +3,49 @@
   "description": "from afar, evolved: Lasers join the Snipers",
   "order": 13,
   "goal": 330,
-  "core_chance": 1,
+  "core_chance": 0.07,
   "unlock": { "requires": "b2" },
   "hints": ["Many ranged units", "Lasers: get out of the thick line before it fires", "Swarms cover the shooters behind them"],
   "arena": { "start_size": [400, 280], "shrink_speed": 12.5, "shrink_growth": 2.5, "max_shrink_speed": 28, "armor": 3.5, "push_falloff": 0.8 },
-  "spawning": { "first_spawn": 2, "start_interval": 2.1, "min_interval": 0.7, "interval_drop": 0.012 },
+  "spawning": { "first_spawn": 0.5, "start_interval": 2.1, "min_interval": 0.7, "interval_drop": 0.012 },
   "enemies": [
-    { "type": "basic",     "weight": 25, "after": 0 },
-    { "type": "shooter",   "weight": 30, "after": 0,   "growth": 4 },
-    { "type": "sniper",    "weight": 20, "after": 20,  "growth": 4 },
-    { "type": "artillery", "weight": 10, "after": 60,  "growth": 2 },
-    { "type": "charger",   "weight": 8,  "after": 60 },
-    { "type": "carrier",   "weight": 6,  "after": 120, "growth": 1 }
+    { "type": "basic", "weight": 25, "after": 0 },
+    { "type": "shooter", "weight": 22, "after": 0, "growth": 3 },
+    { "type": "sniper", "weight": 15, "after": 20, "growth": 3 },
+    { "type": "artillery", "weight": 10, "after": 60, "growth": 2 },
+    { "type": "charger", "weight": 8, "after": 60 },
+    { "type": "carrier", "weight": 6, "after": 120, "growth": 1 }
   ],
   "evolutions": [
-    { "type": "basic",   "chance": 0.18, "after": 0,  "growth": 0.03, "max_chance": 0.38 },
-    { "type": "shooter", "chance": 0.15, "after": 0,  "growth": 0.04, "max_chance": 0.35 },
+    { "type": "basic", "chance": 0.18, "after": 0, "growth": 0.03, "max_chance": 0.38 },
+    { "type": "shooter", "chance": 0.1, "after": 0, "growth": 0.04, "max_chance": 0.25 },
     { "type": "charger", "chance": 0.12, "after": 60, "growth": 0.03, "max_chance": 0.3 },
-    { "type": "sniper",  "chance": 0.12, "after": 40, "growth": 0.05, "max_chance": 0.4 }
+    { "type": "sniper", "chance": 0.1, "after": 40, "growth": 0.05, "max_chance": 0.3 }
   ],
-  "swarms": {
-    "type": "basic", "after": 40,
-    "start_chance": 0.03, "chance_growth": 0.001, "max_chance": 0.18,
-    "start_size": 7, "growth_time": 10, "max_size": 32, "min_gap": 6
-  },
+  "swarms": { "type": "basic", "after": 40, "start_chance": 0.03, "chance_growth": 0.001, "max_chance": 0.18, "start_size": 7, "growth_time": 10, "max_size": 32, "min_gap": 6 },
   "phases": [
-    { "from": 70, "to": 100, "weights": { "sniper": "x3" }, "spawn": { "sniper": 4, "laser": 1 }, "spawn_interval": "x0.85",
-      "announce": "Snipers incoming!" },
-    { "from": 110, "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
-    { "from": 150, "arena": { "armor": "+5" }, "announce": "The walls harden!" },
-    { "from": 160, "enemy_stats": { "all": { "base_hp": "+1" } } },
-    { "from": 180, "to": 210, "weights": { "shooter": "x2", "sniper": "x2" }, "spawn": { "shooter": 4, "sniper": 3 },
-      "spawn_interval": "x0.85", "announce": "Long range incoming!" },
-    { "from": 260, "arena": { "armor": "+3.5" }, "announce": "The walls harden!" },
-    { "from": 280, "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
+    { "from": 0, "to": 20, "spawn": { "basic": 4 }, "spawn_interval": "x0.5" },
+    { "from": 70, "to": 100, "spawn_interval": "x0.85", "one_of": [
+      { "weights": { "sniper": "x3" }, "spawn": { "sniper": 4, "laser": 1 }, "announce": "Snipers incoming!" },
+      { "weights": { "sniper": "x2" }, "spawn": { "laser": 2, "sniper": 2 }, "announce": "Lasers incoming!" }
+    ] },
+    { "from": 110, "every": 170, "enemy_stats": { "all": { "contact_damage": "x1.1", "projectile_damage": "x1.1", "blast_damage": "x1.1" } }, "announce": "Enemies hit harder!" },
+    { "from": 150, "every": 120, "arena": { "armor": "+4" }, "announce": "The walls harden!" },
+    { "from": 160, "every": 200, "enemy_stats": { "all": { "base_hp": "+1" } }, "announce": "Enemies +1 HP" },
+    { "from": 180, "to": 210, "weights": { "shooter": "x2", "sniper": "x2" }, "spawn": { "shooter": 4, "sniper": 3 }, "spawn_interval": "x0.85", "announce": "Long range incoming!" },
     { "from": 295, "to": 330, "weights": { "laser": "+10", "cannoneer": "+10" }, "spawn": { "laser": 2, "cannoneer": 2 }, "spawn_interval": "x0.7", "announce": "Final wave!" },
-    { "from": 315, "to": 330, "spawn": { "sniper": 3, "laser": 1, "shield": 1 }, "spawn_interval": "x0.8", "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "arena": { "armor": "+3.5" }, "announce": "Hold on!" },
-    { "from": 360, "enemy_stats": { "all": { "base_hp": "+1" } } },
-    { "from": 390, "arena": { "armor": "+5" }, "announce": "The walls harden!" }
+    { "from": 315, "to": 330, "spawn": { "sniper": 3, "laser": 1, "shield": 1 }, "spawn_interval": "x0.8", "enemy_stats": { "all": { "contact_damage": "x1.15", "projectile_damage": "x1.15", "blast_damage": "x1.15" } }, "arena": { "armor": "+3.5" }, "announce": "Hold on!" },
+    { "from": 360, "to": 380, "every": 45, "spawn_interval": "x0.8", "one_of": [
+      { "weights": { "sniper": "x2" }, "spawn": { "laser": 2, "sniper": 2 }, "announce": "Lasers incoming!" },
+      { "weights": { "sniper": "x3" }, "spawn": { "sniper": 3 }, "announce": "Snipers incoming!" },
+      { "weights": { "shooter": "x2" }, "spawn": { "cannoneer": 2, "shooter": 2 }, "announce": "Cannoneers incoming!" }
+    ] },
+    { "from": 380, "to": 386, "every": 80, "breathe": 60, "announce": "The arena breathes in!" },
+    { "from": 390, "every": 120, "one_of": [
+      { "points": { "totem": 1 } },
+      { "points": { "nest": 1 } },
+      { "points": { "storm": 1 } }
+    ] }
   ],
-  "enemy_stats": {
-    "all": { "base_hp": "+1" }
-  }
+  "enemy_stats": { "all": { "base_hp": "+1" } }
 }

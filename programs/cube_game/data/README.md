@@ -15,7 +15,8 @@ Werte) zeigt das Spielmenü rot an; das Spiel nimmt dann den Standardwert, statt
 | `abilities.json` | Grundwerte der Fähigkeiten: Dash und Rakete (siehe unten) |
 | `buildings.json` | Gebäude, die man im Run setzt – bisher der Wachturm (siehe unten) |
 | `radar.json` | Grundwerte des Radars aus dem Skilltree (siehe unten) |
-| `difficulties/*.json` | eine Datei pro Level (A1 … B6, Survival) – Ziel, Arena, Cores, Spawns, Evolutionen und eigene Gegnerwerte (`difficulties/README.md`) |
+| `points.json` | Points of Interest: Funde (Truhe, Magnet, Reparatur) und Gefahren (Totem, Nest, Sturm) – siehe unten |
+| `difficulties/*.json` | eine Datei pro Level (A1 … C6, Survival) – Ziel, Arena, Cores, Spawns, Evolutionen und eigene Gegnerwerte (`difficulties/README.md`) |
 
 ## `ships.json`
 
@@ -77,9 +78,13 @@ Energieverbrauch, Cooldown). Fehlt ein Wert oder ein ganzer Knoten, gilt der ein
 | `watchtower` | so viele Türme mehr gleichzeitig |
 | `card_slots` | so viele Karten mehr gleichzeitig aktiv (dazu `max_active` in `upgrades.json`) |
 | `radar_size` / `radar_cooldown` / `radar_duration` | Fenstergröße (px) / Zeit zwischen Scans (s, negativ = öfter) / Dauer eines Scans (s) |
+| `radar_find` | Anteil der Scans, die zu einem noch unentdeckten Point of Interest gehen und ihn aufdecken (0.15 = 15 % pro Stufe; braucht *Radar* und *Points of interest*) |
+| `point_rate` | so viele Sekunden früher kommt der nächste Fund (Grundwert `finds.interval` in `points.json`) |
 
 Knoten, die nur etwas freischalten (`shop`, `card_shop`, `dash`, `rocket`, `machine_gun`, `cannon`, `laser`, `radar`,
-`mines`, `slow_field`), haben nur `costs`. **`burning_ground`** hat statt `per_level` die Werte des brennenden Bodens:
+`mines`, `slow_field`, `points`, `point_magnet`, `point_repair`), haben nur `costs`. **`points`** (*Points of
+interest*, hinter *Watchtower*) lässt Funde erscheinen – erst nur Sternentruhen; **`point_magnet`** und
+**`point_repair`** fügen Magnet und Reparatur-Kit hinzu (siehe `points.json`). **`burning_ground`** hat statt `per_level` die Werte des brennenden Bodens:
 
 | Wert | Bedeutung |
 |---|---|
@@ -104,8 +109,8 @@ Wie im StarCraft-2-Editor, wo jede Map eigene Einheitenwerte haben kann – jede
 
 ## `enemies.json`
 
-Ein Eintrag pro Gegnertyp: `basic`, `charger`, `shooter`, `sniper`, `carrier`, `critter`, `artillery` (Tier 1) und
-ihre Evolutionen (Tier 2, mit dunklem Rahmen im Würfel): `fat` (aus Basic), `cannoneer` (aus Shooter), `shield` (aus
+Ein Eintrag pro Gegnertyp: `basic`, `charger`, `shooter`, `sniper`, `carrier`, `critter`, `artillery`, `commander`,
+`pusher`, `living_window` (Tier 1) und die Evolutionen (Tier 2, mit dunklem Rahmen im Würfel): `fat` (aus Basic), `cannoneer` (aus Shooter), `shield` (aus
 Charger), `laser` (aus Sniper), `cluster` (aus Artillery). Wann eine Evolution statt Tier 1 kommt, steht im Level
 (`evolutions`).
 Zeiten in Sekunden, Strecken und Größen in Pixeln, Tempo in Pixeln pro Sekunde, Winkel in Grad.
@@ -234,6 +239,49 @@ Schaden (einmal pro Strahl). Solange der Strahl an ist, bewegt und dreht er sich
 | `beam_time` | so viele Sekunden ist der Strahl an |
 | `beam_width` | Dicke des Strahls in Pixeln |
 
+**Commander** – golden, mit Krone und einem dünnen Ring um sich: So weit reicht seine Aura. Jeder andere Gegner darin
+wird schneller und trifft härter und behält das noch `aura_time` Sekunden, nachdem er sie verlassen hat (goldener
+Rand). Mehrere Commander stapeln sich nicht, Commander buffen sich nicht gegenseitig. Er hält Abstand hinter den
+anderen. Schwärme können ihn als Anführer mitbringen (`leader` im Level) – dann steht er genau in ihrer Mitte.
+
+| Wert | Bedeutung |
+|---|---|
+| `preferred_distance` / `back_off` / `close_in` | hält so viel Abstand zum Schiff (wie der Carrier) |
+| `aura_radius` | Gegner höchstens so weit weg (Mitte zu Mitte) bekommen den Buff … |
+| `aura_time` | … und behalten ihn so viele Sekunden nach dem Verlassen |
+| `aura_speed` / `aura_damage` | ihr Tempo × das, ihr Schaden (Berührung, Schüsse, Explosionen) × das |
+
+**Pusher** – ein großer dunkelblauer Block, der von jenseits des Bildschirmrands kommt. Er läuft durch alle anderen
+Gegner hindurch (draußen sieht man ja nicht, wer wen anrempelt) zur nächsten Kante der Arena, packt sie von außen und
+**schiebt das ganze Fenster** von sich weg. Am Bildschirmrand geht das Fenster nicht weiter: Dann wird es auf dieser
+Seite schmaler, bis zum Zerquetschen. Sein Körper bleibt draußen und ist gepanzert (Schüsse prallen ab) – treffen kann
+man nur den **Arm**, den er in die Arena streckt; die Faust tut weh, wenn man hineinfliegt. Draußen sieht man ihn
+trotzdem: Er bekommt ein kleines eigenes Fenster mit rotem Rahmen, das ihm folgt (gehört nicht zum Spielfeld – keine
+Schüsse, keine Maus).
+
+| Wert | Bedeutung |
+|---|---|
+| `push_speed` | so viele Pixel pro Sekunde schiebt er das Fenster |
+| `arm_length` / `arm_width` | so weit reicht sein Arm in die Arena und so dick ist er (die Trefferfläche) |
+
+**Living Window** – ein lebendes Fenster mit einem Auge, das dem Schiff folgt. Es treibt zur Arena, dockt an einer
+Kante an (ragt `overlap` Pixel hinein) und gleitet dann an den Kanten entlang um die Arena herum. Es wächst ständig, und
+alle `spawn_interval` Sekunden kommt ein Gegner heraus (einer der Typen, die das Level gerade bringt). Hat es
+`max_size` erreicht, **platzt** es: `burst_count` Gegner auf einmal, dann ist es weg (ohne Beute). Es hat keine HP –
+**seine Größe ist sein Leben**: Jeder Treffer macht es kleiner, unter `min_size` stirbt es. Also früh beschießen. Der
+Rahmen wird von Türkis zu Rot, je näher es dem Platzen ist. Draußen sieht man es in einem eigenen kleinen Fenster (wie
+den Pusher), andere Gegner laufen hindurch, berühren tut nicht weh.
+
+| Wert | Bedeutung |
+|---|---|
+| `size` | Kantenlänge am Anfang |
+| `min_size` / `max_size` | kleiner: tot – so groß: es platzt |
+| `grow_speed` | so viele Pixel pro Sekunde wächst es |
+| `shrink_per_damage` | so viele Pixel kleiner pro Schadenspunkt (nach `armor`) |
+| `overlap` | so weit ragt es angedockt in die Arena (dort trifft man es) |
+| `slide_speed` | so viele Pixel pro Sekunde gleitet es an den Kanten entlang |
+| `spawn_interval` / `burst_count` | alle so viele Sekunden ein Gegner – so viele beim Platzen |
+
 **Shield** – die Evolution des Chargers: hält einen großen Schild vor sich, dreht sich sehr langsam und läuft nur in Schildrichtung (kommt also
 im Bogen). Der Schild blockt Kugeln von vorne (mit Funken, ohne Wand-Push), Explosionen treffen ihn von jeder Seite.
 Ist das Schiff vor dem Schild und nah genug, lädt er auf (Warnlinie) und stürmt mit dem Schild voran – wie ein
@@ -271,7 +319,7 @@ Eine Waffe steht nur im Shop, wenn sie ausgerüstet ist, Dash, Rocket und Watcht
 |---|---|
 | `amount` | genau so viel ändert eine Stufe (negativ bei Cooldowns) – bei Waffen ohne `upgrade_factor` |
 | `price` | Sterne für die erste Stufe in einem Run … |
-| `price_step` | … und so viele mehr für jede weitere Stufe desselben Werts (10, 15, 20, …) – fehlt er, 0 |
+| `price_step` | … und so viele mehr für jede weitere Stufe desselben Werts (6, 10, 14, …) – fehlt er, 0 |
 
 Fehlt ein Eintrag, gilt der eingebaute Wert (bei Waffen der allgemeine mal ihr `upgrade_factor`) – nur `price_step`
 ist dann immer 0, damit nichts heimlich teurer wird. Alte Namen wie
@@ -352,6 +400,7 @@ dessen Upgrades dazugeben, steht in `skilltree.json`, was Shop-Stufen bringen, i
 | `distance` | so viele Pixel weit |
 | `duration` | so viele Sekunden dauert der Sprung (kleiner = schneller) |
 | `charges` | so viele Dashes auf Vorrat (Standard 1, der Skilltree-Knoten *Charges* gibt mehr): jeder Dash nimmt eine Ladung, der `cooldown` füllt eine nach der anderen wieder auf. Ein neuer Dash geht erst, wenn der vorige vorbei ist |
+| `invulnerable_time` | so viele Sekunden ab Beginn des Dashs trifft nichts das Schiff (Gegner, Schüsse, Strahlen, Artillerie) – man kann durch Gegner hindurch dashen. Etwas länger als `duration`, damit man nicht direkt am Ende getroffen wird; 0 = aus |
 
 **`rocket`** – fliegt dorthin, wo die Maus beim Abschuss war, und explodiert dort. Der brennende Boden (*Burning
 ground*) steht in `skilltree.json`.
@@ -427,4 +476,34 @@ draußen kein Gegner, schaut er jede Sekunde wieder. Solange es offen ist, flieg
 | `min_cooldown` | … nie kürzer als das, auch mit *Scan rate* |
 | `duration` | Sekunden, die ein Scan offen bleibt |
 
-Was *Scan size*, *Scan rate* und *Scan time* pro Stufe dazugeben, steht in `skilltree.json`.
+Was *Scan size*, *Scan rate* und *Scan time* pro Stufe dazugeben, steht in `skilltree.json`. Mit *Find* geht ein Teil
+der Scans stattdessen zu einem Point of Interest, den noch niemand gesehen hat – das deckt auf, was er ist.
+
+## `points.json`
+
+**Points of Interest** erscheinen irgendwo auf dem Desktop, außerhalb der Sicht. Solange niemand sie gesehen hat, sind
+sie nur ein **„?“**: Ein Pfeil am Fensterrand zeigt hin. Sobald einer in Sicht ist (Spielfeld, Turmfenster, Radar-Scan),
+ist er aufgedeckt – dann zeigt der Pfeil sein Symbol, grün für einen Fund, rot für eine Gefahr. **Erreicht** ist er,
+wenn das Spielfeld oder das Fenster eines stehenden Wachturms ihn überdeckt: Wände in die Richtung schieben oder einen
+Turm hinwerfen. Ein Radar-Scan deckt nur auf. Jeder verschwindet nach seiner Lebenszeit (ein Ring um ihn zeigt sie).
+
+**Funde** (gut, aus dem Skilltree *Points of interest* hinter *Watchtower*):
+
+| Eintrag | Wert | Bedeutung |
+|---|---|---|
+| `finds` | `first` | Sekunden bis zum ersten Fund im Run … |
+| | `interval` | … dann alle so viele Sekunden einer (*More finds* zieht ab) … |
+| | `min_interval` | … nie öfter als das |
+| | `lifetime` | so viele Sekunden bleibt ein Fund liegen |
+| `chest` | `stars` | **Sternentruhe:** so viele Sterne |
+| `magnet` | `time` / `speed` | **Magnet:** so viele Sekunden fliegen alle Sterne und Cores mit diesem Tempo (px/s) zum Schiff |
+| `repair` | `push` | **Reparatur-Kit:** jede Kante federt so viele Pixel heraus (ohne Panzerung und Falloff) |
+| `place` | `min_distance` / `max_distance` | so weit jenseits der Arena erscheinen alle Points (Funde und Gefahren) |
+
+**Gefahren** (schlecht, aus dem Level: `points` in einer Phase, siehe `difficulties/README.md`) – jede mit `lifetime`:
+
+| Eintrag | Wert | Bedeutung |
+|---|---|---|
+| `totem` | `speed` / `damage` | **Totem:** Solange es steht, sind alle Gegner so viel schneller und treffen so viel härter (violetter Rand). Erreichen zerstört es |
+| `nest` | `interval` | **Nest:** schickt alle so viele Sekunden einen Gegner los (einen der Typen, die das Level gerade bringt). Erreichen zerstört es |
+| `storm` | `radius` / `shrink_speed` | **Sturm:** eine große Fläche; solange die Arena hineinreicht, rücken die Kanten so viele px/s schneller ein. Lässt sich nicht zerstören, nur aussitzen |

@@ -1,0 +1,53 @@
+{
+  "name": "C5",
+  "description": "wilds: Totems, Nests, Storms – and Living Windows",
+  "order": 25,
+  "goal": 360,
+  "core_chance": 0.18,
+  "unlock": { "requires": "c4" },
+  "hints": ["Totems make every enemy stronger – reach them with the window or a watchtower", "Nests keep sending enemies until you reach them", "Storms: keep the window out of them"],
+  "arena": { "start_size": [400, 280], "shrink_speed": 16, "shrink_growth": 2.5, "max_shrink_speed": 32, "armor": 5, "push_falloff": 0.8 },
+  "spawning": { "first_spawn": 0.5, "start_interval": 1.9, "min_interval": 0.75, "interval_drop": 0.011 },
+  "enemies": [
+    { "type": "fat", "weight": 40, "after": 0 },
+    { "type": "shield", "weight": 12, "after": 20, "growth": 2 },
+    { "type": "cannoneer", "weight": 12, "after": 30, "growth": 2 },
+    { "type": "laser", "weight": 8, "after": 60, "growth": 1 },
+    { "type": "cluster", "weight": 8, "after": 90, "growth": 1 },
+    { "type": "commander", "weight": 5, "after": 60, "growth": 1 },
+    { "type": "living_window", "weight": 3, "after": 60, "growth": 1 }
+  ],
+  "swarms": [
+    { "type": "fat", "after": 40, "start_chance": 0.02, "chance_growth": 0.0008, "max_chance": 0.12, "start_size": 4, "growth_time": 18, "max_size": 14, "min_gap": 8, "leader": "commander", "leader_chance": 0.5 }
+  ],
+  "phases": [
+    { "from": 0, "to": 20, "spawn": { "fat": 3 }, "spawn_interval": "x0.5" },
+    { "from": 40, "points": { "nest": 1 }, "announce": "Something is out there …" },
+    { "from": 90, "every": 60, "one_of": [
+      { "points": { "totem": 1 } },
+      { "points": { "nest": 1 } },
+      { "points": { "storm": 1 } }
+    ] },
+    { "from": 120, "every": 150, "enemy_stats": { "all": { "contact_damage": "x1.1", "projectile_damage": "x1.1", "blast_damage": "x1.1" } }, "announce": "Enemies hit harder!" },
+    { "from": 150, "every": 150, "arena": { "armor": "+4" }, "announce": "The walls harden!" },
+    { "from": 180, "every": 170, "enemy_stats": { "all": { "base_hp": "+1" } }, "announce": "Enemies +1 HP" },
+    { "from": 200, "to": 230, "spawn_interval": "x0.85", "one_of": [
+      { "weights": { "shield": "x2" }, "spawn": { "shield": 4 }, "announce": "Shields incoming!" },
+      { "weights": { "cannoneer": "x2" }, "spawn": { "cannoneer": 3 }, "announce": "Cannoneers incoming!" },
+      { "spawn": { "commander": 2, "fat": 4 }, "announce": "Commanders incoming!" }
+    ] },
+    { "from": 330, "to": 360, "spawn": { "fat": 3, "shield": 2 }, "spawn_interval": "x0.7", "announce": "Final wave!" },
+    { "from": 345, "to": 360, "spawn": { "cannoneer": 2, "laser": 1 }, "spawn_interval": "x0.8", "enemy_stats": { "all": { "contact_damage": "x1.15", "projectile_damage": "x1.15", "blast_damage": "x1.15" } }, "announce": "Hold on!" },
+    { "from": 390, "to": 410, "every": 45, "spawn_interval": "x0.8", "one_of": [
+      { "weights": { "shield": "x2" }, "spawn": { "shield": 4 }, "announce": "Shields incoming!" },
+      { "weights": { "cluster": "x2" }, "spawn": { "cluster": 3 }, "announce": "Clusters incoming!" },
+      { "spawn": { "fat": 4, "cannoneer": 2 }, "announce": "Heavy wave!" }
+    ] },
+    { "from": 410, "to": 416, "every": 80, "breathe": 80, "announce": "The arena breathes in!" },
+    { "from": 420, "every": 60, "one_of": [
+      { "points": { "totem": 1 } },
+      { "points": { "nest": 1 } },
+      { "points": { "storm": 1 } }
+    ] }
+  ]
+}

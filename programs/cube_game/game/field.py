@@ -28,12 +28,15 @@ REACH = 2           # windows this close count as touching (rounded window posit
 
 
 class Field:
-    def __init__(self, arena, windows):
-        """arena: the run's Arena. windows: the screen rectangles of the open extra windows."""
+    def __init__(self, arena, windows, lookouts=()):
+        """arena: the run's Arena. windows: the screen rectangles of the open extra windows. lookouts: windows that are
+        only for seeing (a Pusher's) – they never belong to the field, so shots and the mouse don't go there."""
         self.arena = arena
         self.main = arena.window_rect()
         self.sight = [self.main] + [pygame.Rect(window) for window in windows]
         connected, rest = [], self.sight[1:]
+        self.lookouts = [pygame.Rect(window) for window in lookouts]
+        self.sight += self.lookouts                 # last in sight
         grown = True
         while grown:                            # windows connected through other windows count, too
             grown = False

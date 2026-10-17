@@ -534,3 +534,72 @@ Notizen / offene Fragen:
   Treffer, Seitenverhältnis bleibt. Kein Tier-Rahmen (Evolutionen haben eigene Dateien). Läufe, Lebenspunkte und
   Buff-Rand bleiben. Kaputte Datei = wieder das Quadrat. Anleitung und Knopf *Bilder-Ordner öffnen* auf der
   Toolbox-Seite. Gelesen beim Spielstart, nicht während des Spiels.
+- 17.10.2026 (Claude, auf Wunsch gebaut): **Balance nach Bot-Tests** – nur Datendateien, kein Code. Getestet mit
+  einem Bot, der die echte `PlayScene` ohne Fenster spielt (je 10 Runs pro Level mit meinem Spielstand und 6
+  Kampagnen von einem neuen Spielstand bis B6, der Bot kauft im Shop und im Skilltree):
+  - **Start:** In jedem Level kommt der erste Gegner nach 0,5 s, dazu eine Phase 0–20 s mit 4 Basics sofort und
+    halben Abständen. Im Fenster ist jetzt in den ersten 30 s etwa 70 % der Zeit ein Gegner statt 30–45 %, und es gibt
+    doppelt so viele Kills. Die A-Level werden dadurch kaum schwerer.
+  - **Cores:** B-Level und Survival hatten `core_chance: 1` (600–1700 Cores pro Run, ein B-Run kaufte fast den halben
+    Skilltree). Jetzt gibt es eine gleichmäßige Kurve: Ein Run bis zum Ziel bringt etwa 12 Cores in A1 und bis zu 95 in B6
+    (Werte in `data/difficulties/README.md`). In den Test-Kampagnen waren nach A6 ca. 635, nach B3 ca. 1200 Cores
+    ausgegeben, voll ist der Skilltree während B4.
+  - **A2:** Die Wände ziehen langsamer (6 → 4 px/s am Anfang, Grenze 20 → 18). Dafür brauchte der Bot im Schnitt
+    5 statt 16 Runs.
+  - **B3:** Weniger Fernkampf: Shooter 30 → 22, Sniper 20 → 15 Gewicht (Wachstum 4 → 3), Chance auf Cannoneer
+    höchstens 25 statt 35 %, auf Laser 30 statt 40 %. Vorher schaffte der Bot B3 in ca. 1 % der Runs, jetzt in 30–50 %.
+  - **B1–B6:** Die „Enemies hit harder!“-Phasen vor dem Ziel stapeln sich weniger: ×1,1 statt ×1,2/×1,25, die letzte
+    (*Hold on!*) ×1,15. Kurz vor dem Ziel treffen Gegner jetzt ×1,4 (B6: ×1,5) so hart statt ×1,7 (B6: ×2,25).
+  - **Shop:** Die erste Stufe ist günstiger, 6 statt 10 Sterne und dann +4 statt +5 (`shop.json`, alle Preise
+    ×0,6, jede Stufe einen Stern weniger mehr). Die Wachtürme kosten weiter 10.
+  - Ergebnis in den Kampagnen: Alle 6 schaffen bis B4, 5 auch B5 (vorher war bei B3 Schluss). B4–B6 schafft der
+    Bot selten (B4 4 %, B6 0 % pro Run), auch mit vollem Skilltree und besserem Zielen. Das liegt eher an seiner
+    Spielweise als an einem einzelnen Wert (B4 mit Wandpanzerung 5 statt 7 war nicht leichter), darum habe ich dort
+    nichts weiter geändert. **Selbst testen.**
+  - Offen: Die häufigsten Treffer sind fast überall Shooter-Schüsse. Shooter feuern ab 520 px (`fire_range`), also oft
+    von außerhalb des Fensters. Eine kleinere Reichweite wäre eine Idee. Ideen für die Wände (noch nicht gebaut):
+    Wand-Reparatur im Shop, Wandbrecher-Gegner, Abprall-Schüsse, Gegner zerquetschen, „atmende“ Arena, Wand-Mine.
+- 17.10.2026 (Claude, auf Wunsch gebaut): **Zufall in Phasen, atmende Arena, Dash ohne Schaden.**
+  - **`one_of`** in einer Phase: eine Liste von Möglichkeiten (mit `weight`), jeder Run würfelt eine aus
+    (`difficulty.chosen()`, beim Start im `Spawner`). Sie kommt zu dem dazu, was direkt in der Phase steht. Im
+    Spielmenü steht jede Möglichkeit als eigene Zeile mit Würfel-Symbol (`draw_random_icon`) und ihrer Chance.
+  - **`breathe`** in einer Phase (nur mit `to`): Jede Kante rückt über die Dauer zusätzlich so viele Pixel ein und
+    federt danach genauso weit zurück (`Arena.breathe()`, über `pending`, ohne Panzerung und Falloff). Wer
+    währenddessen schiebt, hat danach mehr Platz.
+  - **Dash:** 0,2 s ab Beginn des Dashs trifft nichts das Schiff (`invulnerable_time` in `abilities.json`,
+    `Ability.protects`, `Ship.hit`). Man kann durch Gegner und Schüsse dashen. Im Bot-Test ca. 10 % weniger Treffer
+    in B.
+  - Beides steht noch in keinem Level, Beispiele in `data/difficulties/README.md`.
+  - Ideen (noch nicht gebaut): Gegner mit eigenem Fenster, Gegner, der das Hauptfenster verschiebt, Commander (bufft
+    Gegner in seiner Nähe, auch mitten in Schwärmen), C-Level nur mit T2 und neuen Gegnern, Themen-Level, periodische
+    Phasen („alle x Sekunden“), Points of Interest außerhalb des Fensters.
+- 17.10.2026 (Claude, auf Wunsch gebaut): **Periodische Phasen, Commander, Pusher, Points of Interest, C-Level.**
+  - **`every`** in einer Phase: wiederholt sie alle x Sekunden (`Spawner.repeat_phases`, jede Wiederholung eine eigene
+    Phase, `one_of` würfelt neu). Im Spielmenü „– every 01:00“.
+  - **Commander** (`game/enemies/commander.py`): Aura (dünner goldener Ring), Gegner darin werden schneller und treffen
+    härter, goldener Rand (`Buff.source`/`Buff.color`, `Enemy.renew_buffs`, `Enemy.commands`). Schwärme können einen
+    `leader` haben: Er steht genau in ihrer Mitte (`leader_chance`).
+  - **Pusher** (`game/enemies/pusher.py`): kommt von jenseits des Kartenrands (`spawns_outside`), läuft durch andere
+    Gegner (`Enemy.solid`), packt die Arena von außen und schiebt das ganze Fenster (`Arena.shove`; am Bildschirmrand wird
+    es schmaler). Treffbar ist nur der Arm (sein `rect`), der Körper ist gepanzert. Eigenes kleines Fenster mit rotem
+    Rahmen (`PlayScene.update_lookouts`, `Field` `lookouts`: nur Sicht, kein Spielfeld).
+  - **Rand-Markierungen:** Ein Schwarm außerhalb der Sicht zeigt ein Schwarm-Symbol statt vieler Punkte, größer, je
+    näher er ist (`Enemy.swarm`, `spawner.Swarm`). Points of Interest bekommen Pfeile mit „?“ bzw. ihrem Symbol.
+  - **Points of Interest** (`game/points.py`, `data/points.json`): Funde (Sternentruhe, Magnet, Reparatur-Kit) über
+    den neuen Skilltree-Zweig hinter dem Wachturm (*Points of interest*, *Magnet*, *Repair kit*, *More finds*), Gefahren
+    (Totem, Nest, Sturm) über `points` in Level-Phasen. Unbekannt („?“), bis man sie sieht; erreicht, wenn Spielfeld oder
+    Turmfenster sie überdecken. Radar-Upgrade *Find*: ein Teil der Scans deckt einen unentdeckten auf. Die Radar-Knoten
+    im Skilltree sind dafür etwas nach rechts gerückt.
+  - **Level neu** (alle Phasen): HP-, Schadens- und Wand-Steigerungen sind jetzt periodisch und laufen nach dem Ziel
+    weiter. Die meisten Level würfeln eine Welle aus (`one_of`). A5, B4 und B6 atmen einmal vor dem Ziel. Nach dem Ziel
+    kommen in jedem Level alle 45 s eine Zufallswelle, alle 80 s ein Atemzug und ab B1 alle 2 Minuten eine Gefahr.
+  - **C1–C6** (nur Evolutionen und die neuen Gegner, je ein Thema: Commander, Blitz, Pusher, atmende Arena, Gefahren,
+    Chaos). Freigeschaltet durch B6, wie Survival. Survival steht jetzt in der C-Reihe (`order` 27, 7 Knöpfe pro Reihe)
+    und bringt ab 7:00 Commander und Pusher, ab 8:00 Gefahren.
+  - **Living Window** (`game/enemies/living_window.py`): dockt an eine Kante an, gleitet um die Arena (Position als
+    Strecke im Uhrzeigersinn), wächst, schickt Gegner heraus, platzt bei `max_size`. Größe = Leben, Treffer schrumpfen
+    es. Eigenes Fenster wie der Pusher. In C5, C6 und Survival.
+  - Bot-Test mit vollem Skilltree (Sekunden bis zum Zerquetschen): B4 ca. 230, B5 ca. 220, B6 ca. 155–170, C1–C6
+    meist 110–150. A1–B3 wie vorher (neue Kampagnen bis B3 im Schnitt 29 Runs, wie vorher). Der Bot schafft ab B4
+    kaum noch etwas, und in C streuen seine Zeiten stark (C3 zwischen 116 und 188 s bei kleinen Änderungen) – die
+    C-Level müssen selbst angespielt werden.

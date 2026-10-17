@@ -110,6 +110,28 @@ def draw_notice_icon(surface, center, color, size=14):
     pygame.draw.polygon(surface, color, [(x, y - half), (x + half, y), (x, y + half), (x - half, y)])
 
 
+def draw_random_icon(surface, center, color, size=14):
+    """One of several things, picked at random: a die showing five."""
+    die = pygame.Rect(0, 0, size, size)
+    die.center = center
+    pygame.draw.rect(surface, color, die, border_radius=max(2, size // 5))
+    pip = max(1, size // 9)
+    dark = [round(channel * 0.2) for channel in color]
+    for dx, dy in ((-1, -1), (1, -1), (0, 0), (-1, 1), (1, 1)):
+        pygame.draw.circle(surface, dark, (die.centerx + dx * size * 0.25, die.centery + dy * size * 0.25), pip)
+
+
+def draw_pin_icon(surface, center, color, size=14):
+    """Points of interest appear: a map pin – a round head with a hole, a point below."""
+    x, y = center
+    radius = size * 0.36
+    head = (x, y - size * 0.14)
+    pygame.draw.polygon(surface, color, [(x - radius * 0.8, head[1] + radius * 0.5),
+                                         (x + radius * 0.8, head[1] + radius * 0.5), (x, y + size / 2)])
+    pygame.draw.circle(surface, color, head, radius)
+    pygame.draw.circle(surface, [round(channel * 0.25) for channel in color], head, max(1, radius * 0.4))
+
+
 def draw_check(surface, center, color, size=14):
     """A tick: cleared."""
     x, y = center

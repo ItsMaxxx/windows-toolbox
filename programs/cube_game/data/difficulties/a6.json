@@ -3,43 +3,42 @@
   "description": "everything at once – the final test of A",
   "order": 6,
   "goal": 300,
-  "core_chance": 0.08,
+  "core_chance": 0.06,
   "unlock": { "requires": "a5" },
   "hints": ["Everything at once", "Swarms of Basics and Chargers", "Enemies hit harder over time"],
   "arena": { "start_size": [400, 280], "shrink_speed": 11, "shrink_growth": 2, "max_shrink_speed": 22, "armor": 3, "push_falloff": 0.8 },
-  "spawning": { "first_spawn": 2, "start_interval": 2.6, "min_interval": 1.05, "interval_drop": 0.01 },
+  "spawning": { "first_spawn": 0.5, "start_interval": 2.6, "min_interval": 1.05, "interval_drop": 0.01 },
   "enemies": [
-    { "type": "basic",     "weight": 50, "after": 0 },
-    { "type": "shooter",   "weight": 20, "after": 10, "growth": 4 },
-    { "type": "charger",   "weight": 20, "after": 20, "growth": 4 },
-    { "type": "sniper",    "weight": 10, "after": 40, "growth": 3 },
-    { "type": "artillery", "weight": 8,  "after": 60, "growth": 2 },
-    { "type": "carrier",   "weight": 8,  "after": 80, "growth": 2 }
+    { "type": "basic", "weight": 50, "after": 0 },
+    { "type": "shooter", "weight": 20, "after": 10, "growth": 4 },
+    { "type": "charger", "weight": 20, "after": 20, "growth": 4 },
+    { "type": "sniper", "weight": 10, "after": 40, "growth": 3 },
+    { "type": "artillery", "weight": 8, "after": 60, "growth": 2 },
+    { "type": "carrier", "weight": 8, "after": 80, "growth": 2 }
   ],
   "swarms": [
-    {
-      "type": "basic", "after": 40,
-      "start_chance": 0.02, "chance_growth": 0.0008, "max_chance": 0.13,
-      "start_size": 6, "growth_time": 12, "max_size": 28, "min_gap": 8
-    },
-    {
-      "type": "charger", "after": 90,
-      "start_chance": 0.015, "chance_growth": 0.0006, "max_chance": 0.1,
-      "start_size": 4, "growth_time": 16, "max_size": 15, "min_gap": 10
-    }
+    { "type": "basic", "after": 40, "start_chance": 0.02, "chance_growth": 0.0008, "max_chance": 0.13, "start_size": 6, "growth_time": 12, "max_size": 28, "min_gap": 8 },
+    { "type": "charger", "after": 90, "start_chance": 0.015, "chance_growth": 0.0006, "max_chance": 0.1, "start_size": 4, "growth_time": 16, "max_size": 15, "min_gap": 10 }
   ],
   "phases": [
-    { "from": 90, "to": 120, "weights": { "sniper": "x2", "artillery": "x2" }, "spawn": { "sniper": 2, "artillery": 2 },
-      "spawn_interval": "x0.85", "announce": "Long range incoming!" },
-    { "from": 120, "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
-    { "from": 150, "arena": { "armor": "+5" }, "announce": "The walls harden!" },
-    { "from": 180, "enemy_stats": { "all": { "base_hp": "+1" } } },
-    { "from": 210, "to": 240, "weights": { "charger": "x3" }, "spawn": { "charger": 5 }, "spawn_interval": "x0.85",
-      "announce": "Chargers incoming!" },
-    { "from": 250, "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
+    { "from": 0, "to": 20, "spawn": { "basic": 4 }, "spawn_interval": "x0.5" },
+    { "from": 90, "to": 120, "weights": { "sniper": "x2", "artillery": "x2" }, "spawn": { "sniper": 2, "artillery": 2 }, "spawn_interval": "x0.85", "announce": "Long range incoming!" },
+    { "from": 120, "every": 130, "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
+    { "from": 150, "every": 210, "arena": { "armor": "+5" }, "announce": "The walls harden!" },
+    { "from": 180, "every": 150, "enemy_stats": { "all": { "base_hp": "+1" } }, "announce": "Enemies +1 HP" },
+    { "from": 210, "to": 240, "spawn_interval": "x0.85", "one_of": [
+      { "weights": { "charger": "x3" }, "spawn": { "charger": 5 }, "announce": "Chargers incoming!" },
+      { "weights": { "basic": "x2" }, "spawn": { "basic": 10 }, "announce": "The horde is coming!" },
+      { "weights": { "sniper": "x2" }, "spawn": { "sniper": 2, "artillery": 2 }, "announce": "Long range incoming!" }
+    ] },
     { "from": 265, "to": 300, "weights": { "sniper": "x1.5", "artillery": "x1.5", "charger": "x1.5" }, "spawn": { "sniper": 2, "artillery": 1, "charger": 2 }, "spawn_interval": "x0.7", "announce": "Final wave!" },
     { "from": 285, "to": 300, "spawn": { "charger": 3, "sniper": 1, "carrier": 1 }, "spawn_interval": "x0.8", "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "arena": { "shrink_speed": "x1.3" }, "announce": "Hold on!" },
-    { "from": 330, "enemy_stats": { "all": { "base_hp": "+1" } } },
-    { "from": 360, "arena": { "armor": "+5" }, "announce": "The walls harden!" }
+    { "from": 330, "to": 350, "every": 45, "spawn_interval": "x0.8", "one_of": [
+      { "weights": { "charger": "x3" }, "spawn": { "charger": 4 }, "announce": "Chargers incoming!" },
+      { "weights": { "sniper": "x3" }, "spawn": { "sniper": 3 }, "announce": "Snipers incoming!" },
+      { "weights": { "basic": "x2" }, "spawn": { "basic": 10 }, "announce": "The horde is coming!" },
+      { "weights": { "artillery": "x3" }, "spawn": { "artillery": 3 }, "announce": "Artillery incoming!" }
+    ] },
+    { "from": 350, "to": 356, "every": 80, "breathe": 60, "announce": "The arena breathes in!" }
   ]
 }

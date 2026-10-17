@@ -1,41 +1,41 @@
 {
   "upgrades": {
-    "move_speed":              { "amount": 20, "price": 10, "price_step": 5 },
-    "max_energy":              { "amount": 10, "price": 10, "price_step": 5 },
-    "energy_regen":            { "amount": 2, "price": 10, "price_step": 5 },
-    "armor":                   { "amount": 2, "price": 12, "price_step": 6 },
-    "recovery":                { "amount": 0.1, "price": 10, "price_step": 5 },
-    "magnet":                  { "amount": 25, "price": 6, "price_step": 3 },
+    "move_speed":              { "amount": 20, "price": 6, "price_step": 4 },
+    "max_energy":              { "amount": 10, "price": 6, "price_step": 4 },
+    "energy_regen":            { "amount": 2, "price": 6, "price_step": 4 },
+    "armor":                   { "amount": 2, "price": 7, "price_step": 5 },
+    "recovery":                { "amount": 0.1, "price": 6, "price_step": 4 },
+    "magnet":                  { "amount": 25, "price": 4, "price_step": 2 },
 
-    "gun_damage":              { "amount": 0.5, "price": 10, "price_step": 5 },
-    "gun_attack_speed":        { "amount": 0.5, "price": 10, "price_step": 5 },
-    "gun_wall_push":           { "amount": 5, "price": 10, "price_step": 5 },
-    "gun_projectile_speed":    { "amount": 100, "price": 10, "price_step": 5 },
+    "gun_damage":              { "amount": 0.5, "price": 6, "price_step": 4 },
+    "gun_attack_speed":        { "amount": 0.5, "price": 6, "price_step": 4 },
+    "gun_wall_push":           { "amount": 5, "price": 6, "price_step": 4 },
+    "gun_projectile_speed":    { "amount": 100, "price": 6, "price_step": 4 },
 
-    "mg_damage":               { "amount": 0.2, "price": 8, "price_step": 4 },
-    "mg_attack_speed":         { "amount": 1, "price": 10, "price_step": 5 },
-    "mg_wall_push":            { "amount": 1.5, "price": 10, "price_step": 5 },
-    "mg_projectile_speed":     { "amount": 100, "price": 10, "price_step": 5 },
+    "mg_damage":               { "amount": 0.2, "price": 5, "price_step": 3 },
+    "mg_attack_speed":         { "amount": 1, "price": 6, "price_step": 4 },
+    "mg_wall_push":            { "amount": 1.5, "price": 6, "price_step": 4 },
+    "mg_projectile_speed":     { "amount": 100, "price": 6, "price_step": 4 },
 
-    "cannon_damage":           { "amount": 1.5, "price": 10, "price_step": 5 },
-    "cannon_attack_speed":     { "amount": 0.2, "price": 10, "price_step": 5 },
-    "cannon_wall_push":        { "amount": 10, "price": 10, "price_step": 5 },
-    "cannon_projectile_speed": { "amount": 100, "price": 10, "price_step": 5 },
+    "cannon_damage":           { "amount": 1.5, "price": 6, "price_step": 4 },
+    "cannon_attack_speed":     { "amount": 0.2, "price": 6, "price_step": 4 },
+    "cannon_wall_push":        { "amount": 10, "price": 6, "price_step": 4 },
+    "cannon_projectile_speed": { "amount": 100, "price": 6, "price_step": 4 },
 
-    "laser_damage":            { "amount": 0.01, "price": 10, "price_step": 5 },
-    "laser_attack_speed":      { "amount": 2, "price": 10, "price_step": 5 },
-    "laser_wall_push":         { "amount": 0.45, "price": 10, "price_step": 5 },
-    "laser_projectile_speed":  { "amount": 100, "price": 10, "price_step": 5 },
+    "laser_damage":            { "amount": 0.01, "price": 6, "price_step": 4 },
+    "laser_attack_speed":      { "amount": 2, "price": 6, "price_step": 4 },
+    "laser_wall_push":         { "amount": 0.45, "price": 6, "price_step": 4 },
+    "laser_projectile_speed":  { "amount": 100, "price": 6, "price_step": 4 },
 
-    "dash_distance":           { "amount": 25, "price": 10, "price_step": 5 },
-    "dash_cooldown":           { "amount": -0.1, "price": 10, "price_step": 5 },
+    "dash_distance":           { "amount": 25, "price": 6, "price_step": 4 },
+    "dash_cooldown":           { "amount": -0.1, "price": 6, "price_step": 4 },
 
-    "rocket_damage":           { "amount": 2, "price": 10, "price_step": 5 },
-    "rocket_blast_radius":     { "amount": 15, "price": 10, "price_step": 5 },
-    "rocket_wall_push":        { "amount": 20, "price": 10, "price_step": 5 },
-    "rocket_cooldown":         { "amount": -0.3, "price": 10, "price_step": 5 },
+    "rocket_damage":           { "amount": 2, "price": 6, "price_step": 4 },
+    "rocket_blast_radius":     { "amount": 15, "price": 6, "price_step": 4 },
+    "rocket_wall_push":        { "amount": 20, "price": 6, "price_step": 4 },
+    "rocket_cooldown":         { "amount": -0.3, "price": 6, "price_step": 4 },
 
-    "watchtower_vision":       { "amount": 40, "price": 10, "price_step": 5 }
+    "watchtower_vision":       { "amount": 40, "price": 6, "price_step": 4 }
   },
   "watchtower": { "price": 10, "price_step": 0 }
 }

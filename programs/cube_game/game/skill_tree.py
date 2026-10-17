@@ -22,7 +22,7 @@ import json
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
-from game import ability_data
+from game import ability_data, points
 from game.buildings.watchtower import WatchtowerKit
 from game.cards import CARDS
 from game.dash import Dash
@@ -36,6 +36,8 @@ FILE = Path(__file__).resolve().parents[1] / "data" / "skilltree.json"
 SHOP, DASH, ROCKET, HEAD_START, BIGGER_ARENA, CORE_LUCK, WATCHTOWER = (
     "shop", "dash", "rocket", "head_start", "bigger_arena", "core_luck", "watchtower")
 RADAR, RADAR_SIZE, RADAR_COOLDOWN, RADAR_DURATION = "radar", "radar_size", "radar_cooldown", "radar_duration"
+POINTS, POINT_MAGNET, POINT_REPAIR, POINT_RATE, RADAR_FIND = (     # points of interest (game/points.py)
+    "points", "point_magnet", "point_repair", "point_rate", "radar_find")
 BURNING_GROUND = "burning_ground"
 MINES = "mines"                 # the dash leaves a mine where it started …
 SLOW_FIELD = "slow_field"       # … and its blast a field that slows enemies
@@ -184,11 +186,22 @@ DEFAULT_NODES = [
          "+{per_level:g} tower per level.", (3, 5, 8),
          (SHOP,), "scouting", (2.6, -1.25)),
     Node(RADAR, "Radar", "Every now and then a light blue window shows the biggest enemy group out of sight.", (4,),
-         (WATCHTOWER,), "scouting", (3.8, -1.95)),
-    Node(RADAR_SIZE, "Scan size", "The radar's window gets bigger.", (2, 4, 6), (RADAR,), "scouting", (3.4, -3.15)),
-    Node(RADAR_COOLDOWN, "Scan rate", "The radar scans more often.", (2, 4, 6), (RADAR,), "scouting", (4.75, -2.95)),
+         (WATCHTOWER,), "scouting", (4.0, -2.05)),
+    Node(RADAR_SIZE, "Scan size", "The radar's window gets bigger.", (2, 4, 6), (RADAR,), "scouting", (4.5, -3.25)),
+    Node(RADAR_COOLDOWN, "Scan rate", "The radar scans more often.", (2, 4, 6), (RADAR,), "scouting", (5.4, -2.6)),
     Node(RADAR_DURATION, "Scan time", "The radar's window stays open longer.", (2, 4, 6), (RADAR,), "scouting",
-         (5.25, -1.75)),
+         (5.4, -1.55)),
+    Node(POINTS, "Points of interest", "Now and then something appears out of sight – a ? at the window's edge points "
+         "to it. Reach it with the window or a watchtower's window: a star chest (+{stars:g} stars).", (6,),
+         (WATCHTOWER,), "scouting", (2.3, -2.5)),
+    Node(POINT_MAGNET, "Magnet", "A find can be a magnet: for a while every star and core flies to you.", (5,),
+         (POINTS,), "scouting", (1.8, -3.5)),
+    Node(POINT_REPAIR, "Repair kit", "A find can be a repair kit: every wall springs out.", (6,), (POINTS,),
+         "scouting", (2.75, -3.8)),
+    Node(POINT_RATE, "More finds", "Finds appear {per_level:g} s sooner per level.", (4, 8, 12), (POINTS,),
+         "scouting", (3.05, -2.95)),
+    Node(RADAR_FIND, "Find", "Now and then a scan goes to a point of interest nobody has seen yet and reveals it: "
+         "{per_level:.0%} of the scans per level.", (4, 8, 12), (RADAR, POINTS), "scouting", (3.65, -3.75)),
 ]
 # what each node does – the fallback for data/skilltree.json. "per_level": how much one level adds (to the value in
 # EFFECTS, or as below); nodes that only unlock something have none.
@@ -234,10 +247,13 @@ DEFAULT_VALUES = {
     RADAR_SIZE: {"per_level": 30},                  # pixels
     RADAR_COOLDOWN: {"per_level": -0.75},           # seconds (negative: sooner)
     RADAR_DURATION: {"per_level": 1},               # seconds
+    POINT_RATE: {"per_level": 8},                   # seconds sooner
+    RADAR_FIND: {"per_level": 0.15},                # share of the scans
 }
-MUST_NOT_BE_NEGATIVE = {HEAD_START, BIGGER_ARENA, CORE_LUCK, WATCHTOWER, BURNING_GROUND, ARMOR, RECOVERY, CARD_SLOTS}
+MUST_NOT_BE_NEGATIVE = {HEAD_START, BIGGER_ARENA, CORE_LUCK, WATCHTOWER, BURNING_GROUND, ARMOR, RECOVERY, CARD_SLOTS,
+                        POINT_RATE, RADAR_FIND}
 # descriptions with their values in them
-DESCRIBED = {HEAD_START, BIGGER_ARENA, CORE_LUCK, WATCHTOWER, CARD_SLOTS}
+DESCRIBED = {HEAD_START, BIGGER_ARENA, CORE_LUCK, WATCHTOWER, CARD_SLOTS, POINT_RATE, RADAR_FIND, POINTS}
 NODES = []                      # the tree as it is now (filled by reload(), changed in place)
 NODES_BY_KEY = {}
 
@@ -264,7 +280,7 @@ def reload(warnings):
         if node.key in DESCRIBED:
             per_level = values.get("per_level")
             texts = dict(width=per_level[0], height=per_level[1]) if isinstance(per_level, tuple) else values
-            description = description.format(**texts)
+            description = description.format(stars=points.STATS["chest"]["stars"], **texts)
         NODES.append(replace(node, costs=costs, values=values, description=description))
     NODES_BY_KEY.clear()
     NODES_BY_KEY.update((node.key, node) for node in NODES)
@@ -451,7 +467,17 @@ def start_radar(profile):
     """The run's radar with the bought upgrades – None if it isn't unlocked."""
     if not profile.owns(RADAR):
         return None
-    return Radar(amount(profile, RADAR_SIZE), amount(profile, RADAR_COOLDOWN), amount(profile, RADAR_DURATION))
+    return Radar(amount(profile, RADAR_SIZE), amount(profile, RADAR_COOLDOWN), amount(profile, RADAR_DURATION),
+                 amount(profile, RADAR_FIND) if profile.owns(POINTS) else 0.0)
+
+
+def start_finds(profile):
+    """The run's finds (points of interest for the player): which kinds and how often – None without the node."""
+    if not profile.owns(POINTS):
+        return None
+    kinds = ["chest"] + [kind for key, kind in ((POINT_MAGNET, "magnet"), (POINT_REPAIR, "repair"))
+                         if profile.owns(key)]
+    return {"kinds": kinds, "interval": points.STATS["finds"]["interval"] - amount(profile, POINT_RATE)}
 
 
 def start_arena_size(profile, difficulty):

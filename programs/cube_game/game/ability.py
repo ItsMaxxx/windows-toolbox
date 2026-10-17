@@ -17,6 +17,7 @@ class Ability:
     name = "Ability"
     cooldown_time = 0.0         # seconds after use until it can be used again (until one charge is back)
     max_charges = 1
+    protects = False            # True while it keeps the ship from being hit (the dash)
 
     def __init__(self):
         self.cooldown = 0.0     # seconds left until the next charge is back (0 while all are there)

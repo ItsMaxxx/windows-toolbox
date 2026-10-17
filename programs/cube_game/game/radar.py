@@ -7,12 +7,16 @@ seconds – size × size pixels, without a frame (Engine.open_view, drawn by the
 Finding the group: the enemies out of sight are sorted into a grid of size × size cells; the fullest cell wins, the
 window goes over the middle of the enemies around it (once more: everything within the window around that middle).
 
+With the skill tree's "Find" (find_chance), a scan goes to a point of interest nobody has seen yet now and then
+instead – that reveals what it is (game/points.py).
+
 The base values are in data/radar.json (explained in data/README.md), what each level of the skill tree's "Scan
 size" / "Scan rate" / "Scan time" adds in data/skilltree.json; reload() reads radar.json again – the game menu calls it
 every time it opens (via difficulty.reload()).
 """
 
 import json
+import random
 from pathlib import Path
 
 import pygame
@@ -51,8 +55,10 @@ def reload(warnings):
 
 
 class Radar:
-    def __init__(self, more_size=0, more_cooldown=0, more_duration=0):
-        """What the skill tree's radar upgrades add to the base values (pixels, seconds, seconds)."""
+    def __init__(self, more_size=0, more_cooldown=0, more_duration=0, find_chance=0.0):
+        """What the skill tree's radar upgrades add to the base values (pixels, seconds, seconds), and how likely a scan
+        goes to a hidden point of interest instead (0 … 1)."""
+        self.find_chance = find_chance
         stats = STATS
         self.size = max(1, round(stats["size"] + more_size))
         self.cooldown = max(stats["min_cooldown"], stats["cooldown"] + more_cooldown)
@@ -62,9 +68,9 @@ class Radar:
         self.remaining = 0.0                # seconds the open scan stays
         self.view = None                    # its window (set by the scene) – None while closed / if there's none
 
-    def update(self, dt, enemies, seen, desktop):
-        """seen: the rectangles the player already sees. Returns "open" when a scan starts (rect is set), "close" when
-        it ends, else None."""
+    def update(self, dt, enemies, seen, desktop, hidden_points=()):
+        """seen: the rectangles the player already sees. hidden_points: where the points of interest nobody has seen
+        yet are. Returns "open" when a scan starts (rect is set), "close" when it ends, else None."""
         if self.rect is not None:
             self.remaining -= dt
             if self.remaining > 0:
@@ -74,12 +80,22 @@ class Radar:
         self.timer -= dt
         if self.timer > 0:
             return None
-        self.rect = self.find_group(enemies, seen, desktop)
+        if hidden_points and random.random() < self.find_chance:
+            self.rect = self.over(random.choice(hidden_points), desktop)
+        else:
+            self.rect = self.find_group(enemies, seen, desktop)
         if self.rect is None:
             self.timer = RETRY
             return None
         self.remaining = self.duration
         return "open"
+
+    def over(self, point, desktop):
+        """The window centred on point (kept on its monitor)."""
+        rect = pygame.Rect(0, 0, self.size, self.size)
+        rect.center = (round(point[0]), round(point[1]))
+        area = desktop.area_at(rect.center)
+        return rect.clamp(area).clip(area)
 
     def find_group(self, enemies, seen, desktop):
         """The window over the biggest group of enemies out of sight (see the top of this file) – None if there's

@@ -32,6 +32,12 @@ stack.
 
 Shots of the player first ask blocks(): an enemy can stop a shot without being hurt (the shield enemy's shield).
 
+Auras: an enemy with commands = True (the Commander) buffs the others near it – the scene calls command() every tick
+with all enemies.
+
+Swarms: every enemy of a swarm knows its group (swarm, one object shared by all of them – None if it came alone), so
+the off-screen marker can show the whole swarm as one.
+
 Tiers: the plain types are tier 1. Some have an evolution (tier 2, roster.EVOLUTIONS): a stronger version that can
 spawn in its place on harder levels (the level's "evolutions"). Their skins get a dark frame inside the body.
 """
@@ -55,6 +61,8 @@ class Enemy(Entity):
     drops_loot = True       # leaves a star (with the shop unlocked) and, rarely, a core when killed
     melee = False           # only fights by touching – then a watchtower nearby can lure it away from the ship
     shielded = False        # has a shield that can block the player's shots (blocks())
+    commands = False        # buffs the enemies near it (command())
+    solid = True            # pushed apart from other enemies – False: walks through them (and they through it)
     stats = {               # fallback only – the real values are in data/enemies.json
         "base_hp": 1,
         "speed": 100,           # pixels per second
@@ -82,6 +90,9 @@ class Enemy(Entity):
         self.oriented = False
         self.speed_factor = 1.0     # 1 = normal speed; slow() lowers it for one tick
         self.damage_factor = 1.0    # damage it takes × this – more in a watchtower's area (set by the scene every tick)
+        self.swarm = None           # its swarm (one object shared by the whole group) – None: it came alone
+        self.arena = None           # the run's Arena (set by the scene) – only the Pusher and the Living Window need it
+        self.spawner = None         # the run's Spawner (set by the scene) – the Living Window sends out its enemies
 
     def stat(self, name):
         """The value for this run with every active buff: (value + adds) × factors."""
@@ -91,6 +102,15 @@ class Enemy(Entity):
                 add += buff.add
                 factor *= buff.factor
         return (self.base[name] + add) * factor
+
+    def renew_buffs(self, buffs):
+        """Gives it buffs (all from one source, e.g. a Commander's): if it already has buffs from that source, they're
+        replaced – so the same aura renews its buff instead of stacking it."""
+        source = buffs[0].source
+        self.buffs = [buff for buff in self.buffs if buff.source != source] + buffs
+
+    def command(self, enemies):
+        """An aura: buff the enemies near it (only types with commands = True do something here)."""
 
     def active_buffs(self):
         return self.buffs + self.roster.buffs_for(self) if self.roster.buffs else self.buffs

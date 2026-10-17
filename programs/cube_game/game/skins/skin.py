@@ -25,7 +25,7 @@ from pathlib import Path
 import pygame
 
 from engine.sprite_cache import PICTURES, load_picture
-from game.effects.buff_glow import GAP as GLOW_GAP
+from game.effects.buff_glow import COLOR as GLOW_COLOR, GAP as GLOW_GAP
 from game.effects.buff_glow import buff_glow
 
 IMAGES = Path(__file__).resolve().parents[2] / "assets" / "images"
@@ -72,8 +72,10 @@ class Skin:
         """rect: the enemy's body in window coordinates."""
         self.draw_below(surface, enemy, rect)
         size = (int(rect.width), int(rect.height))
-        if enemy.active_buffs():
-            surface.blit(buff_glow(size), (rect.x - GLOW_GAP, rect.y - GLOW_GAP))
+        buffs = enemy.active_buffs()
+        if buffs:
+            color = next((buff.color for buff in buffs if buff.color), GLOW_COLOR)    # a coloured buff shows first
+            surface.blit(buff_glow(size, color), (rect.x - GLOW_GAP, rect.y - GLOW_GAP))
         file = picture_file(enemy.key)
         if file is None:
             body = PICTURES.get((type(self), size, enemy.tier, bool(enemy.flash)),
