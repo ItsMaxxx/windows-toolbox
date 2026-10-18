@@ -1,12 +1,13 @@
 """
 The player's ship: moves with W A S D and always points at the mouse.
 
-It has 2 weapon slots (slot 1: left mouse button, slot 2: right mouse button – filled from the loadout) and 2 ability
-slots (keys in settings.ABILITY_KEYS). A slot holds a Weapon / Ability or None (empty). Weapons and abilities decide
+It has 2 weapon slots (filled from the loadout) and 2 ability slots (keys in settings.ABILITY_KEYS). Only one weapon
+fires at a time – the one in active_slot (left mouse button); switch_weapon() swaps to the other one (right mouse
+button), with no cooldown. A slot holds a Weapon / Ability or None (empty). Weapons and abilities decide
 everything about their shots – the ship only says where from and in which direction.
 
 Energy: both weapons share it. Every shot costs its weapon's energy_cost; the ship gets energy_regen back per second,
-up to max_energy. Firing both at once empties it faster. Once it's empty, the weapons only fire as fast as it comes
+up to max_energy. Once it's empty, the weapons only fire as fast as it comes
 back – a shot goes off as soon as there's enough for it. Abilities don't use energy, only their cooldown.
 
 Hull: armor takes a flat amount off every hit (absorb()), invulnerable_time is how long it can't be hit again after one,
@@ -44,6 +45,7 @@ class Ship(Entity):
         self.aim = pygame.Vector2(0, -1)                # direction the nose points in (length 1)
         self.speed = stats["speed"]
         self.weapons = [Gun(), None]
+        self.active_slot = 0                            # the weapon slot that fires
         self.max_energy = stats["max_energy"]
         self.energy_regen = stats["energy_regen"]       # per second
         self.energy = self.max_energy
@@ -128,10 +130,21 @@ class Ship(Entity):
         """Where shots come out (world coordinates)."""
         return pygame.Vector2(self.rect.center) + self.aim * self.size * 0.6
 
-    def fire(self, slot):
-        """Fires the weapon in slot (0 or 1) from the nose. Returns the new projectiles – empty if the slot is empty,
-        the weapon is still cooling down or there isn't enough energy for a shot."""
-        weapon = self.weapons[slot]
+    @property
+    def weapon(self):
+        """The weapon that fires: the one in active_slot – or the other one if that slot is empty."""
+        return self.weapons[self.active_slot] or self.weapons[1 - self.active_slot]
+
+    def switch_weapon(self):
+        """Makes the other weapon slot the one that fires – if there's a weapon in it."""
+        other = 1 - self.active_slot
+        if self.weapons[other]:
+            self.active_slot = other
+
+    def fire(self):
+        """Fires the active weapon (self.weapon) from the nose. Returns the new projectiles – empty if there's none,
+        it is still cooling down or there isn't enough energy for a shot."""
+        weapon = self.weapon
         if weapon is None or not weapon.ready or self.energy < weapon.energy_cost:
             return []
         self.energy -= weapon.energy_cost

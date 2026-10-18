@@ -16,7 +16,7 @@ from game import settings
 from game.cards import CARDS
 from game.cards.card import CATEGORY_COLORS, WeaponCard
 
-WEAPON_KEYS = ("LMB", "RMB")        # which mouse button fires which weapon slot
+WEAPON_KEYS = ("Slot 1", "Slot 2")  # one fires at a time (LMB), RMB switches
 PART_KEYS = {"Dash": settings.ABILITY_KEY_NAMES[0], "Rocket": settings.ABILITY_KEY_NAMES[1],
              "Watchtower": settings.BUILD_KEY_NAME}
 

@@ -36,6 +36,8 @@ ABILITY_KEYS = ((pygame.K_LSHIFT, pygame.K_RSHIFT), (pygame.K_SPACE,))
 ABILITY_KEY_NAMES = ("SHIFT", "SPACE")
 BUILD_KEYS = (pygame.K_b,)      # throws a watchtower (once unlocked in the skill tree)
 BUILD_KEY_NAME = "B"
+WEAPON_SWITCH_BUTTON = 3        # right mouse button (event.button): switches the weapon that fires (the mouse wheel
+WEAPON_SWITCH_KEY_NAME = "RMB"  # does, too) – no cooldown
 
 # key display in the bottom right corner – shown at the start or not: a setting on the toolbox's Cube Game page
 # (profile.SETTINGS); F3 shows/hides it while playing

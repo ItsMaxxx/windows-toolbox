@@ -17,7 +17,7 @@ SHOWCASE_AIM = pygame.Vector2(1, -1).normalize()        # ship pointing up and t
 SLOT_GAP = 14
 SLOT_HEIGHT = 200                   # weapon slots …
 ABILITY_SLOT_HEIGHT = 170           # … and ability slots
-WEAPON_KEYS = ("LMB", "RMB")        # which mouse button fires which weapon slot
+WEAPON_KEYS = ("Slot 1", "Slot 2")  # one fires at a time (LMB), RMB switches
 SLOT_BORDER = (70, 70, 80)
 LINE = (50, 50, 58)
 

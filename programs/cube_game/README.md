@@ -603,3 +603,10 @@ Notizen / offene Fragen:
     meist 110–150. A1–B3 wie vorher (neue Kampagnen bis B3 im Schnitt 29 Runs, wie vorher). Der Bot schafft ab B4
     kaum noch etwas, und in C streuen seine Zeiten stark (C3 zwischen 116 und 188 s bei kleinen Änderungen) – die
     C-Level müssen selbst angespielt werden.
+- 18.10.2026 (Claude, auf Wunsch gebaut): **Nur eine Waffe feuert.** Linksklick feuert die aktive Waffe
+  (`Ship.weapon`, `Ship.active_slot`), **Rechtsklick** oder das **Mausrad** wechselt ohne Abklingzeit
+  (`Ship.switch_weapon`, `settings.WEAPON_SWITCH_BUTTON`) – auch betäubt. Unten links steht über der Energie
+  „RMB  Gun  Cannon“ (aktive Waffe hell in ihrer Farbe), die Energie wird rot, wenn sie für einen Schuss der aktiven Waffe
+  nicht reicht. Die Tasten-Anzeige leuchtet bei der rechten Maustaste nur mit zwei Waffen. Slots heißen jetzt
+  „Slot 1“/„Slot 2“ statt LMB/RMB (Inventar, Loadout, Shop, Spielmenü); das Loadout zeigt die Energie je Waffe statt
+  „Firing both“. Jede Waffe behält ihre eigene Feuerrate, die auch läuft, während sie nicht aktiv ist.

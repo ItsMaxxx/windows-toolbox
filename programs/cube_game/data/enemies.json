@@ -9,13 +9,13 @@
   },
   "shooter": {
     "base_hp": 2, "speed": 95, "size": 20, "contact_damage": 25,
-    "shooting_distance": 100, "fire_range": 440, "fire_interval": 1.5, "turn_speed": 140, "fire_cone": 20,
+    "shooting_distance": 100, "fire_range": 340, "fire_interval": 1.5, "turn_speed": 140, "fire_cone": 20,
     "projectile_damage": 25, "projectile_speed": 360, "projectile_size": 10
   },
   "sniper": {
     "base_hp": 1, "speed": 80, "size": 22, "contact_damage": 25,
     "preferred_distance": 100, "back_off": 150, "close_in": 80,
-    "fire_range": 240, "aim_time": 1.2, "lock_time": 0.3, "reload_time": 2.2, "turn_speed": 70, "fire_cone": 30,
+    "fire_range": 300, "aim_time": 1.2, "lock_time": 0.3, "reload_time": 2.2, "turn_speed": 70, "fire_cone": 30,
     "projectile_damage": 50, "projectile_speed": 1400, "projectile_size": 6
   },
   "carrier": {

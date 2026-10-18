@@ -1,11 +1,11 @@
 {
   "watchtower": {
-    "lifetime": 10,
+    "lifetime": 15,
     "damage_bonus": 20,
     "size": 24,
     "vision": 320,
     "throw_range": 420,
-    "throw_time": 0.5,
+    "throw_time": 0.8,
     "lure_range": 220
   }
 }

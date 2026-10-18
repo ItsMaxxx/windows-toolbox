@@ -1,8 +1,9 @@
 """
-The "Loadout" tab of the game menu: which weapon goes into which weapon slot (left / right mouse button).
+The "Loadout" tab of the game menu: which weapon goes into which weapon slot (in a run only one fires at a time –
+the left mouse button – and the right one switches).
 
 Left: every weapon as a card – locked ones (not bought in the skill tree yet) greyed out. Right: the two slots with
-the full values of what's in them (with the skill tree's upgrades) and what firing both at once costs in energy.
+the full values of what's in them (with the skill tree's upgrades) and what firing each of them costs in energy.
 
 Drag a weapon card onto a slot to put it there (if it's already in the other slot, the two swap). Drag a weapon from
 one slot onto the other to swap them, or off the slots to empty its slot. A plain click on a card puts it into the
@@ -24,7 +25,7 @@ CARD_COLUMNS = 2
 SLOTS_LEFT = 480                    # the slots start this far right of the tab's left edge
 SLOT_SIZE = (228, 230)
 SLOT_GAP = 16
-SLOT_KEYS = ("LMB", "RMB")
+SLOT_KEYS = ("Slot 1", "Slot 2")
 DRAG_START = 5                      # pixels the mouse has to move before a press becomes a drag
 
 FILL = (24, 24, 30)
@@ -205,20 +206,24 @@ class LoadoutPanel:
         self.draw_rows(surface, weapon.stat_lines(), rect.left + 14, rect.right - 14, rect.top + 50)
 
     def draw_energy(self, surface, ship, top):
-        """The ship's energy, and what firing everything in the slots at once costs per second."""
+        """The ship's energy, what firing each weapon in the slots costs per second (only one fires at a time) and how
+        long the hungriest one can fire non-stop."""
         left = self.rect.left + SLOTS_LEFT
         right = self.slot_rects()[-1].right
         weapons = [weapon for weapon in ship.weapons if weapon]
-        use = sum(weapon.energy_cost * weapon.fire_rate for weapon in weapons)
-        rows = [("Energy", f"{ship.max_energy:g}"), ("Energy regen", f"{ship.energy_regen:g}/s"),
-                ("Firing " + ("both" if len(weapons) > 1 else "it"), f"{use:.3g} energy/s")]
+        rows = [("Energy", f"{ship.max_energy:g}"), ("Energy regen", f"{ship.energy_regen:g}/s")]
+        rows += [(f"Firing the {weapon.name}", f"{weapon.energy_cost * weapon.fire_rate:.3g} energy/s")
+                 for weapon in weapons]
         self.draw_rows(surface, rows, left, right, top, size=22, step=27)
+        hungriest = max(weapons, key=lambda weapon: weapon.energy_cost * weapon.fire_rate)
+        use = hungriest.energy_cost * hungriest.fire_rate
         if use > ship.energy_regen:
             seconds = ship.max_energy / (use - ship.energy_regen)
-            text = f"full energy lasts {seconds:.0f} s of non-stop fire, then it fires slower"
+            weapon = f" with the {hungriest.name}" if len(weapons) > 1 else ""
+            text = f"full energy lasts {seconds:.0f} s of non-stop fire{weapon}, then it fires slower"
         else:
             text = "the energy keeps up with non-stop fire"
-        draw_text(surface, text, 19, settings.TEXT_MUTED, topleft=(left, top + 3 * 27 + 4))
+        draw_text(surface, text, 19, settings.TEXT_MUTED, topleft=(left, top + len(rows) * 27 + 4))
 
     def draw_details(self, surface, key):
         """The values of the weapon under the mouse (or being dragged), below the cards."""

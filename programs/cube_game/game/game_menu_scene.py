@@ -285,8 +285,8 @@ class GameMenuScene(Scene):
         width, height = skill_tree.start_arena_size(profile, difficulty)
         best = profile.best_times.get(profile.difficulty)
         rows = [
-            ("LMB", ship.weapons[0].name if ship.weapons[0] else "empty"),
-            ("RMB", ship.weapons[1].name if ship.weapons[1] else "empty"),
+            ("Weapon 1", ship.weapons[0].name if ship.weapons[0] else "empty"),
+            ("Weapon 2", ship.weapons[1].name if ship.weapons[1] else "empty"),
             ("Energy", f"{ship.max_energy:g}  ·  +{ship.energy_regen:g}/s"),
             ("Armor", f"{ship.armor:g} px  ·  {ship.invulnerable_time:g} s"),
             (settings.ABILITY_KEY_NAMES[0], (dash.name + (f" ×{dash.max_charges}" if dash.max_charges > 1 else ""))
@@ -346,8 +346,8 @@ class GameMenuScene(Scene):
                                    "goes on after the goal", 20, settings.TEXT, alpha=settings.HINT_ALPHA * 2,
                           midtop=(center, INFO_TOP + 12))
         elif self.tab == "loadout":
-            draw_text(surface, "drag a weapon onto a slot  ·  drag it off its slot to empty it  ·  both weapons share "
-                               "the energy", 20, settings.TEXT, alpha=settings.HINT_ALPHA * 2,
+            draw_text(surface, "drag a weapon onto a slot  ·  drag it off its slot to empty it  ·  one fires at a time (LMB), "
+                               "RMB switches  ·  both share the energy", 20, settings.TEXT, alpha=settings.HINT_ALPHA * 2,
                       midtop=(center, INFO_TOP + 12))
         elif self.tab == "cards":
             limit = self.profile.max_active_cards()

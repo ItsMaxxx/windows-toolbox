@@ -2,7 +2,8 @@
 Bottom left in the game: the ability slots with their key, e.g. "SHIFT  Dash". Bright when ready, faded with the
 seconds left while cooling down. An ability with several charges shows how many it has, e.g. "SHIFT  Dash  1/2  0.8s"
 (bright while at least one is there, the seconds until the next one while one is missing). Above them the energy bar (shared by both weapons) – it turns red while there isn't
-enough energy for a shot of any weapon.
+enough energy for a shot of the active weapon. Above that the weapons, e.g. "RMB  Gun  Cannon": the one that fires
+bright in its colour, the other one faded.
 """
 
 import pygame
@@ -31,18 +32,30 @@ class AbilityBar:
                 text += f"  {ability.cooldown:.1f}s"
             draw_text(surface, text, 22, settings.TEXT, alpha=READY_ALPHA if ability.ready else settings.HINT_ALPHA,
                       topleft=(10, y))
-        self.draw_energy(surface, ship, bottom - len(slots) * LINE_HEIGHT - 8)
+        label = self.draw_energy(surface, ship, bottom - len(slots) * LINE_HEIGHT - 8)
+        self.draw_weapons(surface, ship, label.top - 6)
 
     @staticmethod
     def draw_energy(surface, ship, bottom):
         width, height = ENERGY_BAR
         bar = pygame.Rect(10, bottom - height, width, height)
-        costs = [weapon.energy_cost for weapon in ship.weapons if weapon]
-        color = EMPTY_COLOR if costs and ship.energy < min(costs) else ENERGY_COLOR
+        color = EMPTY_COLOR if ship.weapon and ship.energy < ship.weapon.energy_cost else ENERGY_COLOR
         pygame.draw.rect(surface, BAR_BACKGROUND, bar, border_radius=3)
         filled = bar.copy()
         filled.width = round(width * ship.energy / ship.max_energy) if ship.max_energy else 0
         if filled.width:
             pygame.draw.rect(surface, color, filled, border_radius=3)
-        draw_text(surface, f"ENERGY  {ship.energy:.0f}", 20, settings.TEXT, alpha=READY_ALPHA,
-                  bottomleft=(bar.left, bar.top - 3))
+        return draw_text(surface, f"ENERGY  {ship.energy:.0f}", 20, settings.TEXT, alpha=READY_ALPHA,
+                         bottomleft=(bar.left, bar.top - 3))
+
+    @staticmethod
+    def draw_weapons(surface, ship, bottom):
+        weapons = [weapon for weapon in ship.weapons if weapon]
+        x = 10
+        if len(weapons) > 1:
+            x = draw_text(surface, settings.WEAPON_SWITCH_KEY_NAME, 22, settings.TEXT, alpha=READY_ALPHA,
+                          bottomleft=(x, bottom)).right + 10
+        for weapon in weapons:
+            active = weapon is ship.weapon
+            x = draw_text(surface, weapon.name, 22, weapon.color if active else settings.TEXT,
+                          alpha=255 if active else settings.HINT_ALPHA, bottomleft=(x, bottom)).right + 12

@@ -26,6 +26,7 @@
     { "from": 165, "every": 135, "enemy_stats": { "all": { "contact_damage": "x1.2", "projectile_damage": "x1.2", "blast_damage": "x1.2" } }, "announce": "Enemies hit harder!" },
     { "from": 180, "to": 210, "weights": { "shooter": "x2", "sniper": "x1.5" }, "spawn": { "sniper": 3, "shooter": 2 }, "spawn_interval": "x0.65", "announce": "Final wave!" },
     { "from": 195, "to": 210, "spawn": { "shooter": 3, "sniper": 2 }, "spawn_interval": "x0.8", "announce": "Hold on!" },
+    { "from": 300, "every": 40, "enemy_stats": { "all": { "base_hp": "+1" } }, "announce": "Enemies +1 HP" },
     { "from": 320, "spawn_interval": "x0.75" },
     { "from": 240, "to": 260, "every": 45, "spawn_interval": "x0.8", "one_of": [
       { "weights": { "sniper": "x3" }, "spawn": { "sniper": 3 }, "announce": "Snipers incoming!" },

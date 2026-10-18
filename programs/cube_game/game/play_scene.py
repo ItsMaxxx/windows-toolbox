@@ -79,7 +79,8 @@ SEPARATION_PASSES = (2, 8)      # how often per tick touching enemies are pushed
 SEPARATION_BUDGET = 4000        # … as often as fits into this many pair checks – huge crowds get fewer passes
 ENEMY_GAP = 3                   # pixels between touching enemies, so a crowd doesn't look like one big block
 SEPARATION_REACH = 6            # pairs further apart than gap + this are skipped for the rest of the tick
-WEAPON_BUTTONS = (0, 2)         # weapon slot 1: left mouse button, slot 2: right mouse button (index in get_pressed)
+FIRE_BUTTON = 0                 # the left mouse button fires the active weapon (index in get_pressed) …
+SWITCH_BUTTON = 2               # … the right one switches weapons (settings.WEAPON_SWITCH_BUTTON, shown lit)
 
 # W on top, A S D below – like on the keyboard
 MOVEMENT_KEYS = [("W", pygame.K_w, 1, 0), ("A", pygame.K_a, 0, 1), ("S", pygame.K_s, 1, 1), ("D", pygame.K_d, 2, 1)]
@@ -141,7 +142,7 @@ class PlayScene(Scene):
         self.shop = Shop(self.ship)
         self.shop_panel = ShopPanel(self.shop)
         self.key_overlay = KeyOverlay(key_layout(self.ship), settings.KEY_OVERLAY_INSET,
-                                      profile.settings["key_display"], mouse_buttons=WEAPON_BUTTONS)
+                                      profile.settings["key_display"], mouse_buttons=(FIRE_BUTTON, SWITCH_BUTTON) if all(self.ship.weapons) else (FIRE_BUTTON,))
         self.pause_menu = PauseMenu(resume=self.resume, game_menu=self.to_game_menu, quit_game=self.quit)
         self.inventory = Inventory()
         self.state = PLAYING
@@ -202,6 +203,9 @@ class PlayScene(Scene):
             self.set_state(SHOP if self.state == PLAYING else PLAYING)
         elif event.type == pygame.WINDOWFOCUSLOST and self.state == PLAYING:
             self.set_state(PAUSED)
+        elif self.state == PLAYING and (event.type == pygame.MOUSEWHEEL or event.type == pygame.MOUSEBUTTONDOWN
+                                        and event.button == settings.WEAPON_SWITCH_BUTTON):
+            self.ship.switch_weapon()                   # also while stunned – it's no action
         elif event.type == pygame.KEYDOWN and self.state == PLAYING and self.ship.stunned:
             pass                                        # stunned: no abilities, no towers
         elif event.type == pygame.KEYDOWN and self.state == PLAYING:
@@ -234,10 +238,8 @@ class PlayScene(Scene):
             self.game_over()
             return
 
-        buttons = pygame.mouse.get_pressed()
-        for slot, button in enumerate(WEAPON_BUTTONS):
-            if buttons[button] and not self.ship.stunned:
-                self.projectiles += self.ship.fire(slot)
+        if pygame.mouse.get_pressed()[FIRE_BUTTON] and not self.ship.stunned:
+            self.projectiles += self.ship.fire()
 
         self.roster.update(dt)
         field = self.field()
